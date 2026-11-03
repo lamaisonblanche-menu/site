@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="logo.png">
+<style>[hidden]{display:none!important}html,body{margin:0;padding:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<meta property="og:title" content="La Maison Blanche, restaurant à Hydra">
+<meta property="og:description" content="Brunch, cuisine gastronomique et asiatique. Menu en ligne et réservation.">
+<meta property="og:image" content="https://lamaisonblanchehydra.com/photos/saumon-orange.jpg">
+<title>Restaurant La Maison Blanche Hydra | Brunch, gastronomique, terrasse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="La Maison Blanche, restaurant à Hydra (Alger) : brunch, carte gastronomique, cuisine asiatique. Menu en ligne et réservation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@300;400;500&display=swap">
+<style>
+/* Layout: a white house with black ink. White rooms, generous space, photos at their natural framing.
+   Black is kept for three moments only: the band under the hero, the signature dishes, the booking + footer. */
+:root {
+  --ink: #111111;
+  --paper: #ffffff;
+  --stone: #f3f2ef;
+  --muted: #6d6d6d;
+  --line: #e4e3df;
+  --f-display: "Marcellus", "Optima", "Candara", Georgia, serif;
+  --f-body: "Jost", "Futura", "Avenir Next", "Segoe UI", sans-serif;
+  --fg: var(--ink); --bg: var(--paper);
+  color-scheme: light;
+}
+.dark { --fg: #ffffff; --bg: #0e0e0e; --muted: #9c9c9c; --line: #2d2d2d; background: var(--bg); color: var(--fg); color-scheme: dark; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 76px); background: var(--paper); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-weight: 300; font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 40; background: var(--paper); }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 400; margin: 0; text-wrap: balance; letter-spacing: .01em; line-height: 1.15; }
+p { margin: 0; }
+img { display: block; max-width: 100%; }
+figure { margin: 0; }
+.label { font-size: 11px; font-weight: 500; letter-spacing: .32em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 30px; font: 500 12px/1 var(--f-body); letter-spacing: .24em; text-transform: uppercase; text-decoration: none; cursor: pointer; border: 1px solid var(--fg); background: transparent; color: var(--fg); transition: background .25s, color .25s; }
+.btn-solid { background: var(--fg); color: var(--bg); }
+.btn-solid:hover { background: transparent; color: var(--fg); }
+.btn-line:hover { background: var(--fg); color: var(--bg); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; }
+
+/* Header */
+.site-header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 74px; }
+.brand { display: flex; align-items: center; color: var(--ink); text-decoration: none; }
+.brand img { height: 48px; width: auto; }
+.site-nav { display: flex; align-items: center; gap: 34px; }
+.site-nav a { color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 400; letter-spacing: .26em; text-transform: uppercase; }
+.site-nav a:not(.btn):hover { text-decoration: underline; text-underline-offset: 7px; text-decoration-thickness: 1px; }
+.site-nav .btn { min-height: 42px; padding: 0 22px; }
+.site-nav a.btn-solid { color: var(--paper); }
+.site-nav a.btn-solid:hover { color: var(--ink); }
+.burger { display: none; background: none; border: 0; color: var(--ink); width: 44px; height: 44px; cursor: pointer; padding: 0; }
+.burger span { display: block; width: 24px; height: 1px; background: currentColor; margin: 7px auto; }
+@media (max-width: 900px) {
+  .burger { display: block; }
+  .site-nav { display: none; position: absolute; left: 0; right: 0; top: 100%; background: var(--paper); flex-direction: column; align-items: stretch; gap: 0; padding: 4px max(24px, env(safe-area-inset-right, 0px)) 24px max(24px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
+  .site-nav.open { display: flex; }
+  .site-nav a:not(.btn) { padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .site-nav .btn { margin-top: 18px; min-height: 50px; }
+}
+
+/* Hero: the logo alone, centered */
+.hero { padding-block: 88px 96px; }
+.hero .wrap { display: grid; justify-items: center; text-align: center; }
+.hero h1 { margin-top: 36px; }
+.hero-logo { width: min(400px, 74vw); height: auto; }
+.hero .tag { font-size: 19px; color: var(--muted); margin-top: 36px; max-width: 40ch; }
+.hero .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 40px; }
+.hero .hours { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 64px; margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--line); font-size: 15px; min-width: min(640px, 100%); }
+.hero .hours b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 21px; }
+@media (max-width: 640px) { .hero { padding-block: 56px 64px; } .hero .hours { gap: 18px 36px; } }
+
+/* Black band */
+.band { padding-block: 22px; }
+.band ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 44px; font-family: var(--f-display); font-size: 17px; letter-spacing: .12em; text-transform: uppercase; }
+.band ul { gap: 8px 0; }
+.band li { display: inline-flex; align-items: center; }
+.band li + li::before { content: ""; display: inline-block; width: 5px; height: 5px; background: currentColor; transform: rotate(45deg); margin: 0 26px; }
+@media (max-width: 640px) { .band ul { font-size: 13px; } .band li + li::before { margin: 0 14px; } }
+
+/* Sections */
+section.room { padding-block: 112px; }
+@media (max-width: 640px) { section.room { padding-block: 72px; } }
+.room.stone { background: var(--stone); }
+.head { display: grid; gap: 16px; margin-bottom: 56px; }
+.head.center { text-align: center; justify-items: center; }
+.head h2 { font-size: clamp(34px, 5vw, 58px); line-height: 1.06; }
+.head p.sub { max-width: 52ch; color: var(--muted); }
+
+/* La maison */
+.statement { font-family: var(--f-display); font-size: clamp(26px, 3.4vw, 40px); line-height: 1.3; text-align: center; max-width: 30ch; margin: 0 auto; }
+.intro-text { max-width: 60ch; margin: 28px auto 0; text-align: center; color: var(--muted); display: grid; gap: 14px; }
+
+
+/* Espaces: three columns, text only */
+.spaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ink); }
+.space { display: grid; gap: 18px; align-content: start; padding: 44px 40px 8px; }
+.space:first-child { padding-left: 0; }
+.space:last-child { padding-right: 0; }
+.space + .space { border-left: 1px solid #d6d5d0; }
+.space h3 { font-size: clamp(28px, 3vw, 38px); }
+.space p { color: var(--muted); }
+.space dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; margin: 8px 0 0; padding-top: 20px; border-top: 1px solid #d6d5d0; font-size: 15px; }
+.space dt { color: var(--muted); }
+.space dd { margin: 0; font-weight: 400; }
+.space .btn { justify-self: start; margin-top: 10px; }
+@media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-left: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
+
+/* Signatures */
+.sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
+.sig { display: grid; gap: 16px; }
+.sig img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.sig .meta { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.sig h3 { font-size: 22px; }
+.sig .cat { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); }
+.sig .p { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 16px; }
+@media (max-width: 860px) { .sig-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 14px; } .sig h3 { font-size: 18px; } .sig .meta { flex-direction: column; gap: 4px; } }
+
+/* Menu */
+.menu-tabs { display: flex; justify-content: center; gap: 4px 36px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 64px; }
+.menu-tabs button { background: none; border: 0; border-bottom: 1px solid transparent; margin-bottom: -1px; padding: 16px 2px; color: var(--muted); font: 500 12px var(--f-body); letter-spacing: .26em; text-transform: uppercase; cursor: pointer; }
+.menu-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+@media (max-width: 640px) { .menu-tabs { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; gap: 24px; } .menu-tabs button { flex: none; } }
+.menu-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px 96px; max-width: 1040px; margin: 0 auto; }
+@media (max-width: 760px) { .menu-panel { grid-template-columns: 1fr; gap: 52px; } }
+.course h3 { font-size: 26px; margin-bottom: 26px; }
+.course ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.dish { display: flex; align-items: center; gap: 16px; }
+.dish .thumb { flex: none; width: 64px; height: 64px; object-fit: cover; }
+.dish .line { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.dish .n { min-width: 0; font-weight: 400; }
+.dish .n small { display: block; color: var(--muted); font-size: 14px; font-weight: 300; }
+.dish .dots { flex: 1 1 16px; border-bottom: 1px dotted #c4c3bf; transform: translateY(-5px); min-width: 16px; }
+.dish .p { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 400; }
+.photo-dishes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 40px 26px; }
+.photo-dishes figure { display: grid; gap: 12px; text-align: center; }
+.photo-dishes img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; }
+.photo-dishes figcaption { font-size: 15px; font-weight: 400; }
+.photo-dishes figcaption b { display: block; font-weight: 300; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--muted); }
+.menu-note { margin-top: 64px; text-align: center; color: var(--muted); font-size: 14px; }
+
+/* Booking */
+.booking { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 80px; align-items: start; }
+@media (max-width: 900px) { .booking { grid-template-columns: 1fr; gap: 40px; } }
+.steps { list-style: none; margin: 36px 0 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
+.steps li { display: grid; grid-template-columns: 40px 1fr; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.steps li span { font-family: var(--f-display); font-size: 20px; }
+.note { margin-top: 26px; font-size: 14px; color: var(--muted); }
+form.resa, .confirm { border: 1px solid var(--line); padding: 40px; }
+@media (max-width: 520px) { form.resa, .confirm { padding: 26px 18px; } }
+form.resa { display: grid; gap: 26px; }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+.field { display: grid; gap: 8px; min-width: 0; }
+.field > label, .field legend { font-size: 11px; font-weight: 500; letter-spacing: .26em; text-transform: uppercase; }
+.field .hint { font-size: 13px; color: var(--muted); letter-spacing: 0; text-transform: none; font-weight: 300; }
+input, select, textarea { width: 100%; min-height: 48px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--muted); border-radius: 0; background: transparent; color: var(--fg); font: 300 17px var(--f-body); }
+input:focus, select:focus, textarea:focus { border-bottom-color: var(--fg); }
+select option { color: #111; background: #fff; }
+textarea { min-height: 80px; resize: vertical; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 6px; border: 1px solid var(--muted); }
+.choices label { position: relative; display: grid; gap: 2px; padding: 16px 10px; cursor: pointer; text-align: center; font-size: 14px; font-weight: 400; letter-spacing: .06em; }
+.choices label + label { border-left: 1px solid var(--muted); }
+.choices label small { font-size: 12px; color: var(--muted); font-weight: 300; }
+.choices input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.choices label:has(input:checked) { background: var(--fg); color: var(--bg); }
+.choices label:has(input:checked) small { color: var(--bg); opacity: .7; }
+.choices label:has(input:focus-visible) { outline: 1px solid var(--fg); outline-offset: 3px; }
+@media (max-width: 520px) { .choices { grid-template-columns: 1fr; } .choices label + label { border-left: 0; border-top: 1px solid var(--muted); } }
+.alert { padding: 12px 14px; border: 1px solid var(--line); font-size: 14px; }
+.error { color: #f08a80; font-size: 14px; }
+.confirm { display: grid; gap: 18px; }
+.confirm h3 { font-size: 32px; }
+.recap { display: grid; grid-template-columns: auto 1fr; gap: 8px 22px; margin: 0; padding-block: 18px; border-block: 1px solid var(--line); font-size: 15px; }
+.recap dt { color: var(--muted); }
+.recap dd { margin: 0; }
+.confirm .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Infos */
+.infos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; text-align: center; }
+.infos > div { display: grid; gap: 12px; align-content: start; justify-items: center; }
+.infos h3 { font-size: 26px; margin-bottom: 4px; }
+.infos table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.infos td { padding: 3px 12px; }
+.infos td:first-child { color: var(--muted); text-align: right; }
+.infos td:last-child { text-align: left; }
+.infos a { color: var(--ink); text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.copy { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0 0 0 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 860px) { .infos { grid-template-columns: 1fr; gap: 44px; } }
+
+footer.site { padding-block: 72px 56px; text-align: center; border-top: 1px solid var(--line); }
+footer.site img { width: 120px; margin: 0 auto; filter: invert(1); }
+footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); }
+</style>
+<link rel="canonical" href="https://lamaisonblanchehydra.com/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Restaurant","name":"Restaurant La Maison Blanche","alternateName":["La Maison Blanche Hydra","Maison Blanche Hydra"],
+"url":"https://lamaisonblanchehydra.com/","image":"https://lamaisonblanchehydra.com/photos/saumon-orange.jpg",
+"telephone":"+213541559672","email":"maisonblanchehydra@gmail.com","servesCuisine":["Brunch","Gastronomique","Asiatique"],
+"address":{"@type":"PostalAddress","streetAddress":"23 rue des Frères Ben Ali","addressLocality":"Hydra","addressRegion":"Alger","addressCountry":"DZ"},
+"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday"],"opens":"09:00","closes":"23:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Friday","opens":"16:00","closes":"23:00"}],
+"acceptsReservations":"True","hasMenu":"https://lamaisonblanchehydra.com/#menu"}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#accueil" aria-label="La Maison Blanche, accueil"><img src="logo.png" alt=""></a>
+    <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav"><span></span><span></span></button>
+    <nav class="site-nav" id="nav" aria-label="Navigation principale">
+      <a href="#maison">La maison</a>
+      <a href="#espaces">Espaces</a>
+      <a href="#signatures">Signatures</a>
+      <a href="#menu">Menu</a>
+      <a href="#infos">Infos</a>
+      <a class="btn btn-solid" href="#reserver">Réserver</a>
+    </nav>
+  </div>
+</header>
+
+<main id="accueil">
+  <section class="hero">
+    <div class="wrap">
+      <p class="label">Restaurant · Hydra, Alger</p>
+      <h1><img class="hero-logo" src="logo.png" alt="La Maison Blanche"></h1>
+      <p class="tag">Brunch, cuisine gastronomique et asiatique, avec des produits de saison.</p>
+      <div class="actions">
+        <a class="btn btn-solid" href="#reserver">Réserver une table</a>
+        <a class="btn btn-line" href="#menu">Découvrir le menu</a>
+      </div>
+      <div class="hours">
+        <span><span class="muted">Samedi au jeudi</span><b>9 h – 23 h</b></span>
+        <span><span class="muted">Vendredi</span><b>16 h – 23 h</b></span>
+        <span><span class="muted">Brunch</span><b>Jusqu’à 18 h</b></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="band dark" aria-label="La Maison Blanche en bref">
+    <ul class="wrap"><li>Brunch</li><li>Gastronomie</li><li>Cuisine asiatique</li><li>Produits de saison</li><li>Bar sans alcool</li></ul>
+  </div>
+
+  <section class="room" id="maison">
+    <div class="wrap">
+      <p class="label" style="text-align:center;margin-bottom:22px">La maison</p>
+      <p class="statement">Du premier café du matin au dernier dessert du soir, une seule maison au cœur d’Hydra.</p>
+      <div class="intro-text">
+        <p>Une salle brunch lumineuse, un espace gastronomique et une terrasse entourée de verdure, rue des Frères Ben Ali. En cuisine, des produits de saison ; au bar, des cocktails maison sans alcool.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="room stone" id="espaces">
+    <div class="wrap">
+      <div class="head center">
+        <p class="label">Nos espaces</p>
+        <h2>Trois ambiances</h2>
+        <p class="sub">Choisissez votre espace au moment de réserver.</p>
+      </div>
+      <div class="spaces">
+        <article class="space">
+                      <p class="label">Jusqu’à 18 h</p>
+            <h3>Salle brunch</h3>
+            <p>Œufs, toasts, brioches perdues, pancakes et cocktails maison. Une salle lumineuse pour un brunch entre amis ou en famille.</p>
+            <dl><dt>Réservation</dt><dd>9 h – 17 h</dd><dt>Vendredi</dt><dd>16 h – 17 h</dd></dl>
+            <a class="btn btn-line" href="#reserver">Réserver au brunch</a>
+        </article>
+        <article class="space">
+                      <p class="label">Toute la journée</p>
+            <h3>Espace gastronomique</h3>
+            <p>Nappes blanches, moulures et appliques dorées. Foie gras, cœur de filet de bœuf, poissons et pâtes, dans un cadre feutré.</p>
+            <dl><dt>Réservation</dt><dd>9 h – 22 h</dd><dt>Vendredi</dt><dd>16 h – 22 h</dd></dl>
+            <a class="btn btn-line" href="#reserver">Réserver en salle</a>
+        </article>
+        <article class="space">
+                      <p class="label">Toute la journée</p>
+            <h3>Terrasse</h3>
+            <p>Le plus grand espace de la maison, avec ses banquettes et sa verdure, du déjeuner au dîner.</p>
+            <dl><dt>Réservation</dt><dd>9 h – 22 h</dd><dt>Vendredi</dt><dd>16 h – 22 h</dd></dl>
+            <a class="btn btn-line" href="#reserver">Réserver en terrasse</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="room dark" id="signatures">
+    <div class="wrap">
+      <div class="head center">
+        <p class="label">Nos signatures</p>
+        <h2>Les assiettes de la maison</h2>
+      </div>
+      <div class="sig-grid">
+        <article class="sig"><img src="photos/saumon-orange.jpg" alt="Saumon à l’orange" loading="lazy" style="object-position:50% 50%"><div class="meta"><div><p class="cat">Poisson</p><h3>Saumon à l’orange</h3></div><span class="p">4 500 DA</span></div></article>
+        <article class="sig"><img src="photos/carpaccio-burrata.jpg" alt="Carpaccio de bœuf" loading="lazy" style="object-position:50% 72%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Carpaccio de bœuf</h3></div><span class="p">2 500 DA</span></div></article>
+        <article class="sig"><img src="photos/gambas-tempura.jpg" alt="Gambas tempura" loading="lazy" style="object-position:50% 62%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Gambas tempura</h3></div><span class="p">3 200 DA</span></div></article>
+        <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Escargots de Bourgogne</h3></div><span class="p">2 300 DA</span></div></article>
+        <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat">Brunch</p><h3>Club sandwich saumon fumé</h3></div><span class="p">2 700 DA</span></div></article>
+        <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 000 DA</span></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="room" id="menu">
+    <div class="wrap">
+      <div class="head center">
+        <p class="label">Le menu</p>
+        <h2>Notre carte</h2>
+        <p class="sub">Prix en dinars algériens (DA).</p>
+      </div>
+      <div class="menu-tabs" role="tablist" aria-label="Cartes" id="menu-tabs"></div>
+      <div class="menu-panel" id="menu-panel" role="tabpanel"></div>
+      <p class="menu-note">La carte peut évoluer selon les saisons et les arrivages.</p>
+    </div>
+  </section>
+
+
+  <section class="room dark" id="reserver">
+    <div class="wrap booking">
+      <div>
+        <div class="head" style="margin-bottom:0">
+          <p class="label">Réservation</p>
+          <h2>Réserver une table</h2>
+          <p class="sub">Envoyez votre demande en une minute. Notre équipe vous rappelle pour la confirmer.</p>
+        </div>
+        <ol class="steps">
+          <li><span>1</span><p>Vous choisissez l’espace, la date et l’heure, puis vous envoyez votre demande.</p></li>
+          <li><span>2</span><p>Notre équipe vous appelle pour confirmer votre table.</p></li>
+          <li><span>3</span><p>Votre table vous attend.</p></li>
+        </ol>
+        <p class="note">Réservation en ligne jusqu’à 8 personnes, au plus tard 2 heures à l’avance, et jusqu’à 1 heure avant la fermeture de l’espace. Pour un groupe ou une demande de dernière minute, appelez le +213 541 55 96 72.</p>
+      </div>
+      <div>
+        <form class="resa" id="resa" novalidate>
+          <fieldset class="field">
+            <legend>Espace</legend>
+            <div class="choices">
+              <label><input type="radio" name="espace" id="esp-brunch" value="brunch" checked><span>Salle brunch</span><small>9 h – 17 h</small></label>
+              <label><input type="radio" name="espace" id="esp-gastro" value="gastro"><span>Gastronomique</span><small>9 h – 22 h</small></label>
+              <label><input type="radio" name="espace" id="esp-terrasse" value="terrasse"><span>Terrasse</span><small>9 h – 22 h</small></label>
+            </div>
+          </fieldset>
+          <div class="row2">
+            <div class="field"><label for="date">Date</label><input type="date" id="date" name="date" required></div>
+            <div class="field"><label for="heure">Heure</label><select id="heure" name="heure" required></select></div>
+          </div>
+          <div class="field">
+            <label for="personnes">Nombre de personnes</label>
+            <select id="personnes" name="personnes" required></select>
+            <p class="alert" id="groupe" hidden>Pour plus de 8 personnes, appelez-nous directement au <b>+213 541 55 96 72</b>.</p>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="nom">Nom et prénom</label><input type="text" id="nom" name="nom" autocomplete="name" required></div>
+            <div class="field"><label for="tel">Téléphone</label><input type="tel" id="tel" name="tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="email">E-mail <span class="hint">(facultatif)</span></label><input type="email" id="email" name="email" autocomplete="email"></div>
+            <div class="field"><label for="occasion">Occasion <span class="hint">(facultatif)</span></label>
+              <select id="occasion" name="occasion"><option value="">Aucune</option><option>Anniversaire</option><option>Repas d’affaires</option><option>Rendez-vous en couple</option><option>Repas en famille</option><option>Autre</option></select></div>
+          </div>
+          <div class="field"><label for="remarque">Remarque <span class="hint">(facultatif)</span></label><textarea id="remarque" name="remarque" placeholder="Chaise bébé, allergie, table près de la fenêtre…"></textarea></div>
+          <p class="error" id="err" role="alert" hidden></p>
+          <button class="btn btn-solid" type="submit" id="send">Continuer</button>
+        </form>
+
+        <div class="confirm" id="ok" hidden tabindex="-1">
+          <p class="label" id="ok-label">Demande envoyée</p>
+          <h3 id="ok-title">Merci, votre demande est bien reçue</h3>
+          <p id="ok-text">Notre équipe vous appelle pour confirmer votre table.</p>
+          <dl class="recap" id="recap"></dl>
+          <p id="ok-wa" hidden>Pour aller plus vite, vous pouvez aussi l’envoyer sur WhatsApp.</p>
+          <div class="actions">
+            <a class="btn btn-solid" id="wa" href="https://wa.me/213541559672" target="_blank" rel="noopener">Envoyer sur WhatsApp</a>
+            <button class="btn btn-line" type="button" id="again">Nouvelle demande</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="room" id="infos">
+    <div class="wrap">
+      <div class="head center"><p class="label">Infos pratiques</p><h2>Nous rendre visite</h2></div>
+      <div class="infos">
+        <div>
+          <h3>Horaires</h3>
+          <table><tbody>
+            <tr><td>Samedi – jeudi</td><td>9 h – 23 h</td></tr>
+            <tr><td>Vendredi</td><td>16 h – 23 h</td></tr>
+            <tr><td>Brunch</td><td>jusqu’à 18 h</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <h3>Adresse</h3>
+          <p>23, rue des Frères Ben Ali<br>Hydra, Alger</p>
+          <p><a href="https://www.google.com/maps/search/?api=1&amp;query=La+Maison+Blanche+23+rue+des+Fr%C3%A8res+Ben+Ali+Hydra+Alger" target="_blank" rel="noopener">Voir sur Google Maps</a></p>
+        </div>
+        <div>
+          <h3>Contact</h3>
+          <p>+213 541 55 96 72<button class="copy" type="button" data-copy="+213541559672">Copier</button></p>
+          <p>maisonblanchehydra@gmail.com<button class="copy" type="button" data-copy="maisonblanchehydra@gmail.com">Copier</button></p>
+          <p><a href="https://wa.me/213541559672" target="_blank" rel="noopener">Écrire sur WhatsApp</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site dark">
+  <div class="wrap">
+    <img src="logo.png" alt="La Maison Blanche">
+    <p>23, rue des Frères Ben Ali · Hydra · Alger</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var b = document.getElementById("burger"), n = document.getElementById("nav");
+  b.addEventListener("click", function () { var o = n.classList.toggle("open"); b.setAttribute("aria-expanded", o ? "true" : "false"); b.setAttribute("aria-label", o ? "Fermer le menu" : "Ouvrir le menu"); });
+  n.addEventListener("click", function (e) { if (e.target.tagName === "A") { n.classList.remove("open"); b.setAttribute("aria-expanded", "false"); } });
+})();
+</script>
+<script>
+(function () {
+  /* ---------- Réglages ---------- */
+  var CONFIG = {
+    endpoint: "https://api.web3forms.com/submit",                 /* service qui envoie chaque demande par e-mail (Web3Forms) */
+    cle: "1e505bf1-b6e3-4e34-bb9c-05aa89d567cf",                      /* clé d'accès Web3Forms liée à maisonblanchehydra@gmail.com */
+    whatsapp: "213541559672",
+    maxPers: 8,
+    delaiMinH: 2,
+    joursMax: 60,
+    pas: 30,
+    espaces: {
+      brunch:   { nom: "Salle brunch",          debut: "09:00", fin: "17:00", debutVendredi: "16:00" },
+      gastro:   { nom: "Espace gastronomique",  debut: "09:00", fin: "22:00", debutVendredi: "16:00" },
+      terrasse: { nom: "Terrasse",              debut: "09:00", fin: "22:00", debutVendredi: "16:00" }
+    }
+  };
+
+  /* ---------- Menu ---------- */
+  var MENU = [
+    { id: "brunch", nom: "Brunch", sections: [
+      { t: "Pour bien commencer la journée", items: [["Œuf à la turque", 1500], ["Œuf Benedict", 2000, "Frites allumettes"]] },
+      { t: "Classiques du brunch", items: [["Toast avocat saumon", 2600], ["Club sandwich saumon fumé", 2700, "Frites allumettes"], ["Club sandwich poulet fumé", 2200, "Frites allumettes"], ["Croissant croque-monsieur", 2000, "Poulet fumé artisanal, cheese"], ["Long toast tunacado", 2500, "Crémeux de thon et avocat, carottes frites"]] },
+      { t: "Autres envies", items: [["Salade César", 1600], ["Crêpe salée poulet, épinard", 1500], ["Sandwich La Maison Blanche", 2300, "Émincé de bœuf, oignons caramélisés, champignons"], ["Sandwich salade César", 1700, "Poulet crispy et sauce César"], ["Le Burger bœuf", 2000, "Crème fromagère aux champignons, frites allumettes"], ["Le Burger poulet crispy", 1800, "Crème fromagère aux champignons, frites allumettes"]] }
+    ]},
+    { id: "carte", nom: "À la carte", sections: [
+      { t: "Entrées froides", items: [["Carpaccio de bœuf", 2500], ["Burrata sur un carpaccio de tomates, sauce pesto", 2000], ["Salade grecque", 2200], ["Salade de quinoa gourmande aux crustacés", 2800], ["Médaillon de foie gras", 3300]] },
+      { t: "Entrées chaudes", items: [["Soupe du jour", 1800], ["Soupe aux fruits de mer", 2400], ["Assortiment de boureks × 2", 800], ["Escargots de Bourgogne", 2300], ["Tarte aux crevettes", 2700], ["Noix de Saint-Jacques à la compotée de pommes vertes", 3300], ["Duo de calamars et crevettes sautés à l’ail", 2800], ["Gambas tempura", 3200], ["Moules frites", 2100]] },
+      { t: "Viande", items: [["Cœur de filet de bœuf, sauce aux morilles", 4500], ["Côte de bœuf poêlée aux herbes", 9000, "Pour 2 personnes"], ["Méchoui d’agneau", 5000], ["Souris d’agneau confite au miel et marjolaine", 4500], ["Entrecôte sauce au poivre vert", 3200]] },
+      { t: "Volaille", items: [["Ballotine de poulet au saumon, sauce suisse", 3000], ["Magret de canard au cassis", 4500], ["La blanquette exotique de La Maison Blanche", 3000]] },
+      { t: "Poisson", items: [["Saumon à l’orange", 4500], ["Daurade aux crustacés", 3700], ["Loup de mer", 3700]] },
+      { t: "Pasta", items: [["Raviolis ricotta et épinards", 2600], ["Tagliatelles au saumon fumé", 2800], ["Tagliatelles poulet et champignons", 2400], ["Linguine alla scoglio", 4500], ["Spaghettis aux moules et pesto", 2800]] }
+    ]},
+    { id: "asie", nom: "Box & Asie", sections: [
+      { t: "Box", items: [["Duo signature × 24", 5400, "4 california, 4 crunchy, 6 maki, 5 dragon saumon, 5 futomaki"], ["Party box × 54", 14200, "8 california, 8 crunchy, 6 maki crispy, 10 futomaki, 6 maki avocat, 8 choix du chef, 8 creamy avocat"]] },
+      { t: "Plats", items: [["Poke bowl", 3200], ["Wok au poulet", 2400], ["Ramen gyoza", 2500], ["Ramen aux crevettes", 3200], ["Taco crispy", 3100], ["Mochis glacés × 2", 2000, "Pistache, framboise, mangue"]] }
+    ]},
+    { id: "desserts", nom: "Desserts", sections: [
+      { t: "Gâteaux et brioches", items: [["Cake fondant au caramel et crème vanille", 1500], ["Hot cookie", 1600], ["Brioche perdue tiramisu", 1500], ["Brioche perdue caramel beurre salé", 2000], ["New York roll meringué au citron", 1000], ["New York roll pistache", 1200], ["Matilda cake", 1000], ["Tiramisu", 1000], ["Meringue lemon cake", 1000]] },
+      { t: "Crêpes, gaufres et bowls", items: [["Crêpe Suzette et glace vanille", 1600], ["Crêpe Nutella ou pistache", 1500], ["Gaufre Nutella ou pistache", 1500], ["Pancake beurre et miel", 1000], ["Granola bowl", 1800, "Crumble pommes et beurre de cacahuète"]] }
+    ]},
+    { id: "boissons", nom: "Boissons", sections: [
+      { t: "Classiques", items: [["Eau minérale ou pétillante", 200], ["Soda", 250], ["Café", 400], ["Cappuccino", 500], ["Chocolat chaud", 700], ["Thé ou infusion", 400]] },
+      { t: "Nos cocktails sans alcool", items: [["Parfum des femmes", 650], ["Exotic passion", 750, "Fruit de la passion, coco"], ["Exotic mango", 750, "Mangue, pêche"], ["Exotic fruits rouges", 750, "Framboise, myrtille"], ["Mojito classique", 650], ["Mojito fraise", 750], ["Piña colada", 700], ["Ice tea pêche ou fruits des bois", 700], ["Cocktail Maison Blanche", 1000, "Vanille, fruit de la passion, ananas, coco"]] },
+      { t: "Jus detox", items: [["Ananas, pomme, menthe", 700], ["Orange, carotte, dattes", 800], ["Pomme, gingembre, coco", 800]] },
+      { t: "Jus nature et smoothies", items: [["Jus d’orange", 500], ["Jus de citron", 500], ["Jus de mangue", 900], ["Jus de fraise", 700], ["Smoothie pistachio kunafa", 1100], ["Smoothie peanut butter", 1100]] }
+    ]}
+  ];
+
+  var PHOTOS = {};
+  function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+  var tabs = document.getElementById("menu-tabs"), panel = document.getElementById("menu-panel");
+  function showMenu(id) {
+    Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.id === id ? "true" : "false"); });
+    panel.innerHTML = "";
+    var m = MENU.filter(function (x) { return x.id === id; })[0];
+    var sections = m.sections;
+    sections.forEach(function (s) {
+      var c = el("div", "course"); c.appendChild(el("h3", null, s.t));
+      var ul = el("ul");
+      s.items.forEach(function (it) {
+        var li = el("li", "dish"), line = el("span", "line"), n = el("span", "n", it[0]);
+        if (it[2]) n.appendChild(el("small", null, it[2]));
+        if (PHOTOS[it[0]]) { var th = el("img", "thumb"); th.src = "photos/" + PHOTOS[it[0]] + ".jpg"; th.alt = ""; th.loading = "lazy"; li.appendChild(th); }
+        line.appendChild(n); line.appendChild(el("span", "dots")); line.appendChild(el("span", "p", fmt(it[1])));
+        li.appendChild(line);
+        ul.appendChild(li);
+      });
+      c.appendChild(ul); panel.appendChild(c);
+    });
+  }
+  MENU.forEach(function (m, i) {
+    var b = el("button", null, m.nom); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id;
+    b.addEventListener("click", function () { showMenu(m.id); });
+    tabs.appendChild(b);
+  });
+  showMenu("brunch");
+
+  /* ---------- Réservation ---------- */
+  var form = document.getElementById("resa"), dateIn = document.getElementById("date"), heureIn = document.getElementById("heure");
+  var persIn = document.getElementById("personnes"), groupe = document.getElementById("groupe"), err = document.getElementById("err");
+  var send = document.getElementById("send"), ok = document.getElementById("ok");
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function toMin(hm) { var p = hm.split(":"); return +p[0] * 60 + +p[1]; }
+  function espace() { return form.querySelector("input[name=espace]:checked").value; }
+
+  var today = new Date(), maxD = new Date(); maxD.setDate(maxD.getDate() + CONFIG.joursMax);
+  dateIn.min = iso(today); dateIn.max = iso(maxD); dateIn.value = iso(today);
+
+  for (var i = 1; i <= CONFIG.maxPers; i++) { var o = el("option", null, i + (i > 1 ? " personnes" : " personne")); o.value = i; persIn.appendChild(o); }
+  var big = el("option", null, "Plus de " + CONFIG.maxPers + " personnes"); big.value = "plus"; persIn.appendChild(big);
+  persIn.value = "2";
+
+  function slots() {
+    var e = CONFIG.espaces[espace()], v = dateIn.value;
+    heureIn.innerHTML = "";
+    if (!v) return;
+    var d = new Date(v + "T00:00"), friday = d.getDay() === 5;
+    var start = toMin(friday ? e.debutVendredi : e.debut), end = toMin(e.fin);
+    var limit = new Date(Date.now() + CONFIG.delaiMinH * 3600000), count = 0;
+    for (var m = start; m <= end; m += CONFIG.pas) {
+      var t = new Date(d); t.setHours(Math.floor(m / 60), m % 60, 0, 0);
+      if (t < limit) continue;
+      var label = pad(Math.floor(m / 60)) + ":" + pad(m % 60), o = el("option", null, label.replace(":", " h ")); o.value = label;
+      heureIn.appendChild(o); count++;
+    }
+    if (!count) { var none = el("option", null, "Plus de créneau ce jour-là"); none.value = ""; heureIn.appendChild(none); }
+  }
+  form.addEventListener("change", function (ev) {
+    if (ev.target.name === "espace" || ev.target === dateIn) slots();
+    if (ev.target === persIn) { var g = persIn.value === "plus"; groupe.hidden = !g; send.disabled = g; }
+  });
+  slots();
+
+  send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    err.hidden = true;
+    var nom = form.nom.value.trim(), tel = form.tel.value.trim(), problem = "";
+    if (!heureIn.value) problem = "Choisissez une autre date : il n’y a plus de créneau disponible ce jour-là.";
+    else if (persIn.value === "plus") problem = "Pour plus de 8 personnes, appelez-nous au +213 541 55 96 72.";
+    else if (!nom) problem = "Indiquez votre nom et prénom.";
+    else if (tel.replace(/\D/g, "").length < 9) problem = "Indiquez un numéro de téléphone valide pour que nous puissions vous rappeler.";
+    else if (form.email.value && !form.email.checkValidity()) problem = "L’adresse e-mail n’est pas valide. Corrigez-la ou laissez le champ vide.";
+    if (problem) { err.textContent = problem; err.hidden = false; return; }
+
+    var e = CONFIG.espaces[espace()];
+    var data = {
+      espace: e.nom, date: dateIn.value, heure: heureIn.value, personnes: persIn.value,
+      nom: nom, telephone: tel, email: form.email.value.trim(), occasion: form.occasion.value, remarque: form.remarque.value.trim()
+    };
+    var dLabel = new Date(data.date + "T00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+
+    var heureTxt = data.heure.replace(":", " h ");
+    var rows = [["Espace", data.espace], ["Date", dLabel], ["Heure", heureTxt], ["Personnes", data.personnes], ["Nom", data.nom], ["Téléphone", data.telephone]];
+    var msg = "Bonjour, je souhaite réserver une table à La Maison Blanche.\n" +
+      "Espace : " + data.espace + "\nDate : " + dLabel + "\nHeure : " + heureTxt +
+      "\nPersonnes : " + data.personnes + "\nNom : " + data.nom + "\nTéléphone : " + data.telephone +
+      (data.occasion ? "\nOccasion : " + data.occasion : "") + (data.remarque ? "\nRemarque : " + data.remarque : "");
+    var waUrl = "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(msg);
+
+    /* sent = true : la demande est partie par e-mail ; false : le client doit l'envoyer sur WhatsApp */
+    function done(sent) {
+      var recap = document.getElementById("recap"); recap.innerHTML = "";
+      rows.forEach(function (r) { recap.appendChild(el("dt", null, r[0])); recap.appendChild(el("dd", null, r[1])); });
+      document.getElementById("wa").href = waUrl;
+      document.getElementById("ok-label").textContent = sent ? "Demande envoyée" : "Dernière étape";
+      document.getElementById("ok-title").textContent = sent ? "Merci, votre demande est bien reçue" : "Envoyez votre demande sur WhatsApp";
+      document.getElementById("ok-text").textContent = sent
+        ? "Notre équipe vous appelle pour confirmer votre table. Votre réservation n’est valable qu’après cette confirmation."
+        : "Votre demande est prête. Appuyez sur le bouton ci-dessous pour l’envoyer à notre équipe sur WhatsApp. Nous vous rappelons ensuite pour confirmer votre table.";
+      document.getElementById("ok-wa").hidden = !sent;
+      form.hidden = true; ok.hidden = false; ok.focus();
+      send.disabled = false; send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
+    }
+
+    if (!CONFIG.endpoint) { done(false); return; }
+
+    /* Envoi par e-mail via Web3Forms ; en cas d'échec, le client envoie sa demande sur WhatsApp */
+    send.disabled = true; send.textContent = "Envoi en cours…";
+    var payload = {
+      access_key: CONFIG.cle,
+      subject: "Réservation : " + dLabel + " à " + heureTxt + ", " + data.personnes + " pers., " + data.nom,
+      from_name: "Site La Maison Blanche",
+      "Espace": data.espace, "Date": dLabel, "Heure": heureTxt, "Personnes": data.personnes,
+      "Nom": data.nom, "Téléphone": data.telephone, "E-mail": data.email || "-", "Occasion": data.occasion || "-", "Remarque": data.remarque || "-"
+    };
+    if (data.email) payload.replyto = data.email;
+    var finished = false;
+    var timer = setTimeout(function () { if (!finished) { finished = true; done(false); } }, 15000);
+    fetch(CONFIG.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (finished) return; finished = true; clearTimeout(timer); done(!!(j && j.success)); })
+      .catch(function () { if (finished) return; finished = true; clearTimeout(timer); done(false); });
+  });
+
+  document.getElementById("again").addEventListener("click", function () { form.reset(); dateIn.value = iso(new Date()); persIn.value = "2"; groupe.hidden = true; send.disabled = false; slots(); ok.hidden = true; form.hidden = false; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".copy"), function (b) {
+    b.addEventListener("click", function () {
+      var v = b.dataset.copy, done = function () { b.textContent = "Copié"; setTimeout(function () { b.textContent = "Copier"; }, 1600); };
+      try { navigator.clipboard.writeText(v).then(done, done); } catch (e) { done(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>
