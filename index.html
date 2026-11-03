@@ -307,7 +307,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
         <article class="sig"><img src="photos/gambas-tempura.jpg" alt="Gambas tempura" loading="lazy" style="object-position:50% 62%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Gambas tempura</h3></div><span class="p">3 200 DA</span></div></article>
         <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Escargots de Bourgogne</h3></div><span class="p">2 300 DA</span></div></article>
         <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat">Brunch</p><h3>Club sandwich saumon fumé</h3></div><span class="p">2 700 DA</span></div></article>
-        <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 000 DA</span></div></article>
+        <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 500 DA</span></div></article>
       </div>
     </div>
   </section>
@@ -452,30 +452,33 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   /* ---------- Menu ---------- */
   var MENU = [
     { id: "brunch", nom: "Brunch", sections: [
-      { t: "Pour bien commencer la journée", items: [["Œuf à la turque", 1500], ["Œuf Benedict", 2000, "Frites allumettes"]] },
-      { t: "Classiques du brunch", items: [["Toast avocat saumon", 2600], ["Club sandwich saumon fumé", 2700, "Frites allumettes"], ["Club sandwich poulet fumé", 2200, "Frites allumettes"], ["Croissant croque-monsieur", 2000, "Poulet fumé artisanal, cheese"], ["Long toast tunacado", 2500, "Crémeux de thon et avocat, carottes frites"]] },
-      { t: "Autres envies", items: [["Salade César", 1600], ["Crêpe salée poulet, épinard", 1500], ["Sandwich La Maison Blanche", 2300, "Émincé de bœuf, oignons caramélisés, champignons"], ["Sandwich salade César", 1700, "Poulet crispy et sauce César"], ["Le Burger bœuf", 2000, "Crème fromagère aux champignons, frites allumettes"], ["Le Burger poulet crispy", 1800, "Crème fromagère aux champignons, frites allumettes"]] }
+      { t: "Pour bien commencer la journée", items: [["Œuf à la turque", 1500], ["Œuf Benedict", 2000, "Frites allumettes en accompagnement"]] },
+      { t: "Classiques du brunch", items: [["Toast avocat saumon", 2600], ["Club sandwich saumon fumé", 2700, "Frites allumettes en accompagnement"], ["Club sandwich poulet fumé", 2200, "Frites allumettes en accompagnement"], ["Croissant croque-monsieur", 2000, "Poulet fumé artisanal, cheese"], ["Long toast tunacado", 2500, "Crémeux de thon et avocat, carottes frites en accompagnement"]] },
+      { t: "Autres envies", items: [["Salade César", 1600], ["Crêpe salée poulet, épinard", 1500], ["Sandwich La Maison Blanche", 2300, "Émincé de bœuf, oignons caramélisés, champignons, frites allumettes"], ["Sandwich salade César", 1700, "Poulet crispy et sauce César"], ["Le Burger bœuf", 2000, "Sur crème fromagère aux champignons, frites allumettes"], ["Le Burger poulet crispy", 1800, "Sur crème fromagère aux champignons, frites allumettes"]] },
+      { t: "Desserts du brunch", items: [["Cake fondant au caramel et crème vanille", 1500], ["Hot cookie", 1600], ["Brioche perdue tiramisu", 1500], ["Brioche perdue caramel beurre salé", 2000], ["New York roll meringué au citron", 1000], ["New York roll pistache", 1200], ["Crêpe Suzette et boule de glace vanille", 1600], ["Matilda cake", 1000], ["Pancake beurre et miel", 1000], ["Gaufre Nutella ou pistache", 1500], ["Crêpe Nutella ou pistache", 1500], ["Tiramisu", 1000], ["Meringue lemon cake", 1000], ["Granola bowl", 1800, "Crumble pommes et beurre de cacahuète"]] }
     ]},
     { id: "carte", nom: "À la carte", sections: [
-      { t: "Entrées froides", items: [["Carpaccio de bœuf", 2500], ["Burrata sur un carpaccio de tomates, sauce pesto", 2000], ["Salade grecque", 2200], ["Salade de quinoa gourmande aux crustacés", 2800], ["Médaillon de foie gras", 3300]] },
-      { t: "Entrées chaudes", items: [["Soupe du jour", 1800], ["Soupe aux fruits de mer", 2400], ["Assortiment de boureks × 2", 800], ["Escargots de Bourgogne", 2300], ["Tarte aux crevettes", 2700], ["Noix de Saint-Jacques à la compotée de pommes vertes", 3300], ["Duo de calamars et crevettes sautés à l’ail", 2800], ["Gambas tempura", 3200], ["Moules frites", 2100]] },
-      { t: "Viande", items: [["Cœur de filet de bœuf, sauce aux morilles", 4500], ["Côte de bœuf poêlée aux herbes", 9000, "Pour 2 personnes"], ["Méchoui d’agneau", 5000], ["Souris d’agneau confite au miel et marjolaine", 4500], ["Entrecôte sauce au poivre vert", 3200]] },
-      { t: "Volaille", items: [["Ballotine de poulet au saumon, sauce suisse", 3000], ["Magret de canard au cassis", 4500], ["La blanquette exotique de La Maison Blanche", 3000]] },
+      { t: "Entrées froides", items: [["Carpaccio de bœuf", 2500], ["Burrata sur un carpaccio de tomate, sauce pesto", 2500], ["Salade grecque", 2200], ["Salade de quinoa gourmande aux crustacés", 2800], ["Médaillon de foie gras", 3300]] },
+      { t: "Entrées chaudes", items: [["Soupe du jour", 1800], ["Velouté aux fruits de mer", 2400], ["Assortiment de bourak × 2", 800], ["Escargots de Bourgogne", 2300], ["Tarte aux crevettes", 2700], ["Noix de Saint-Jacques", 3300], ["Duo de calamars et crevettes sautés à l’ail", 2800], ["Gambas tempura", 3200], ["Moules frites", 2100]] },
+      { t: "Viande", items: [["Cœur de filet de bœuf, sauce aux morilles", 4500], ["Côte de bœuf poêlée aux herbes", 9000, "Pour 2 personnes"], ["Méchoui", 5000], ["Souris d’agneau confite au miel et marjolaine", 4500], ["Entrecôte à la sauce poivre vert", 3200]] },
       { t: "Poisson", items: [["Saumon à l’orange", 4500], ["Daurade aux crustacés", 3700], ["Loup de mer", 3700]] },
-      { t: "Pasta", items: [["Raviolis ricotta et épinards", 2600], ["Tagliatelles au saumon fumé", 2800], ["Tagliatelles poulet et champignons", 2400], ["Linguine alla scoglio", 4500], ["Spaghettis aux moules et pesto", 2800]] }
+      { t: "Gibier", items: [["Ballotine de poulet au saumon et sauce suisse", 3000], ["Magret de canard au cassis", 4500], ["La blanquette exotique de La Maison Blanche", 3000]] },
+      { t: "Pasta", items: [["Ravioli ricotta et épinards", 2600], ["Rigatoni au saumon", 2800], ["Tagliatelles poulet et champignons", 2400], ["Linguine alla scoglio", 4500], ["Spaghetti moules et pesto", 2800]] },
+      { t: "Desserts", items: [["Profiteroles au chocolat mou", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant au chocolat et sa boule de glace", 1000], ["Tiramisu", 1000], ["Nougat glacé au coulis de fruits rouges", 1200], ["Meringue lemon cake", 1000]] }
     ]},
-    { id: "asie", nom: "Box & Asie", sections: [
+    { id: "asie", nom: "Asiatique", sections: [
+      { t: "À partager", items: [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500, "Saumon, avocat, cheese, concombre, salade à la sauce mayo yuzu"], ["Maki avocat × 12", 1800, "Avocat, cheese"], ["Maki saumon × 12", 2200, "Saumon"], ["Nigiri saumon × 3", 1800]] },
+      { t: "Rolls", items: [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600, "Tempura de crevettes, top saumon"], ["Rainbow roll × 8", 2800, "Avocat, cheese, crevettes, top poisson du jour et sauce mayo yuzu"], ["Crunchy saumon roll × 8", 2600, "Saumon frit, avocat, cheese, mayo japonaise épicée et oignons frits"], ["Crunchy poulet roll × 8", 2400, "Poulet frit, avocat, cheese, mayo japonaise épicée et oignons frits"], ["Flamed roll × 8", 2800, "Saumon, cheese, sweet soja sauce, top saumon flambé"]] },
+      { t: "Nouveautés", items: [["Creamy avocado roll × 8", 2400, "Légumes frits, cheese, top avocat, sweet soja sauce et mayo yuzu"], ["Veggie roll × 8", 2500, "Avocat, cheese, feuille de salade à la mayo yuzu"], ["Maki crispy au tartare de saumon × 6", 1800, "Sweet soja sauce"], ["Crunch tempura × 8", 2800, "Tempura de crevettes, avocat, mayo japonaise épicée"]] },
       { t: "Box", items: [["Duo signature × 24", 5400, "4 california, 4 crunchy, 6 maki, 5 dragon saumon, 5 futomaki"], ["Party box × 54", 14200, "8 california, 8 crunchy, 6 maki crispy, 10 futomaki, 6 maki avocat, 8 choix du chef, 8 creamy avocat"]] },
-      { t: "Plats", items: [["Poke bowl", 3200], ["Wok au poulet", 2400], ["Ramen gyoza", 2500], ["Ramen aux crevettes", 3200], ["Taco crispy", 3100], ["Mochis glacés × 2", 2000, "Pistache, framboise, mangue"]] }
-    ]},
-    { id: "desserts", nom: "Desserts", sections: [
-      { t: "Gâteaux et brioches", items: [["Cake fondant au caramel et crème vanille", 1500], ["Hot cookie", 1600], ["Brioche perdue tiramisu", 1500], ["Brioche perdue caramel beurre salé", 2000], ["New York roll meringué au citron", 1000], ["New York roll pistache", 1200], ["Matilda cake", 1000], ["Tiramisu", 1000], ["Meringue lemon cake", 1000]] },
-      { t: "Crêpes, gaufres et bowls", items: [["Crêpe Suzette et glace vanille", 1600], ["Crêpe Nutella ou pistache", 1500], ["Gaufre Nutella ou pistache", 1500], ["Pancake beurre et miel", 1000], ["Granola bowl", 1800, "Crumble pommes et beurre de cacahuète"]] }
+      { t: "Plats", items: [["Poke bowl", 3200], ["Wok au poulet", 2400], ["Ramens gyoza", 2500], ["Ramens aux crevettes", 3200], ["Taco crispy", 3100]] },
+      { t: "Dessert", items: [["Mochis glacés × 2", 2000, "Pistache, framboise, mangue"]] }
     ]},
     { id: "boissons", nom: "Boissons", sections: [
-      { t: "Classiques", items: [["Eau minérale ou pétillante", 200], ["Soda", 250], ["Café", 400], ["Cappuccino", 500], ["Chocolat chaud", 700], ["Thé ou infusion", 400]] },
+      { t: "Classiques", items: [["Eau minérale ou pétillante", 200], ["Soda", 250], ["Café", 400], ["Cappuccino", 500], ["Chocolat chaud", 700], ["Thé, infusion au choix", 400]] },
+      { t: "Iced or hot (au brunch)", items: [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato nature ou vanille", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]] },
       { t: "Nos cocktails sans alcool", items: [["Parfum des femmes", 650], ["Exotic passion", 750, "Fruit de la passion, coco"], ["Exotic mango", 750, "Mangue, pêche"], ["Exotic fruits rouges", 750, "Framboise, myrtille"], ["Mojito classique", 650], ["Mojito fraise", 750], ["Piña colada", 700], ["Ice tea pêche ou fruits des bois", 700], ["Cocktail Maison Blanche", 1000, "Vanille, fruit de la passion, ananas, coco"]] },
-      { t: "Jus detox", items: [["Ananas, pomme, menthe", 700], ["Orange, carotte, dattes", 800], ["Pomme, gingembre, coco", 800]] },
+      { t: "Jus detox", items: [["Ananas, pomme, menthe", 700, "95 kcal"], ["Orange, carotte, dattes", 800, "110 kcal"], ["Pomme, gingembre, coco", 800, "100 kcal"]] },
       { t: "Jus nature et smoothies", items: [["Jus d’orange", 500], ["Jus de citron", 500], ["Jus de mangue", 900], ["Jus de fraise", 700], ["Smoothie pistachio kunafa", 1100], ["Smoothie peanut butter", 1100]] }
     ]}
   ];
