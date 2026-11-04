@@ -7,11 +7,18 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>[hidden]{display:none!important}html,body{margin:0;padding:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<link rel="canonical" href="https://lamaisonblanchehydra.com/">
+<meta property="og:type" content="restaurant">
+<meta property="og:url" content="https://lamaisonblanchehydra.com/">
+<meta property="og:site_name" content="La Maison Blanche">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" as="image" href="photos/hero-terrasse.jpg" media="(min-width: 761px)" fetchpriority="high">
+<link rel="preload" as="image" href="photos/hero-terrasse-mobile.jpg" media="(max-width: 760px)" fetchpriority="high">
 <meta property="og:title" content="La Maison Blanche, restaurant à Hydra">
 <meta property="og:description" content="Brunch, cuisine gastronomique et asiatique. Menu en ligne et réservation.">
 <meta property="og:image" content="https://lamaisonblanchehydra.com/photos/saumon-orange.jpg">
 <title>Restaurant La Maison Blanche Hydra | Brunch, gastronomique, terrasse</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="La Maison Blanche, restaurant à Hydra (Alger) : brunch, carte gastronomique, cuisine asiatique. Menu en ligne et réservation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -127,9 +134,9 @@ section.room { padding-block: 112px; }
 /* Signatures */
 .gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .gallery figure { margin: 0; overflow: hidden; }
-.gallery img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; transition: transform .6s ease; }
+.gallery img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; transition: transform .6s ease; }
 .gallery figure:hover img { transform: scale(1.03); }
-@media (max-width: 860px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } }
+@media (max-width: 860px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .gallery figure:nth-child(9) { display: none; } }
 .sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
 .sig { display: grid; gap: 16px; }
 .sig img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
@@ -232,14 +239,14 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 .motion .rv.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .motion .rv { opacity: 1; transform: none; transition: none; } .motion .hero-photo::after, .motion .hero .wrap > *, #menu-panel > * { animation: none; } }
 </style>
-<link rel="canonical" href="https://lamaisonblanchehydra.com/">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Restaurant","name":"Restaurant La Maison Blanche","alternateName":["La Maison Blanche Hydra","Maison Blanche Hydra"],
 "url":"https://lamaisonblanchehydra.com/","image":"https://lamaisonblanchehydra.com/photos/saumon-orange.jpg","logo":"https://lamaisonblanchehydra.com/icon-512.png",
 "telephone":"+213541559672","email":"maisonblanchehydra@gmail.com","servesCuisine":["Brunch","Gastronomique","Asiatique"],
-"address":{"@type":"PostalAddress","streetAddress":"23 rue des Frères Ben Ali","addressLocality":"Hydra","addressRegion":"Alger","addressCountry":"DZ"},
+"address":{"@type":"PostalAddress","streetAddress":"23 rue des Frères Ben Ali","addressLocality":"Hydra","postalCode":"16000","addressRegion":"Alger","addressCountry":"DZ"},
+"geo":{"@type":"GeoCoordinates","latitude":36.7401258,"longitude":3.0481449},"priceRange":"$$","sameAs":["https://www.instagram.com/restaurant_lamaisonblanche/"],
 "openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday"],"opens":"09:00","closes":"23:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Friday","opens":"16:00","closes":"23:00"}],
-"acceptsReservations":"True","hasMenu":"https://lamaisonblanchehydra.com/#menu"}
+"acceptsReservations":true,"hasMenu":"https://lamaisonblanchehydra.com/#menu"}
 </script>
 </head>
 <body>
@@ -264,7 +271,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   <section class="hero hero-photo dark">
     <div class="wrap">
       <p class="label">Restaurant · Hydra, Alger</p>
-      <h1><img class="hero-logo" src="logo-blanc.png" alt="La Maison Blanche"></h1>
+      <h1><img class="hero-logo" src="logo-blanc.png" alt="La Maison Blanche" fetchpriority="high"></h1>
       <p class="tag">Brunch, cuisine gastronomique et asiatique, avec des produits de saison.</p>
       <div class="actions">
         <a class="btn btn-solid" href="#reserver">Réserver une table</a>
@@ -350,24 +357,15 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
         <h2>À la table de la maison</h2>
       </div>
       <div class="gallery">
-        <figure><img src="photos/brioche-caramel.jpg" alt="Brioche perdue caramel beurre salé" loading="lazy"></figure>
-        <figure><img src="photos/toast-avocat-saumon.jpg" alt="Toast avocat saumon et burrata" loading="lazy"></figure>
-        <figure><img src="photos/rainbow-roll.jpg" alt="Rainbow roll" loading="lazy"></figure>
-        <figure><img src="photos/duo-assiettes.jpg" alt="Assiettes de la carte gastronomique" loading="lazy"></figure>
-        <figure><img src="photos/burrata.jpg" alt="Burrata, carpaccio de tomates" loading="lazy"></figure>
-        <figure><img src="photos/matcha-fraise-pistache.jpg" alt="Matcha latte fraise et pistache" loading="lazy"></figure>
-        <figure><img src="photos/gyoza.jpg" alt="Gyoza au poulet" loading="lazy"></figure>
-        <figure><img src="photos/tartare.jpg" alt="Tartare de la maison" loading="lazy"></figure>
-        <figure><img src="photos/mochis.jpg" alt="Mochis glacés pistache" loading="lazy"></figure>
-        <figure><img src="photos/exotic-mango.jpg" alt="Exotic mango" loading="lazy"></figure>
-        <figure><img src="photos/pates-saumon.jpg" alt="Rigatoni au saumon fumé" loading="lazy"></figure>
-        <figure><img src="photos/carpaccio-poulpe.jpg" alt="Carpaccio à l’orange" loading="lazy"></figure>
-        <figure><img src="photos/saint-sebastien.jpg" alt="Saint-Sébastien au Nutella" loading="lazy"></figure>
-        <figure><img src="photos/mojito.jpg" alt="Mojito" loading="lazy"></figure>
-        <figure><img src="photos/poulet-saumon.jpg" alt="Ballotine de poulet" loading="lazy"></figure>
-        <figure><img src="photos/iced-latte-tiramisu.jpg" alt="Iced latte et tiramisu latte" loading="lazy"></figure>
-        <figure><img src="photos/latte-croissant.jpg" alt="Latte vanille" loading="lazy"></figure>
-        <figure><img src="photos/matcha-pistache.jpg" alt="Matcha latte pistache" loading="lazy"></figure>
+        <figure><img src="photos/brioche-caramel.jpg" alt="Brioche perdue caramel beurre salé" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/toast-avocat-saumon.jpg" alt="Toast avocat saumon et burrata" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/rainbow-roll.jpg" alt="Rainbow roll" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/duo-assiettes.jpg" alt="Assiettes de la carte gastronomique" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/burrata.jpg" alt="Burrata, carpaccio de tomates" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/matcha-fraise-pistache.jpg" alt="Matcha latte fraise et pistache" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/tartare.jpg" alt="Tartare de la maison" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/mochis.jpg" alt="Mochis glacés pistache" loading="lazy" decoding="async" width="800" height="1000"></figure>
+        <figure><img src="photos/exotic-mango.jpg" alt="Exotic mango" loading="lazy" decoding="async" width="800" height="1000"></figure>
       </div>
     </div>
   </section>
@@ -403,6 +401,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       </div>
       <div>
         <form class="resa" id="resa" novalidate>
+          <input type="checkbox" name="botcheck" id="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
           <fieldset class="field">
             <legend>Espace</legend>
             <div class="choices">
@@ -584,7 +583,9 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   function toMin(hm) { var p = hm.split(":"); return +p[0] * 60 + +p[1]; }
   function espace() { return form.querySelector("input[name=espace]:checked").value; }
 
-  var today = new Date(), maxD = new Date(); maxD.setDate(maxD.getDate() + CONFIG.joursMax);
+  /* Heure d'Alger (UTC+1, sans heure d'été), quel que soit le pays du client */
+  function algerNow() { return new Date(Date.now() + (60 + new Date().getTimezoneOffset()) * 60000); }
+  var today = algerNow(), maxD = algerNow(); maxD.setDate(maxD.getDate() + CONFIG.joursMax);
   dateIn.min = iso(today); dateIn.max = iso(maxD); dateIn.value = iso(today);
 
   for (var i = 1; i <= CONFIG.maxPers; i++) { var o = el("option", null, i + (i > 1 ? " personnes" : " personne")); o.value = i; persIn.appendChild(o); }
@@ -597,7 +598,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     if (!v) return;
     var d = new Date(v + "T00:00"), friday = d.getDay() === 5;
     var start = toMin(friday ? e.debutVendredi : e.debut), end = toMin(e.fin);
-    var limit = new Date(Date.now() + CONFIG.delaiMinH * 3600000), count = 0;
+    var limit = new Date(algerNow().getTime() + CONFIG.delaiMinH * 3600000), count = 0;
     for (var m = start; m <= end; m += CONFIG.pas) {
       var t = new Date(d); t.setHours(Math.floor(m / 60), m % 60, 0, 0);
       if (t < limit) continue;
@@ -605,12 +606,18 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       heureIn.appendChild(o); count++;
     }
     if (!count) { var none = el("option", null, "Plus de créneau ce jour-là"); none.value = ""; heureIn.appendChild(none); }
+    return count;
   }
   form.addEventListener("change", function (ev) {
     if (ev.target.name === "espace" || ev.target === dateIn) slots();
     if (ev.target === persIn) { var g = persIn.value === "plus"; groupe.hidden = !g; send.disabled = g; }
   });
-  slots();
+  /* Plus aucun créneau aujourd'hui dans aucun espace : on propose demain ; sinon on sélectionne un espace encore ouvert */
+  if (!slots()) {
+    var radios = form.querySelectorAll("input[name=espace]"), open = null;
+    for (var r = 0; r < radios.length && !open; r++) { radios[r].checked = true; if (slots()) open = radios[r]; }
+    if (!open) { radios[0].checked = true; var dm = algerNow(); dm.setDate(dm.getDate() + 1); dateIn.value = iso(dm); slots(); }
+  }
 
   send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
 
@@ -655,6 +662,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       send.disabled = false; send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
     }
 
+    if (form.botcheck && form.botcheck.checked) { done(true); return; }
     if (!CONFIG.endpoint) { done(false); return; }
 
     /* Envoi par e-mail via Web3Forms ; en cas d'échec, le client envoie sa demande sur WhatsApp */
