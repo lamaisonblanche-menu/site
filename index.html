@@ -117,6 +117,11 @@ section.room { padding-block: 112px; }
 @media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-left: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
 
 /* Signatures */
+.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gallery figure { margin: 0; overflow: hidden; }
+.gallery img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; transition: transform .6s ease; }
+.gallery figure:hover img { transform: scale(1.03); }
+@media (max-width: 860px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } }
 .sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
 .sig { display: grid; gap: 16px; }
 .sig img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
@@ -223,6 +228,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       <a href="#maison">La maison</a>
       <a href="#espaces">Espaces</a>
       <a href="#signatures">Signatures</a>
+      <a href="#galerie">Galerie</a>
       <a href="#menu">Menu</a>
       <a href="#infos">Infos</a>
       <a class="btn btn-solid" href="#reserver">Réserver</a>
@@ -309,6 +315,35 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
         <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Escargots de Bourgogne</h3></div><span class="p">2 300 DA</span></div></article>
         <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat">Brunch</p><h3>Club sandwich saumon fumé</h3></div><span class="p">2 700 DA</span></div></article>
         <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 000 DA</span></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="room" id="galerie">
+    <div class="wrap">
+      <div class="head center">
+        <p class="label">En images</p>
+        <h2>À la table de la maison</h2>
+      </div>
+      <div class="gallery">
+        <figure><img src="photos/brioche-caramel.jpg" alt="Brioche perdue caramel beurre salé" loading="lazy"></figure>
+        <figure><img src="photos/toast-avocat-saumon.jpg" alt="Toast avocat saumon et burrata" loading="lazy"></figure>
+        <figure><img src="photos/rainbow-roll.jpg" alt="Rainbow roll" loading="lazy"></figure>
+        <figure><img src="photos/duo-assiettes.jpg" alt="Assiettes de la carte gastronomique" loading="lazy"></figure>
+        <figure><img src="photos/burrata.jpg" alt="Burrata, carpaccio de tomates" loading="lazy"></figure>
+        <figure><img src="photos/matcha-fraise-pistache.jpg" alt="Matcha latte fraise et pistache" loading="lazy"></figure>
+        <figure><img src="photos/gyoza.jpg" alt="Gyoza au poulet" loading="lazy"></figure>
+        <figure><img src="photos/tartare.jpg" alt="Tartare de la maison" loading="lazy"></figure>
+        <figure><img src="photos/mochis.jpg" alt="Mochis glacés pistache" loading="lazy"></figure>
+        <figure><img src="photos/exotic-mango.jpg" alt="Exotic mango" loading="lazy"></figure>
+        <figure><img src="photos/pates-saumon.jpg" alt="Pâtes au saumon" loading="lazy"></figure>
+        <figure><img src="photos/carpaccio-poulpe.jpg" alt="Carpaccio à l’orange" loading="lazy"></figure>
+        <figure><img src="photos/saint-sebastien.jpg" alt="Cheesecake au chocolat" loading="lazy"></figure>
+        <figure><img src="photos/mojito.jpg" alt="Mojito" loading="lazy"></figure>
+        <figure><img src="photos/poulet-saumon.jpg" alt="Suprême de poulet, saumon fumé" loading="lazy"></figure>
+        <figure><img src="photos/iced-latte-tiramisu.jpg" alt="Iced latte et tiramisu latte" loading="lazy"></figure>
+        <figure><img src="photos/latte-croissant.jpg" alt="Latte et mini-croissant" loading="lazy"></figure>
+        <figure><img src="photos/matcha-pistache.jpg" alt="Matcha latte pistache" loading="lazy"></figure>
       </div>
     </div>
   </section>
@@ -484,7 +519,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     ]}
   ];
 
-  var PHOTOS = {};
+  var PHOTOS = {"Burrata sur un carpaccio de tomate, sauce pesto": "burrata", "Exotic mango": "exotic-mango", "Matcha latte pistache": "matcha-pistache", "Matcha latte fraise": "matcha-fraise-pistache", "Mochis glacés × 2": "mochis", "Rainbow roll × 8": "rainbow-roll", "Brioche perdue caramel beurre salé": "brioche-caramel", "Toast avocat saumon": "toast-avocat-saumon", "Gyoza au poulet × 5": "gyoza", "Tiramisu latte": "iced-latte-tiramisu", "Mojito classique": "mojito"};
   function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 
@@ -500,7 +535,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       s.items.forEach(function (it) {
         var li = el("li", "dish"), line = el("span", "line"), n = el("span", "n", it[0]);
         if (it[2]) n.appendChild(el("small", null, it[2]));
-        if (PHOTOS[it[0]]) { var th = el("img", "thumb"); th.src = "photos/" + PHOTOS[it[0]] + ".jpg"; th.alt = ""; th.loading = "lazy"; li.appendChild(th); }
+        if (PHOTOS[it[0]]) { var th = el("img", "thumb"); th.src = "photos/mini/" + PHOTOS[it[0]] + ".jpg"; th.alt = ""; th.loading = "lazy"; li.appendChild(th); }
         line.appendChild(n); line.appendChild(el("span", "dots")); line.appendChild(el("span", "p", fmt(it[1])));
         li.appendChild(line);
         ul.appendChild(li);
