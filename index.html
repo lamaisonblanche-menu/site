@@ -80,6 +80,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .hero .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 40px; }
 .hero .hours { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 64px; margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--line); font-size: 15px; min-width: min(640px, 100%); }
 .hero .hours b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 21px; }
+.hero-photo { position: relative; isolation: isolate; min-height: min(92vh, 980px); display: grid; align-items: center; --muted: rgba(255,255,255,.78); --line: rgba(255,255,255,.28); background: #111 url("photos/hero-terrasse.jpg") center 40% / cover no-repeat; }
+.hero-photo::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at center, rgba(0,0,0,.42) 0%, rgba(0,0,0,.62) 70%), linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.45)); }
+.hero-photo .tag { color: rgba(255,255,255,.9); }
+.hero-photo .hero-logo { filter: drop-shadow(0 2px 18px rgba(0,0,0,.35)); }
+@media (max-width: 760px) { .hero-photo { background-image: url("photos/hero-terrasse-mobile.jpg"); background-position: center 45%; } }
 @media (max-width: 640px) { .hero { padding-block: 56px 64px; } .hero .hours { gap: 18px 36px; } }
 
 /* Black band */
@@ -239,10 +244,10 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 </header>
 
 <main id="accueil">
-  <section class="hero">
+  <section class="hero hero-photo dark">
     <div class="wrap">
       <p class="label">Restaurant · Hydra, Alger</p>
-      <h1><img class="hero-logo" src="logo.png" alt="La Maison Blanche"></h1>
+      <h1><img class="hero-logo" src="logo-blanc.png" alt="La Maison Blanche"></h1>
       <p class="tag">Brunch, cuisine gastronomique et asiatique, avec des produits de saison.</p>
       <div class="actions">
         <a class="btn btn-solid" href="#reserver">Réserver une table</a>
