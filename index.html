@@ -214,6 +214,38 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .copy { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0 0 0 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 860px) { .infos { grid-template-columns: 1fr; gap: 44px; } }
 
+
+/* Livraison */
+.deliv { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .9fr); gap: 64px; align-items: start; }
+@media (max-width: 960px) { .deliv { grid-template-columns: minmax(0, 1fr); gap: 48px; } }
+.deliv .menu-tabs { justify-content: flex-start; margin-bottom: 40px; gap: 4px 28px; }
+.liv-panel { display: grid; gap: 48px; }
+.liv-panel .course ul { gap: 4px; }
+.liv-dish { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #dddcd7; }
+.liv-dish .n { flex: 1; min-width: 0; font-weight: 400; }
+.liv-dish .n small { display: block; color: var(--muted); font-size: 14px; font-weight: 300; }
+.liv-dish .p { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qty { flex: none; display: inline-flex; align-items: center; border: 1px solid var(--fg); }
+.qty button { width: 40px; height: 40px; background: none; border: 0; color: var(--fg); font: 400 20px/1 var(--f-body); cursor: pointer; }
+.qty button:hover { background: var(--fg); color: var(--bg); }
+.qty span { min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; }
+.qty.zero span, .qty.zero .minus { display: none; }
+.cart { position: sticky; top: 100px; }
+@media (max-width: 960px) { .cart { position: static; } }
+.cart form.resa { background: var(--paper); }
+.cart .error { color: #b3261e; }
+.cart-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 15px; }
+.cart-list li { display: flex; justify-content: space-between; gap: 14px; }
+.cart-list li b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-empty { color: var(--muted); font-size: 15px; }
+.cart-total { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 15px; }
+.cart-total div { display: flex; justify-content: space-between; gap: 14px; }
+.cart-total .big { font-family: var(--f-display); font-size: 24px; }
+.cart-total .muted { font-size: 14px; }
+.cart-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: none; padding: 12px max(16px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--ink); }
+.cart-bar a { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #fff; text-decoration: none; font: 500 12px var(--f-body); letter-spacing: .2em; text-transform: uppercase; min-height: 44px; }
+@media (max-width: 960px) { .cart-bar.show { display: block; } }
+
 footer.site { padding-block: 72px 56px; text-align: center; border-top: 1px solid var(--line); }
 footer.site img { width: 120px; margin: 0 auto; filter: invert(1); }
 footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); }
@@ -255,6 +287,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       <a href="#signatures">Signatures</a>
       <a href="#menu">Menu</a>
       <a href="#infos">Infos</a>
+      <a href="#livraison">Livraison</a>
       <a class="btn btn-solid" href="#reserver">Réserver</a>
     </nav>
   </div>
@@ -269,6 +302,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       <div class="actions">
         <a class="btn btn-solid" href="#reserver">Réserver une table</a>
         <a class="btn btn-line" href="#menu">Découvrir le menu</a>
+        <a class="btn btn-line" href="#livraison">Commander en livraison</a>
       </div>
       <div class="hours">
         <span><span class="muted">Samedi au jeudi</span><b>9 h – 23 h</b></span>
@@ -357,6 +391,61 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   </section>
 
 
+  <section class="room stone" id="livraison">
+    <div class="wrap">
+      <div class="head center">
+        <p class="label">Livraison</p>
+        <h2>Commander en livraison</h2>
+        <p class="sub">Choisissez vos plats, envoyez votre commande, nous vous rappelons pour la confirmer et vous annoncer les frais de livraison. Paiement en espèces à la livraison.</p>
+      </div>
+      <div class="deliv">
+        <div>
+          <div class="menu-tabs" role="tablist" aria-label="Cartes à livrer" id="liv-tabs"></div>
+          <div class="liv-panel" id="liv-panel"></div>
+        </div>
+        <aside class="cart" id="panier">
+          <form class="resa" id="liv-form" novalidate>
+            <div class="field">
+              <p class="label" style="color:var(--fg)">Votre commande</p>
+              <ul class="cart-list" id="cart-list"></ul>
+              <p class="cart-empty" id="cart-empty">Votre panier est vide. Ajoutez des plats avec le bouton +.</p>
+            </div>
+            <div class="cart-total">
+              <div><span>Sous-total</span><span class="big" id="cart-sub">0 DA</span></div>
+              <div class="muted"><span>Frais de livraison</span><span>annoncés par téléphone</span></div>
+              <div class="muted"><span>Paiement</span><span>espèces à la livraison</span></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="l-nom">Nom et prénom</label><input type="text" id="l-nom" autocomplete="name" required></div>
+              <div class="field"><label for="l-tel">Téléphone</label><input type="tel" id="l-tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
+            </div>
+            <div class="field"><label for="l-adr">Adresse de livraison</label><input type="text" id="l-adr" autocomplete="street-address" placeholder="Rue, numéro, bâtiment, étage" required></div>
+            <div class="field"><label for="l-commune">Commune / quartier</label><input type="text" id="l-commune" placeholder="Hydra, Ben Aknoun, El Biar…" required></div>
+            <div class="row2">
+              <div class="field"><label for="l-jour">Jour</label><select id="l-jour"><option value="0">Aujourd’hui</option><option value="1">Demain</option></select></div>
+              <div class="field"><label for="l-heure">Heure de livraison</label><select id="l-heure"></select></div>
+            </div>
+            <div class="field"><label for="l-rem">Remarque <span class="hint">(facultatif)</span></label><textarea id="l-rem" placeholder="Code de la porte, allergie, sauce à part…"></textarea></div>
+            <p class="error" id="l-err" role="alert" hidden></p>
+            <p class="hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre commande.</p>
+            <button class="btn btn-solid" type="submit" id="l-send">Continuer</button>
+          </form>
+          <div class="confirm dark" id="liv-ok" hidden tabindex="-1">
+            <p class="label">Dernière étape obligatoire</p>
+            <h3>Envoyez votre commande sur WhatsApp</h3>
+            <p>Votre commande n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre commande déjà remplie, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre commande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour la confirmer et vous annoncer les frais de livraison.</p>
+            <dl class="recap" id="liv-recap"></dl>
+            <div class="actions">
+              <a class="btn btn-solid" id="liv-wa" href="https://wa.me/213541559672" target="_blank" rel="noopener">Envoyer sur WhatsApp</a>
+              <button class="btn btn-line" type="button" id="liv-again">Nouvelle commande</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+  <div class="cart-bar" id="cart-bar"><a href="#panier"><span id="cart-bar-n">Voir ma commande</span><span id="cart-bar-t"></span></a></div>
+
   <section class="room dark" id="reserver">
     <div class="wrap booking">
       <div>
@@ -403,6 +492,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
           </div>
           <div class="field"><label for="remarque">Remarque <span class="hint">(facultatif)</span></label><textarea id="remarque" name="remarque" placeholder="Chaise bébé, allergie, table près de la fenêtre…"></textarea></div>
           <p class="error" id="err" role="alert" hidden></p>
+          <p class="hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre demande.</p>
           <button class="btn btn-solid" type="submit" id="send">Continuer</button>
         </form>
 
@@ -546,6 +636,130 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   });
   showMenu("brunch");
 
+  /* ---------- Livraison ---------- */
+  (function () {
+    var LIV = { debut: "09:00", debutVendredi: "16:00", fin: "22:30", delaiMin: 45, pas: 30, asieDes: "11:00", brunchJusqua: "18:00" };
+    var cart = {}, ltabs = document.getElementById("liv-tabs"), lpanel = document.getElementById("liv-panel");
+    var lform = document.getElementById("liv-form"), lok = document.getElementById("liv-ok"), lerr = document.getElementById("l-err");
+    var jourIn = document.getElementById("l-jour"), lheure = document.getElementById("l-heure"), lsend = document.getElementById("l-send");
+    var bar = document.getElementById("cart-bar"), current = "brunch";
+    function key(mid, n) { return mid + "|" + n; }
+    function mm(hm) { var p = hm.split(":"); return +p[0] * 60 + +p[1]; }
+    function hhmm(m) { return (m < 600 ? "0" : "") + Math.floor(m / 60) + ":" + (m % 60 < 10 ? "0" : "") + (m % 60); }
+    function items() { return Object.keys(cart).map(function (k) { return cart[k]; }).filter(function (x) { return x.q > 0; }); }
+    function total() { return items().reduce(function (a, x) { return a + x.q * x.prix; }, 0); }
+
+    function qtyCtl(mid, it) {
+      var k = key(mid, it[0]), w = el("span", "qty"), minus = el("button", "minus", "−"), n = el("span"), plus = el("button", "plus", "+");
+      minus.type = plus.type = "button"; minus.setAttribute("aria-label", "Retirer " + it[0]); plus.setAttribute("aria-label", "Ajouter " + it[0]);
+      function sync() { var q = cart[k] ? cart[k].q : 0; n.textContent = q; w.classList.toggle("zero", q === 0); }
+      plus.addEventListener("click", function () { if (!cart[k]) cart[k] = { nom: it[0], prix: it[1], carte: mid, q: 0 }; cart[k].q++; sync(); render(); });
+      minus.addEventListener("click", function () { if (cart[k] && cart[k].q > 0) cart[k].q--; sync(); render(); });
+      w.appendChild(minus); w.appendChild(n); w.appendChild(plus); sync(); return w;
+    }
+    function showLiv(id) {
+      current = id;
+      Array.prototype.forEach.call(ltabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.id === id ? "true" : "false"); });
+      lpanel.innerHTML = "";
+      var m = MENU.filter(function (x) { return x.id === id; })[0];
+      if (m.note) lpanel.appendChild(el("p", "asie-note", m.note));
+      if (id === "brunch") lpanel.appendChild(el("p", "asie-note", "Brunch livré tous les jours jusqu’à 18 h."));
+      m.sections.forEach(function (s) {
+        var c = el("div", "course"); c.appendChild(el("h3", null, s.t)); var ul = el("ul");
+        s.items.forEach(function (it) {
+          var li = el("li", "liv-dish"), n = el("span", "n", it[0]);
+          if (it[2]) n.appendChild(el("small", null, it[2]));
+          li.appendChild(n); li.appendChild(el("span", "p", fmt(it[1]) + " DA")); li.appendChild(qtyCtl(id, it)); ul.appendChild(li);
+        });
+        c.appendChild(ul); lpanel.appendChild(c);
+      });
+    }
+    MENU.forEach(function (m) {
+      var b = el("button", null, m.nom); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id;
+      b.addEventListener("click", function () { showLiv(m.id); }); ltabs.appendChild(b);
+    });
+
+    function render() {
+      var list = document.getElementById("cart-list"), its = items(), t = total(), nb = 0;
+      list.innerHTML = "";
+      its.forEach(function (x) { nb += x.q; var li = el("li"); li.appendChild(el("span", null, x.q + " × " + x.nom)); li.appendChild(el("b", null, fmt(x.q * x.prix) + " DA")); list.appendChild(li); });
+      document.getElementById("cart-empty").hidden = its.length > 0;
+      document.getElementById("cart-sub").textContent = fmt(t) + " DA";
+      document.getElementById("cart-bar-n").textContent = "Voir ma commande (" + nb + ")";
+      document.getElementById("cart-bar-t").textContent = fmt(t) + " DA";
+      bar.classList.toggle("show", nb > 0 && lok.hidden);
+    }
+
+    function lslots() {
+      lheure.innerHTML = "";
+      var d = algerNow(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + +jourIn.value);
+      var start = mm(d.getDay() === 5 ? LIV.debutVendredi : LIV.debut), end = mm(LIV.fin);
+      var now = algerNow(), nowMin = +jourIn.value === 0 ? now.getHours() * 60 + now.getMinutes() : -1;
+      if (nowMin >= start && nowMin <= end - LIV.delaiMin) { var o = el("option", null, "Dès que possible"); o.value = "asap"; lheure.appendChild(o); }
+      for (var m = start; m <= end; m += LIV.pas) {
+        if (nowMin >= 0 && m < nowMin + LIV.delaiMin) continue;
+        var o2 = el("option", null, hhmm(m).replace(":", " h ")); o2.value = hhmm(m); lheure.appendChild(o2);
+      }
+    }
+    jourIn.addEventListener("change", lslots);
+
+    lform.addEventListener("submit", function (ev) {
+      ev.preventDefault(); lerr.hidden = true;
+      var its = items(), nom = document.getElementById("l-nom").value.trim(), tel = document.getElementById("l-tel").value.trim();
+      var adr = document.getElementById("l-adr").value.trim(), com = document.getElementById("l-commune").value.trim(), rem = document.getElementById("l-rem").value.trim();
+      var h = lheure.value, hMin = h === "asap" ? (algerNow().getHours() * 60 + algerNow().getMinutes() + LIV.delaiMin) : (h ? mm(h) : 0), problem = "";
+      var hasAsie = its.some(function (x) { return x.carte === "asie"; }), hasBrunch = its.some(function (x) { return x.carte === "brunch"; });
+      if (!its.length) problem = "Ajoutez au moins un plat à votre commande.";
+      else if (!h) problem = "Plus de livraison possible ce jour-là. Choisissez « Demain » ou appelez le +213 541 55 96 72.";
+      else if (hasAsie && hMin < mm(LIV.asieDes)) problem = "La cuisine asiatique est disponible à partir de 11 h. Choisissez une heure de livraison à partir de 11 h.";
+      else if (hasBrunch && hMin > mm(LIV.brunchJusqua)) problem = "Le brunch est servi jusqu’à 18 h. Choisissez une heure plus tôt ou retirez les plats du brunch.";
+      else if (!nom) problem = "Indiquez votre nom et prénom.";
+      else if (tel.replace(/\D/g, "").length < 9) problem = "Indiquez un numéro de téléphone valide pour que nous puissions vous rappeler.";
+      else if (!adr) problem = "Indiquez l’adresse de livraison.";
+      else if (!com) problem = "Indiquez la commune ou le quartier.";
+      if (problem) { lerr.textContent = problem; lerr.hidden = false; return; }
+
+      var d = algerNow(); d.setDate(d.getDate() + +jourIn.value);
+      var jourTxt = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+      var heureTxt = h === "asap" ? "Dès que possible" : h.replace(":", " h ");
+      var lignes = its.map(function (x) { return x.q + " × " + x.nom + " (" + fmt(x.q * x.prix) + " DA)"; });
+      var t = fmt(total()) + " DA";
+      var msg = "Bonjour, je souhaite passer une commande en livraison à La Maison Blanche.\n\n" + lignes.join("\n") +
+        "\n\nSous-total : " + t + " (hors frais de livraison)\nPaiement : espèces à la livraison\n\nLivraison : " + jourTxt + ", " + heureTxt +
+        "\nNom : " + nom + "\nTéléphone : " + tel + "\nAdresse : " + adr + "\nCommune / quartier : " + com + (rem ? "\nRemarque : " + rem : "");
+      var waUrl = "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(msg);
+
+      function done() {
+        var rc = document.getElementById("liv-recap"); rc.innerHTML = "";
+        [["Commande", lignes.join("\n")], ["Sous-total", t + " + livraison"], ["Livraison", jourTxt + ", " + heureTxt], ["Adresse", adr + ", " + com], ["Téléphone", tel]].forEach(function (r) {
+          rc.appendChild(el("dt", null, r[0])); var dd = el("dd", null, r[1]); dd.style.whiteSpace = "pre-line"; rc.appendChild(dd);
+        });
+        document.getElementById("liv-wa").href = waUrl;
+        lform.hidden = true; lok.hidden = false; bar.classList.remove("show");
+        document.getElementById("panier").scrollIntoView({ block: "start" }); lok.focus({ preventScroll: true });
+        lsend.disabled = false; lsend.textContent = "Continuer";
+      }
+      lsend.disabled = true; lsend.textContent = "Envoi en cours…";
+      var payload = {
+        access_key: CONFIG.cle,
+        subject: "Livraison (à valider seulement si reçue sur WhatsApp) : " + nom + ", " + t + ", " + jourTxt + " " + heureTxt,
+        from_name: "Site La Maison Blanche – Livraison",
+        "Commande": lignes.join("\n"), "Sous-total": t + " (hors frais de livraison)", "Paiement": "Espèces à la livraison",
+        "Jour": jourTxt, "Heure": heureTxt, "Nom": nom, "Téléphone": tel, "Adresse": adr, "Commune / quartier": com, "Remarque": rem || "-"
+      };
+      var fin = false, timer = setTimeout(function () { if (!fin) { fin = true; done(); } }, 15000);
+      fetch(CONFIG.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json(); })
+        .then(function () { if (fin) return; fin = true; clearTimeout(timer); done(); })
+        .catch(function () { if (fin) return; fin = true; clearTimeout(timer); done(); });
+    });
+
+    document.getElementById("liv-again").addEventListener("click", function () {
+      cart = {}; lform.reset(); lslots(); showLiv(current); render(); lok.hidden = true; lform.hidden = false;
+    });
+    showLiv("brunch"); lslots(); render();
+  })();
+
   /* ---------- Réservation ---------- */
   var form = document.getElementById("resa"), dateIn = document.getElementById("date"), heureIn = document.getElementById("heure");
   var persIn = document.getElementById("personnes"), groupe = document.getElementById("groupe"), err = document.getElementById("err");
@@ -592,7 +806,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     if (!open) { radios[0].checked = true; var dm = algerNow(); dm.setDate(dm.getDate() + 1); dateIn.value = iso(dm); slots(); }
   }
 
-  send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
+  send.textContent = "Continuer";
 
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -625,14 +839,13 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       var recap = document.getElementById("recap"); recap.innerHTML = "";
       rows.forEach(function (r) { recap.appendChild(el("dt", null, r[0])); recap.appendChild(el("dd", null, r[1])); });
       document.getElementById("wa").href = waUrl;
-      document.getElementById("ok-label").textContent = sent ? "Demande envoyée" : "Dernière étape";
-      document.getElementById("ok-title").textContent = sent ? "Merci, votre demande est bien reçue" : "Envoyez votre demande sur WhatsApp";
-      document.getElementById("ok-text").textContent = sent
-        ? "Notre équipe vous appelle pour confirmer votre table. Votre réservation n’est valable qu’après cette confirmation."
-        : "Votre demande est prête. Appuyez sur le bouton ci-dessous pour l’envoyer à notre équipe sur WhatsApp. Nous vous rappelons ensuite pour confirmer votre table.";
-      document.getElementById("ok-wa").hidden = !sent;
+      /* L'envoi WhatsApp est obligatoire dans tous les cas : sans message WhatsApp, la demande n'est pas traitée */
+      document.getElementById("ok-label").textContent = "Dernière étape obligatoire";
+      document.getElementById("ok-title").textContent = "Envoyez votre demande sur WhatsApp";
+      document.getElementById("ok-text").textContent = "Votre réservation n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre message déjà rempli, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre demande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour confirmer votre table.";
+      document.getElementById("ok-wa").hidden = true;
       form.hidden = true; ok.hidden = false; ok.focus();
-      send.disabled = false; send.textContent = CONFIG.endpoint ? "Envoyer ma demande" : "Continuer";
+      send.disabled = false; send.textContent = "Continuer";
     }
 
     if (form.botcheck && form.botcheck.checked) { done(true); return; }
@@ -642,7 +855,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     send.disabled = true; send.textContent = "Envoi en cours…";
     var payload = {
       access_key: CONFIG.cle,
-      subject: "Réservation : " + dLabel + " à " + heureTxt + ", " + data.personnes + " pers., " + data.nom,
+      subject: "Réservation (à valider seulement si reçue sur WhatsApp) : " + dLabel + " à " + heureTxt + ", " + data.personnes + " pers., " + data.nom,
       from_name: "Site La Maison Blanche",
       "Espace": data.espace, "Date": dLabel, "Heure": heureTxt, "Personnes": data.personnes,
       "Nom": data.nom, "Téléphone": data.telephone, "E-mail": data.email || "-", "Occasion": data.occasion || "-", "Remarque": data.remarque || "-"
