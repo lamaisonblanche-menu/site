@@ -8,6 +8,10 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>[hidden]{display:none!important}html,body{margin:0;padding:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <link rel="canonical" href="https://lamaisonblanchehydra.com/">
+<link rel="alternate" hreflang="fr" href="https://lamaisonblanchehydra.com/?lang=fr">
+<link rel="alternate" hreflang="en" href="https://lamaisonblanchehydra.com/?lang=en">
+<link rel="alternate" hreflang="ar" href="https://lamaisonblanchehydra.com/?lang=ar">
+<link rel="alternate" hreflang="x-default" href="https://lamaisonblanchehydra.com/">
 <meta property="og:type" content="restaurant">
 <meta property="og:url" content="https://lamaisonblanchehydra.com/">
 <meta property="og:site_name" content="La Maison Blanche">
@@ -22,7 +26,7 @@
 <meta name="description" content="La Maison Blanche, restaurant à Hydra (Alger) : brunch, carte gastronomique, cuisine asiatique. Menu en ligne et réservation.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@300;400;500&family=Reem+Kufi:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500&display=swap">
 <style>
 /* Layout: a white house with black ink. White rooms, generous space, photos at their natural framing.
    Black is kept for three moments only: the band under the hero, the signature dishes, the booking + footer. */
@@ -120,16 +124,16 @@ section.room { padding-block: 112px; }
 /* Espaces: three columns, text only */
 .spaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ink); }
 .space { display: grid; gap: 18px; align-content: start; padding: 44px 40px 8px; }
-.space:first-child { padding-left: 0; }
-.space:last-child { padding-right: 0; }
-.space + .space { border-left: 1px solid #d6d5d0; }
+.space:first-child { padding-inline-start: 0; }
+.space:last-child { padding-inline-end: 0; }
+.space + .space { border-inline-start: 1px solid #d6d5d0; }
 .space h3 { font-size: clamp(28px, 3vw, 38px); }
 .space p { color: var(--muted); }
 .space dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; margin: 8px 0 0; padding-top: 20px; border-top: 1px solid #d6d5d0; font-size: 15px; }
 .space dt { color: var(--muted); }
 .space dd { margin: 0; font-weight: 400; }
 .space .btn { justify-self: start; margin-top: 10px; }
-@media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-left: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
+@media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-inline-start: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
 
 /* Signatures */
 .sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
@@ -186,13 +190,13 @@ textarea { min-height: 80px; resize: vertical; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 6px; border: 1px solid var(--muted); }
 .choices label { position: relative; display: grid; gap: 2px; padding: 16px 10px; cursor: pointer; text-align: center; font-size: 14px; font-weight: 400; letter-spacing: .06em; }
-.choices label + label { border-left: 1px solid var(--muted); }
+.choices label + label { border-inline-start: 1px solid var(--muted); }
 .choices label small { font-size: 12px; color: var(--muted); font-weight: 300; }
 .choices input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
 .choices label:has(input:checked) { background: var(--fg); color: var(--bg); }
 .choices label:has(input:checked) small { color: var(--bg); opacity: .7; }
 .choices label:has(input:focus-visible) { outline: 1px solid var(--fg); outline-offset: 3px; }
-@media (max-width: 520px) { .choices { grid-template-columns: 1fr; } .choices label + label { border-left: 0; border-top: 1px solid var(--muted); } }
+@media (max-width: 520px) { .choices { grid-template-columns: 1fr; } .choices label + label { border-inline-start: 0; border-top: 1px solid var(--muted); } }
 .alert { padding: 12px 14px; border: 1px solid var(--line); font-size: 14px; }
 .error { color: #f08a80; font-size: 14px; }
 .confirm { display: grid; gap: 18px; }
@@ -208,10 +212,10 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .infos h3 { font-size: 26px; margin-bottom: 4px; }
 .infos table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .infos td { padding: 3px 12px; }
-.infos td:first-child { color: var(--muted); text-align: right; }
-.infos td:last-child { text-align: left; }
+.infos td:first-child { color: var(--muted); text-align: end; }
+.infos td:last-child { text-align: start; }
 .infos a { color: var(--ink); text-underline-offset: 5px; text-decoration-thickness: 1px; }
-.copy { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0 0 0 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.copy { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0; padding-inline-start: 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 860px) { .infos { grid-template-columns: 1fr; gap: 44px; } }
 
 
@@ -264,6 +268,30 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 .motion .rv { opacity: 0; transform: translateY(26px); transition: opacity 1.1s var(--ease), transform 1.1s var(--ease); transition-delay: var(--d, 0s); }
 .motion .rv.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .motion .rv { opacity: 1; transform: none; transition: none; } .motion .hero-photo::after, .motion .hero .wrap > *, #menu-panel > * { animation: none; } }
+
+/* Choix de la langue */
+.site-header .wrap { justify-content: flex-start; }
+.site-nav { margin-inline-start: auto; }
+.tools { display: flex; align-items: center; gap: 6px; margin-inline-start: 22px; }
+.lang { display: flex; align-items: center; }
+.lang button { background: none; border: 0; min-height: 40px; padding: 0 7px; font: 400 12px/1 var(--f-body); letter-spacing: .16em; color: var(--muted); cursor: pointer; }
+.lang button + button { border-inline-start: 1px solid var(--line); }
+.lang button[lang="ar"] { font-family: "IBM Plex Sans Arabic", "Geeza Pro", sans-serif; font-size: 14px; letter-spacing: 0; }
+.lang button[aria-pressed="true"] { color: var(--ink); font-weight: 500; }
+.lang button:hover { color: var(--ink); }
+@media (min-width: 901px) and (max-width: 1100px) { .site-nav { gap: 20px; } .site-nav a { letter-spacing: .16em; } .tools { margin-inline-start: 14px; } }
+@media (max-width: 900px) { .tools { margin-inline-start: auto; } }
+@media (max-width: 380px) { .lang button { padding: 0 5px; } }
+
+/* Arabe : écriture de droite à gauche, polices arabes, pas d'espacement entre les lettres */
+html[lang="ar"] { --f-display: "Marcellus", "Reem Kufi", "Geeza Pro", serif; --f-body: "Jost", "IBM Plex Sans Arabic", "Geeza Pro", "Segoe UI", sans-serif; }
+html[lang="ar"] body { line-height: 1.85; }
+html[lang="ar"] body *:not(.lang button) { letter-spacing: 0 !important; }
+html[lang="ar"] .label, html[lang="ar"] .field > label, html[lang="ar"] .field legend { font-size: 13px; }
+html[lang="ar"] .site-nav a, html[lang="ar"] .btn, html[lang="ar"] .menu-tabs button, html[lang="ar"] .cart-bar a { font-size: 14px; }
+html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3 { line-height: 1.4; }
+html[lang="ar"] .statement { line-height: 1.6; }
+[dir="rtl"] input[type="tel"], [dir="rtl"] input[type="email"] { direction: ltr; text-align: right; }
 </style>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Restaurant","name":"Restaurant La Maison Blanche","alternateName":["La Maison Blanche Hydra","Maison Blanche Hydra"],
@@ -279,49 +307,56 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="#accueil" aria-label="La Maison Blanche, accueil"><img src="logo.png" alt=""></a>
-    <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav"><span></span><span></span></button>
-    <nav class="site-nav" id="nav" aria-label="Navigation principale">
-      <a href="#maison">La maison</a>
-      <a href="#espaces">Espaces</a>
-      <a href="#signatures">Signatures</a>
-      <a href="#menu">Menu</a>
-      <a href="#infos">Infos</a>
-      <a href="#livraison">Livraison</a>
-      <a class="btn btn-solid" href="#reserver">Réserver</a>
+    <a class="brand" href="#accueil" aria-label="La Maison Blanche"><img src="logo.png" alt=""></a>
+    <nav class="site-nav" id="nav" aria-label="Navigation">
+      <a href="#maison" data-i18n="nav_maison">La maison</a>
+      <a href="#espaces" data-i18n="nav_espaces">Espaces</a>
+      <a href="#signatures" data-i18n="nav_sig">Signatures</a>
+      <a href="#menu" data-i18n="nav_menu">Menu</a>
+      <a href="#infos" data-i18n="nav_infos">Infos</a>
+      <a href="#livraison" data-i18n="nav_liv">Livraison</a>
+      <a class="btn btn-solid" href="#reserver" data-i18n="nav_resa">Réserver</a>
     </nav>
+    <div class="tools">
+      <div class="lang" role="group" aria-label="Langue · Language · اللغة">
+        <button type="button" data-lang="fr" lang="fr" aria-pressed="true">FR</button>
+        <button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button>
+        <button type="button" data-lang="ar" lang="ar" aria-pressed="false">عربي</button>
+      </div>
+      <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav"><span></span><span></span></button>
+    </div>
   </div>
 </header>
 
 <main id="accueil">
   <section class="hero hero-photo dark">
     <div class="wrap">
-      <p class="label">Restaurant · Hydra, Alger</p>
+      <p class="label" data-i18n="hero_label">Restaurant · Hydra, Alger</p>
       <h1><img class="hero-logo" src="logo-blanc.png" alt="La Maison Blanche" fetchpriority="high"></h1>
-      <p class="tag">Brunch, cuisine gastronomique et asiatique, avec des produits de saison.</p>
+      <p class="tag" data-i18n="hero_tag">Brunch, cuisine gastronomique et asiatique, avec des produits de saison.</p>
       <div class="actions">
-        <a class="btn btn-solid" href="#reserver">Réserver une table</a>
-        <a class="btn btn-line" href="#menu">Découvrir le menu</a>
-        <a class="btn btn-line" href="#livraison">Commander en livraison</a>
+        <a class="btn btn-solid" href="#reserver" data-i18n="hero_b1">Réserver une table</a>
+        <a class="btn btn-line" href="#menu" data-i18n="hero_b2">Découvrir le menu</a>
+        <a class="btn btn-line" href="#livraison" data-i18n="hero_b3">Commander en livraison</a>
       </div>
       <div class="hours">
-        <span><span class="muted">Samedi au jeudi</span><b>9 h – 23 h</b></span>
-        <span><span class="muted">Vendredi</span><b>16 h – 23 h</b></span>
-        <span><span class="muted">Brunch</span><b>Jusqu’à 18 h</b></span>
+        <span><span class="muted" data-i18n="d_satthu">Samedi au jeudi</span><b data-i18n="hr_day">9 h – 23 h</b></span>
+        <span><span class="muted" data-i18n="d_fri">Vendredi</span><b data-i18n="hr_fri">16 h – 23 h</b></span>
+        <span><span class="muted" data-i18n="w_brunch">Brunch</span><b data-i18n="hr_until18">Jusqu’à 18 h</b></span>
       </div>
     </div>
   </section>
 
-  <div class="band dark" aria-label="La Maison Blanche en bref">
-    <ul class="wrap"><li>Brunch</li><li>Gastronomie</li><li>Cuisine asiatique</li><li>Produits de saison</li><li>Bar sans alcool</li></ul>
+  <div class="band dark" aria-label="La Maison Blanche">
+    <ul class="wrap"><li data-i18n="b_brunch">Brunch</li><li data-i18n="b_gastro">Gastronomie</li><li data-i18n="b_asie">Cuisine asiatique</li><li data-i18n="b_saison">Produits de saison</li><li data-i18n="b_bar">Bar sans alcool</li></ul>
   </div>
 
   <section class="room" id="maison">
     <div class="wrap">
-      <p class="label" style="text-align:center;margin-bottom:22px">La maison</p>
-      <p class="statement">Du premier café du matin au dernier dessert du soir, une seule maison au cœur d’Hydra.</p>
+      <p class="label" style="text-align:center;margin-bottom:22px" data-i18n="m_label">La maison</p>
+      <p class="statement" data-i18n="m_statement">Du premier café du matin au dernier dessert du soir, une seule maison au cœur d’Hydra.</p>
       <div class="intro-text">
-        <p>Une salle brunch lumineuse, un espace gastronomique et une terrasse entourée de verdure, rue des Frères Ben Ali. En cuisine, des produits de saison ; au bar, des cocktails maison sans alcool.</p>
+        <p data-i18n="m_text">Une salle brunch lumineuse, un espace gastronomique et une terrasse entourée de verdure, rue des Frères Ben Ali. En cuisine, des produits de saison ; au bar, des cocktails maison sans alcool.</p>
       </div>
     </div>
   </section>
@@ -329,32 +364,32 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   <section class="room stone" id="espaces">
     <div class="wrap">
       <div class="head center">
-        <p class="label">Nos espaces</p>
-        <h2>Trois ambiances</h2>
-        <p class="sub">Choisissez votre espace au moment de réserver.</p>
+        <p class="label" data-i18n="e_label">Nos espaces</p>
+        <h2 data-i18n="e_h2">Trois ambiances</h2>
+        <p class="sub" data-i18n="e_sub">Choisissez votre espace au moment de réserver.</p>
       </div>
       <div class="spaces">
         <article class="space">
-                      <p class="label">Jusqu’à 18 h</p>
-            <h3>Salle brunch</h3>
-            <p>Œufs, toasts, brioches perdues, pancakes et cocktails maison. Une salle lumineuse pour un brunch entre amis ou en famille.</p>
-            <dl><dt>Réservation</dt><dd>9 h – 17 h 30</dd><dt>Vendredi</dt><dd>16 h – 17 h 30</dd></dl>
-            <a class="btn btn-line" href="#reserver">Réserver au brunch</a>
+            <p class="label" data-i18n="hr_until18">Jusqu’à 18 h</p>
+            <h3 data-i18n="sp1_h">Salle brunch</h3>
+            <p data-i18n="sp1_p">Œufs, toasts, brioches perdues, pancakes et cocktails maison. Une salle lumineuse pour un brunch entre amis ou en famille.</p>
+            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_b1">9 h – 17 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_b2">16 h – 17 h 30</dd></dl>
+            <a class="btn btn-line" href="#reserver" data-i18n="sp1_btn">Réserver au brunch</a>
         </article>
         <article class="space">
-                      <p class="label">Toute la journée</p>
-            <h3>Espace gastronomique</h3>
-            <p>Nappes blanches, moulures et appliques dorées. Foie gras, cœur de filet de bœuf, poissons et pâtes, dans un cadre feutré.</p>
-            <dl><dt>Réservation</dt><dd>9 h – 22 h 30</dd><dt>Vendredi</dt><dd>16 h – 22 h 30</dd></dl>
-            <a class="btn btn-line" href="#reserver">Réserver en salle</a>
+            <p class="label" data-i18n="allday">Toute la journée</p>
+            <h3 data-i18n="sp2_h">Espace gastronomique</h3>
+            <p data-i18n="sp2_p">Nappes blanches, moulures et appliques dorées. Foie gras, cœur de filet de bœuf, poissons et pâtes, dans un cadre feutré.</p>
+            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_g1">9 h – 22 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_g2">16 h – 22 h 30</dd></dl>
+            <a class="btn btn-line" href="#reserver" data-i18n="sp2_btn">Réserver en salle</a>
         </article>
         <article class="space">
-                      <p class="label">Toute la journée</p>
-            <h3>Terrasse</h3>
-            <p>Le plus grand espace de la maison, avec ses banquettes et sa verdure, du déjeuner au dîner.</p>
-            <p class="note" style="margin-top:8px">Ouverture selon la météo : si la terrasse est fermée le jour de votre venue, nous vous proposons une table à l’intérieur.</p>
-            <dl><dt>Réservation</dt><dd>9 h – 22 h 30</dd><dt>Vendredi</dt><dd>16 h – 22 h 30</dd></dl>
-            <a class="btn btn-line" href="#reserver">Réserver en terrasse</a>
+            <p class="label" data-i18n="allday">Toute la journée</p>
+            <h3 data-i18n="sp3_h">Terrasse</h3>
+            <p data-i18n="sp3_p">Le plus grand espace de la maison, avec ses banquettes et sa verdure, du déjeuner au dîner.</p>
+            <p class="note" style="margin-top:8px" data-i18n="sp3_note">Ouverture selon la météo : si la terrasse est fermée le jour de votre venue, nous vous proposons une table à l’intérieur.</p>
+            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_g1">9 h – 22 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_g2">16 h – 22 h 30</dd></dl>
+            <a class="btn btn-line" href="#reserver" data-i18n="sp3_btn">Réserver en terrasse</a>
         </article>
       </div>
     </div>
@@ -363,16 +398,16 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   <section class="room dark" id="signatures">
     <div class="wrap">
       <div class="head center">
-        <p class="label">Nos signatures</p>
-        <h2>Les assiettes de la maison</h2>
+        <p class="label" data-i18n="s_label">Nos signatures</p>
+        <h2 data-i18n="s_h2">Les assiettes de la maison</h2>
       </div>
       <div class="sig-grid">
-        <article class="sig"><img src="photos/saumon-orange.jpg" alt="Saumon à l’orange" loading="lazy" style="object-position:50% 50%"><div class="meta"><div><p class="cat">Poisson</p><h3>Saumon à l’orange</h3></div><span class="p">4 500 DA</span></div></article>
-        <article class="sig"><img src="photos/carpaccio-burrata.jpg" alt="Carpaccio de bœuf" loading="lazy" style="object-position:50% 72%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Carpaccio de bœuf</h3></div><span class="p">2 500 DA</span></div></article>
-        <article class="sig"><img src="photos/gambas-tempura.jpg" alt="Gambas tempura" loading="lazy" style="object-position:50% 62%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Gambas tempura</h3></div><span class="p">3 200 DA</span></div></article>
-        <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Escargots de Bourgogne</h3></div><span class="p">2 300 DA</span></div></article>
-        <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat">Brunch</p><h3>Club sandwich saumon fumé</h3></div><span class="p">2 700 DA</span></div></article>
-        <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 000 DA</span></div></article>
+        <article class="sig"><img src="photos/saumon-orange.jpg" alt="Saumon à l’orange" loading="lazy" style="object-position:50% 50%"><div class="meta"><div><p class="cat" data-tr>Poisson</p><h3 data-tr>Saumon à l’orange</h3></div><span class="p" data-da="4500">4 500 DA</span></div></article>
+        <article class="sig"><img src="photos/carpaccio-burrata.jpg" alt="Carpaccio de bœuf" loading="lazy" style="object-position:50% 72%"><div class="meta"><div><p class="cat" data-tr>Entrée froide</p><h3 data-tr>Carpaccio de bœuf</h3></div><span class="p" data-da="2500">2 500 DA</span></div></article>
+        <article class="sig"><img src="photos/gambas-tempura.jpg" alt="Gambas tempura" loading="lazy" style="object-position:50% 62%"><div class="meta"><div><p class="cat" data-tr>Entrée chaude</p><h3 data-tr>Gambas tempura</h3></div><span class="p" data-da="3200">3 200 DA</span></div></article>
+        <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat" data-tr>Entrée chaude</p><h3 data-tr>Escargots de Bourgogne</h3></div><span class="p" data-da="2300">2 300 DA</span></div></article>
+        <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat" data-tr>Brunch</p><h3 data-tr>Club sandwich saumon fumé</h3></div><span class="p" data-da="2700">2 700 DA</span></div></article>
+        <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat" data-tr>Entrée froide</p><h3 data-tr>Burrata, carpaccio de tomates</h3></div><span class="p" data-da="2000">2 000 DA</span></div></article>
       </div>
     </div>
   </section>
@@ -380,13 +415,13 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   <section class="room" id="menu">
     <div class="wrap">
       <div class="head center">
-        <p class="label">Le menu</p>
-        <h2>Notre carte</h2>
-        <p class="sub">Prix en dinars algériens (DA).</p>
+        <p class="label" data-i18n="mn_label">Le menu</p>
+        <h2 data-i18n="mn_h2">Notre carte</h2>
+        <p class="sub" data-i18n="mn_sub">Prix en dinars algériens (DA).</p>
       </div>
-      <div class="menu-tabs" role="tablist" aria-label="Cartes" id="menu-tabs"></div>
+      <div class="menu-tabs" role="tablist" aria-label="Menu" id="menu-tabs"></div>
       <div class="menu-panel" id="menu-panel" role="tabpanel"></div>
-      <p class="menu-note">La carte peut évoluer selon les saisons et les arrivages.</p>
+      <p class="menu-note" data-i18n="mn_note">La carte peut évoluer selon les saisons et les arrivages.</p>
     </div>
   </section>
 
@@ -394,50 +429,50 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   <section class="room stone" id="livraison">
     <div class="wrap">
       <div class="head center">
-        <p class="label">Livraison</p>
-        <h2>Commander en livraison</h2>
-        <p class="sub">Choisissez vos plats, envoyez votre commande, nous vous rappelons pour la confirmer et vous annoncer les frais de livraison. Paiement en espèces à la livraison.</p>
+        <p class="label" data-i18n="l_label">Livraison</p>
+        <h2 data-i18n="l_h2">Commander en livraison</h2>
+        <p class="sub" data-i18n="l_sub">Choisissez vos plats, envoyez votre commande, nous vous rappelons pour la confirmer et vous annoncer les frais de livraison. Paiement en espèces à la livraison.</p>
       </div>
       <div class="deliv">
         <div>
-          <div class="menu-tabs" role="tablist" aria-label="Cartes à livrer" id="liv-tabs"></div>
+          <div class="menu-tabs" role="tablist" aria-label="Menu" id="liv-tabs"></div>
           <div class="liv-panel" id="liv-panel"></div>
         </div>
         <aside class="cart" id="panier">
           <form class="resa" id="liv-form" novalidate>
             <div class="field">
-              <p class="label" style="color:var(--fg)">Votre commande</p>
+              <p class="label" style="color:var(--fg)" data-i18n="l_your">Votre commande</p>
               <ul class="cart-list" id="cart-list"></ul>
-              <p class="cart-empty" id="cart-empty">Votre panier est vide. Ajoutez des plats avec le bouton +.</p>
+              <p class="cart-empty" id="cart-empty" data-i18n="l_empty">Votre panier est vide. Ajoutez des plats avec le bouton +.</p>
             </div>
             <div class="cart-total">
-              <div><span>Sous-total</span><span class="big" id="cart-sub">0 DA</span></div>
-              <div class="muted"><span>Frais de livraison</span><span>annoncés par téléphone</span></div>
-              <div class="muted"><span>Paiement</span><span>espèces à la livraison</span></div>
+              <div><span data-i18n="l_subtot">Sous-total</span><span class="big" id="cart-sub">0 DA</span></div>
+              <div class="muted"><span data-i18n="l_fees">Frais de livraison</span><span data-i18n="l_fees_v">annoncés par téléphone</span></div>
+              <div class="muted"><span data-i18n="l_pay">Paiement</span><span data-i18n="l_pay_v">espèces à la livraison</span></div>
             </div>
             <div class="row2">
-              <div class="field"><label for="l-nom">Nom et prénom</label><input type="text" id="l-nom" autocomplete="name" required></div>
-              <div class="field"><label for="l-tel">Téléphone</label><input type="tel" id="l-tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
+              <div class="field"><label for="l-nom" data-i18n="f_name">Nom et prénom</label><input type="text" id="l-nom" autocomplete="name" required></div>
+              <div class="field"><label for="l-tel" data-i18n="f_tel">Téléphone</label><input type="tel" id="l-tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
             </div>
-            <div class="field"><label for="l-adr">Adresse de livraison</label><input type="text" id="l-adr" autocomplete="street-address" placeholder="Rue, numéro, bâtiment, étage" required></div>
-            <div class="field"><label for="l-commune">Commune / quartier</label><input type="text" id="l-commune" placeholder="Hydra, Ben Aknoun, El Biar…" required></div>
+            <div class="field"><label for="l-adr" data-i18n="f_adr">Adresse de livraison</label><input type="text" id="l-adr" autocomplete="street-address" placeholder="Rue, numéro, bâtiment, étage" data-i18n-ph="ph_adr" required></div>
+            <div class="field"><label for="l-commune" data-i18n="f_com">Commune / quartier</label><input type="text" id="l-commune" placeholder="Hydra, Ben Aknoun, El Biar…" data-i18n-ph="ph_com" required></div>
             <div class="row2">
-              <div class="field"><label for="l-jour">Jour</label><select id="l-jour"><option value="0">Aujourd’hui</option><option value="1">Demain</option></select></div>
-              <div class="field"><label for="l-heure">Heure de livraison</label><select id="l-heure"></select></div>
+              <div class="field"><label for="l-jour" data-i18n="f_day">Jour</label><select id="l-jour"><option value="0" data-i18n="o_today">Aujourd’hui</option><option value="1" data-i18n="o_tomorrow">Demain</option></select></div>
+              <div class="field"><label for="l-heure" data-i18n="f_ltime">Heure de livraison</label><select id="l-heure"></select></div>
             </div>
-            <div class="field"><label for="l-rem">Remarque <span class="hint">(facultatif)</span></label><textarea id="l-rem" placeholder="Code de la porte, allergie, sauce à part…"></textarea></div>
+            <div class="field"><label for="l-rem" data-i18n="f_rem">Remarque <span class="hint">(facultatif)</span></label><textarea id="l-rem" placeholder="Code de la porte, allergie, sauce à part…" data-i18n-ph="ph_lrem"></textarea></div>
             <p class="error" id="l-err" role="alert" hidden></p>
-            <p class="hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre commande.</p>
+            <p class="hint" data-i18n="l_wa_hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre commande.</p>
             <button class="btn btn-solid" type="submit" id="l-send">Continuer</button>
           </form>
           <div class="confirm dark" id="liv-ok" hidden tabindex="-1">
-            <p class="label">Dernière étape obligatoire</p>
-            <h3>Envoyez votre commande sur WhatsApp</h3>
-            <p>Votre commande n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre commande déjà remplie, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre commande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour la confirmer et vous annoncer les frais de livraison.</p>
+            <p class="label" data-i18n="ok_last">Dernière étape obligatoire</p>
+            <h3 data-i18n="l_ok_h">Envoyez votre commande sur WhatsApp</h3>
+            <p data-i18n="l_ok_p">Votre commande n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre commande déjà remplie, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre commande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour la confirmer et vous annoncer les frais de livraison.</p>
             <dl class="recap" id="liv-recap"></dl>
             <div class="actions">
-              <a class="btn btn-solid" id="liv-wa" href="https://wa.me/213541559672" target="_blank" rel="noopener">Envoyer sur WhatsApp</a>
-              <button class="btn btn-line" type="button" id="liv-again">Nouvelle commande</button>
+              <a class="btn btn-solid" id="liv-wa" href="https://wa.me/213541559672" target="_blank" rel="noopener" data-i18n="btn_wa">Envoyer sur WhatsApp</a>
+              <button class="btn btn-line" type="button" id="liv-again" data-i18n="l_again">Nouvelle commande</button>
             </div>
           </div>
         </aside>
@@ -450,49 +485,49 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     <div class="wrap booking">
       <div>
         <div class="head" style="margin-bottom:0">
-          <p class="label">Réservation</p>
-          <h2>Réserver une table</h2>
-          <p class="sub">Envoyez votre demande en une minute. Notre équipe vous rappelle pour la confirmer.</p>
+          <p class="label" data-i18n="r_label">Réservation</p>
+          <h2 data-i18n="r_h2">Réserver une table</h2>
+          <p class="sub" data-i18n="r_sub">Envoyez votre demande en une minute. Notre équipe vous rappelle pour la confirmer.</p>
         </div>
         <ol class="steps">
-          <li><span>1</span><p>Vous choisissez l’espace, la date et l’heure, puis vous envoyez votre demande.</p></li>
-          <li><span>2</span><p>Notre équipe vous appelle pour confirmer votre table.</p></li>
-          <li><span>3</span><p>Votre table vous attend.</p></li>
+          <li><span>1</span><p data-i18n="r_s1">Vous choisissez l’espace, la date et l’heure, puis vous envoyez votre demande.</p></li>
+          <li><span>2</span><p data-i18n="r_s2">Notre équipe vous appelle pour confirmer votre table.</p></li>
+          <li><span>3</span><p data-i18n="r_s3">Votre table vous attend.</p></li>
         </ol>
-        <p class="note">Réservation en ligne jusqu’à 8 personnes, au plus tard 1 heure à l’avance, et jusqu’à 30 minutes avant la fermeture de l’espace. La terrasse ouvre selon la météo : si elle est fermée, nous vous proposons une table à l’intérieur lors de la confirmation. Pour un groupe ou une demande de dernière minute, appelez le +213 541 55 96 72.</p>
+        <p class="note" data-i18n="r_note">Réservation en ligne jusqu’à 8 personnes, au plus tard 1 heure à l’avance, et jusqu’à 30 minutes avant la fermeture de l’espace. La terrasse ouvre selon la météo : si elle est fermée, nous vous proposons une table à l’intérieur lors de la confirmation. Pour un groupe ou une demande de dernière minute, appelez le +213 541 55 96 72.</p>
       </div>
       <div>
         <form class="resa" id="resa" novalidate>
-          <input type="checkbox" name="botcheck" id="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
+          <input type="checkbox" name="botcheck" id="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;top:0;width:1px;height:1px;opacity:0;pointer-events:none;clip-path:inset(50%)">
           <fieldset class="field">
-            <legend>Espace</legend>
+            <legend data-i18n="leg_esp">Espace</legend>
             <div class="choices">
-              <label><input type="radio" name="espace" id="esp-brunch" value="brunch" checked><span>Salle brunch</span><small>9 h – 17 h 30</small></label>
-              <label><input type="radio" name="espace" id="esp-gastro" value="gastro"><span>Gastronomique</span><small>9 h – 22 h 30</small></label>
-              <label><input type="radio" name="espace" id="esp-terrasse" value="terrasse"><span>Terrasse</span><small>9 h – 22 h 30 · selon la météo</small></label>
+              <label><input type="radio" name="espace" id="esp-brunch" value="brunch" checked><span data-i18n="c_brunch">Salle brunch</span><small data-i18n="dd_b1">9 h – 17 h 30</small></label>
+              <label><input type="radio" name="espace" id="esp-gastro" value="gastro"><span data-i18n="c_gastro">Gastronomique</span><small data-i18n="dd_g1">9 h – 22 h 30</small></label>
+              <label><input type="radio" name="espace" id="esp-terrasse" value="terrasse"><span data-i18n="c_terr">Terrasse</span><small data-i18n="c_terr_t">9 h – 22 h 30 · selon la météo</small></label>
             </div>
           </fieldset>
           <div class="row2">
-            <div class="field"><label for="date">Date</label><input type="date" id="date" name="date" required></div>
-            <div class="field"><label for="heure">Heure</label><select id="heure" name="heure" required></select></div>
+            <div class="field"><label for="date" data-i18n="f_date">Date</label><input type="date" id="date" name="date" required></div>
+            <div class="field"><label for="heure" data-i18n="f_time">Heure</label><select id="heure" name="heure" required></select></div>
           </div>
           <div class="field">
-            <label for="personnes">Nombre de personnes</label>
+            <label for="personnes" data-i18n="f_pers">Nombre de personnes</label>
             <select id="personnes" name="personnes" required></select>
-            <p class="alert" id="groupe" hidden>Pour plus de 8 personnes, appelez-nous directement au <b>+213 541 55 96 72</b>.</p>
+            <p class="alert" id="groupe" hidden data-i18n="r_groupe">Pour plus de 8 personnes, appelez-nous directement au <b>+213 541 55 96 72</b>.</p>
           </div>
           <div class="row2">
-            <div class="field"><label for="nom">Nom et prénom</label><input type="text" id="nom" name="nom" autocomplete="name" required></div>
-            <div class="field"><label for="tel">Téléphone</label><input type="tel" id="tel" name="tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
+            <div class="field"><label for="nom" data-i18n="f_name">Nom et prénom</label><input type="text" id="nom" name="nom" autocomplete="name" required></div>
+            <div class="field"><label for="tel" data-i18n="f_tel">Téléphone</label><input type="tel" id="tel" name="tel" autocomplete="tel" inputmode="tel" placeholder="05 xx xx xx xx" required></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="email">E-mail <span class="hint">(facultatif)</span></label><input type="email" id="email" name="email" autocomplete="email"></div>
-            <div class="field"><label for="occasion">Occasion <span class="hint">(facultatif)</span></label>
-              <select id="occasion" name="occasion"><option value="">Aucune</option><option>Anniversaire</option><option>Repas d’affaires</option><option>Rendez-vous en couple</option><option>Repas en famille</option><option>Autre</option></select></div>
+            <div class="field"><label for="email" data-i18n="f_email">E-mail <span class="hint">(facultatif)</span></label><input type="email" id="email" name="email" autocomplete="email"></div>
+            <div class="field"><label for="occasion" data-i18n="f_occ">Occasion <span class="hint">(facultatif)</span></label>
+              <select id="occasion" name="occasion"><option value="" data-i18n="occ_none">Aucune</option><option value="Anniversaire" data-i18n="occ_birth">Anniversaire</option><option value="Repas d’affaires" data-i18n="occ_biz">Repas d’affaires</option><option value="Rendez-vous en couple" data-i18n="occ_couple">Rendez-vous en couple</option><option value="Repas en famille" data-i18n="occ_family">Repas en famille</option><option value="Autre" data-i18n="occ_other">Autre</option></select></div>
           </div>
-          <div class="field"><label for="remarque">Remarque <span class="hint">(facultatif)</span></label><textarea id="remarque" name="remarque" placeholder="Chaise bébé, allergie, table près de la fenêtre…"></textarea></div>
+          <div class="field"><label for="remarque" data-i18n="f_rem">Remarque <span class="hint">(facultatif)</span></label><textarea id="remarque" name="remarque" placeholder="Chaise bébé, allergie, table près de la fenêtre…" data-i18n-ph="ph_rrem"></textarea></div>
           <p class="error" id="err" role="alert" hidden></p>
-          <p class="hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre demande.</p>
+          <p class="hint" data-i18n="r_wa_hint">Après ce formulaire, l’envoi d’un message WhatsApp est obligatoire pour valider votre demande.</p>
           <button class="btn btn-solid" type="submit" id="send">Continuer</button>
         </form>
 
@@ -503,8 +538,8 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
           <dl class="recap" id="recap"></dl>
           <p id="ok-wa" hidden>Pour aller plus vite, vous pouvez aussi l’envoyer sur WhatsApp.</p>
           <div class="actions">
-            <a class="btn btn-solid" id="wa" href="https://wa.me/213541559672" target="_blank" rel="noopener">Envoyer sur WhatsApp</a>
-            <button class="btn btn-line" type="button" id="again">Nouvelle demande</button>
+            <a class="btn btn-solid" id="wa" href="https://wa.me/213541559672" target="_blank" rel="noopener" data-i18n="btn_wa">Envoyer sur WhatsApp</a>
+            <button class="btn btn-line" type="button" id="again" data-i18n="r_again">Nouvelle demande</button>
           </div>
         </div>
       </div>
@@ -513,26 +548,26 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 
   <section class="room" id="infos">
     <div class="wrap">
-      <div class="head center"><p class="label">Infos pratiques</p><h2>Nous rendre visite</h2></div>
+      <div class="head center"><p class="label" data-i18n="i_label">Infos pratiques</p><h2 data-i18n="i_h2">Nous rendre visite</h2></div>
       <div class="infos">
         <div>
-          <h3>Horaires</h3>
+          <h3 data-i18n="i_hours">Horaires</h3>
           <table><tbody>
-            <tr><td>Samedi – jeudi</td><td>9 h – 23 h</td></tr>
-            <tr><td>Vendredi</td><td>16 h – 23 h</td></tr>
-            <tr><td>Brunch</td><td>jusqu’à 18 h</td></tr>
+            <tr><td data-i18n="i_sathu">Samedi – jeudi</td><td data-i18n="hr_day">9 h – 23 h</td></tr>
+            <tr><td data-i18n="d_fri">Vendredi</td><td data-i18n="hr_fri">16 h – 23 h</td></tr>
+            <tr><td data-i18n="w_brunch">Brunch</td><td data-i18n="i_until18">jusqu’à 18 h</td></tr>
           </tbody></table>
         </div>
         <div>
-          <h3>Adresse</h3>
-          <p>23, rue des Frères Ben Ali<br>Hydra, Alger</p>
-          <p><a href="https://www.google.com/maps/search/?api=1&amp;query=La+Maison+Blanche+23+rue+des+Fr%C3%A8res+Ben+Ali+Hydra+Alger" target="_blank" rel="noopener">Voir sur Google Maps</a></p>
+          <h3 data-i18n="i_addr">Adresse</h3>
+          <p data-i18n="i_addr_p">23, rue des Frères Ben Ali<br>Hydra, Alger</p>
+          <p><a href="https://www.google.com/maps/search/?api=1&amp;query=La+Maison+Blanche+23+rue+des+Fr%C3%A8res+Ben+Ali+Hydra+Alger" target="_blank" rel="noopener" data-i18n="i_maps">Voir sur Google Maps</a></p>
         </div>
         <div>
-          <h3>Contact</h3>
-          <p>+213 541 55 96 72<button class="copy" type="button" data-copy="+213541559672">Copier</button></p>
-          <p>maisonblanchehydra@gmail.com<button class="copy" type="button" data-copy="maisonblanchehydra@gmail.com">Copier</button></p>
-          <p><a href="https://wa.me/213541559672" target="_blank" rel="noopener">Écrire sur WhatsApp</a></p>
+          <h3 data-i18n="i_contact">Contact</h3>
+          <p><bdi dir="ltr">+213 541 55 96 72</bdi><button class="copy" type="button" data-copy="+213541559672" data-i18n="copy">Copier</button></p>
+          <p><bdi dir="ltr">maisonblanchehydra@gmail.com</bdi><button class="copy" type="button" data-copy="maisonblanchehydra@gmail.com" data-i18n="copy">Copier</button></p>
+          <p><a href="https://wa.me/213541559672" target="_blank" rel="noopener" data-i18n="i_wa">Écrire sur WhatsApp</a></p>
         </div>
       </div>
     </div>
@@ -542,14 +577,455 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 <footer class="site dark">
   <div class="wrap">
     <img src="logo.png" alt="La Maison Blanche">
-    <p>23, rue des Frères Ben Ali · Hydra · Alger</p>
+    <p data-i18n="foot">23, rue des Frères Ben Ali · Hydra · Alger</p>
   </div>
 </footer>
 
 <script>
+/* ---------- Langues : français (texte d'origine de la page), anglais, arabe ---------- */
+(function () {
+  var TEL = "⁦+213 541 55 96 72⁩", TELH = '<bdi dir="ltr">+213 541 55 96 72</bdi>';
+
+  /* Textes fixes de la page (le français est celui écrit dans le HTML) */
+  var PAGE = {
+    en: {
+      nav_maison: "About", nav_espaces: "Spaces", nav_sig: "Signatures", nav_menu: "Menu", nav_infos: "Info", nav_liv: "Delivery", nav_resa: "Book",
+      hero_label: "Restaurant · Hydra, Algiers",
+      hero_tag: "Brunch, fine dining and Asian cuisine, made with seasonal produce.",
+      hero_b1: "Book a table", hero_b2: "See the menu", hero_b3: "Order for delivery",
+      d_satthu: "Saturday to Thursday", d_fri: "Friday", w_brunch: "Brunch",
+      hr_day: "9 am – 11 pm", hr_fri: "4 pm – 11 pm", hr_until18: "Until 6 pm", i_until18: "until 6 pm",
+      b_brunch: "Brunch", b_gastro: "Fine dining", b_asie: "Asian cuisine", b_saison: "Seasonal produce", b_bar: "Alcohol-free bar",
+      m_label: "The house",
+      m_statement: "From the first morning coffee to the last evening dessert, one house in the heart of Hydra.",
+      m_text: "A bright brunch room, a fine-dining room and a terrace surrounded by greenery, on rue des Frères Ben Ali. In the kitchen, seasonal produce; at the bar, house-made alcohol-free cocktails.",
+      e_label: "Our spaces", e_h2: "Three atmospheres", e_sub: "Choose your space when you book.",
+      sp1_h: "Brunch room", sp1_p: "Eggs, toasts, French toast brioche, pancakes and house cocktails. A bright room for brunch with friends or family.",
+      dt_resa: "Booking", dd_b1: "9 am – 5:30 pm", dd_b2: "4 pm – 5:30 pm", sp1_btn: "Book for brunch",
+      allday: "All day",
+      sp2_h: "Fine-dining room", sp2_p: "White tablecloths, mouldings and gilded wall lamps. Foie gras, beef tenderloin, fish and pasta, in a hushed setting.",
+      dd_g1: "9 am – 10:30 pm", dd_g2: "4 pm – 10:30 pm", sp2_btn: "Book the dining room",
+      sp3_h: "Terrace", sp3_p: "The largest space in the house, with its banquettes and greenery, from lunch to dinner.",
+      sp3_note: "Open depending on the weather: if the terrace is closed on the day of your visit, we will offer you a table inside.",
+      sp3_btn: "Book on the terrace",
+      s_label: "Our signatures", s_h2: "The house plates",
+      mn_label: "The menu", mn_h2: "Our menu", mn_sub: "Prices in Algerian dinars (DA).", mn_note: "The menu may change with the seasons and what the market brings.",
+      l_label: "Delivery", l_h2: "Order for delivery",
+      l_sub: "Choose your dishes and send your order: we call you back to confirm it and tell you the delivery fee. Cash payment on delivery.",
+      l_your: "Your order", l_empty: "Your basket is empty. Add dishes with the + button.",
+      l_subtot: "Subtotal", l_fees: "Delivery fee", l_fees_v: "given by phone", l_pay: "Payment", l_pay_v: "cash on delivery",
+      f_name: "Full name", f_tel: "Phone", f_adr: "Delivery address", ph_adr: "Street, number, building, floor",
+      f_com: "Town / neighbourhood", ph_com: "Hydra, Ben Aknoun, El Biar…",
+      f_day: "Day", o_today: "Today", o_tomorrow: "Tomorrow", f_ltime: "Delivery time",
+      f_rem: 'Note <span class="hint">(optional)</span>', ph_lrem: "Door code, allergy, sauce on the side…",
+      l_wa_hint: "After this form, sending a WhatsApp message is required to confirm your order.",
+      ok_last: "Final required step", l_ok_h: "Send your order on WhatsApp",
+      l_ok_p: "Your order is not registered yet. Tap the button below: WhatsApp opens with your order already filled in, just tap Send. Without this WhatsApp message, your order will not be taken into account. Our team will then call you to confirm it and tell you the delivery fee.",
+      btn_wa: "Send on WhatsApp", l_again: "New order",
+      r_label: "Booking", r_h2: "Book a table", r_sub: "Send your request in one minute. Our team will call you back to confirm it.",
+      r_s1: "You choose the space, the date and the time, then send your request.",
+      r_s2: "Our team calls you to confirm your table.", r_s3: "Your table is waiting for you.",
+      r_note: "Online booking for up to 8 people, at least 1 hour in advance, and up to 30 minutes before the space closes. The terrace opens depending on the weather: if it is closed, we will offer you a table inside when confirming. For a group or a last-minute request, call " + TELH + ".",
+      leg_esp: "Space", c_brunch: "Brunch room", c_gastro: "Fine dining", c_terr: "Terrace", c_terr_t: "9 am – 10:30 pm · weather permitting",
+      f_date: "Date", f_time: "Time", f_pers: "Number of guests",
+      r_groupe: "For more than 8 people, call us directly on <b>" + TELH + "</b>.",
+      f_email: 'E-mail <span class="hint">(optional)</span>', f_occ: 'Occasion <span class="hint">(optional)</span>',
+      occ_none: "None", occ_birth: "Birthday", occ_biz: "Business meal", occ_couple: "Date night", occ_family: "Family meal", occ_other: "Other",
+      ph_rrem: "High chair, allergy, table by the window…",
+      r_wa_hint: "After this form, sending a WhatsApp message is required to confirm your request.",
+      r_again: "New request",
+      i_label: "Practical info", i_h2: "Visit us", i_hours: "Opening hours", i_sathu: "Saturday – Thursday",
+      i_addr: "Address", i_addr_p: "23, rue des Frères Ben Ali<br>Hydra, Algiers", i_maps: "View on Google Maps",
+      i_contact: "Contact", copy: "Copy", i_wa: "Message us on WhatsApp",
+      foot: "23, rue des Frères Ben Ali · Hydra · Algiers"
+    },
+    ar: {
+      nav_maison: "عن المطعم", nav_espaces: "الفضاءات", nav_sig: "أطباقنا المميزة", nav_menu: "القائمة", nav_infos: "معلومات", nav_liv: "التوصيل", nav_resa: "احجز",
+      hero_label: "مطعم · حيدرة، الجزائر العاصمة",
+      hero_tag: "برانش، مطبخ راقٍ وأطباق آسيوية، بمنتجات موسمية.",
+      hero_b1: "احجز طاولة", hero_b2: "اكتشف القائمة", hero_b3: "اطلب التوصيل",
+      d_satthu: "من السبت إلى الخميس", d_fri: "الجمعة", w_brunch: "البرانش",
+      hr_day: "9:00 – 23:00", hr_fri: "16:00 – 23:00", hr_until18: "حتى 18:00", i_until18: "حتى 18:00",
+      b_brunch: "برانش", b_gastro: "مطبخ راقٍ", b_asie: "مطبخ آسيوي", b_saison: "منتجات موسمية", b_bar: "بار بدون كحول",
+      m_label: "عن المطعم",
+      m_statement: "من أول قهوة في الصباح إلى آخر حلوى في المساء، دار واحدة في قلب حيدرة.",
+      m_text: "قاعة برانش مضيئة، وفضاء للمطبخ الراقي، وتراس تحيط به الخضرة، في شارع الإخوة بن علي. في المطبخ منتجات موسمية، وفي البار كوكتيلات من إعدادنا بدون كحول.",
+      e_label: "فضاءاتنا", e_h2: "ثلاثة أجواء", e_sub: "اختر الفضاء الذي يناسبك عند الحجز.",
+      sp1_h: "قاعة البرانش", sp1_p: "بيض، توست، بريوش بردو، بان كيك وكوكتيلات من إعدادنا. قاعة مضيئة لبرانش مع الأصدقاء أو العائلة.",
+      dt_resa: "الحجز", dd_b1: "9:00 – 17:30", dd_b2: "16:00 – 17:30", sp1_btn: "احجز للبرانش",
+      allday: "طوال اليوم",
+      sp2_h: "فضاء المطبخ الراقي", sp2_p: "مفارش بيضاء، زخارف جصّية ومصابيح جدارية مذهّبة. فوا غرا، قلب فيليه البقر، أسماك وباستا، في أجواء هادئة.",
+      dd_g1: "9:00 – 22:30", dd_g2: "16:00 – 22:30", sp2_btn: "احجز في القاعة",
+      sp3_h: "التراس", sp3_p: "أكبر فضاء في المطعم، بمقاعده المريحة وخضرته، من الغداء إلى العشاء.",
+      sp3_note: "يفتح حسب الطقس: إذا كان التراس مغلقًا يوم زيارتك، نقترح عليك طاولة في الداخل.",
+      sp3_btn: "احجز في التراس",
+      s_label: "أطباقنا المميزة", s_h2: "أطباق الدار",
+      mn_label: "القائمة", mn_h2: "قائمة أطباقنا", mn_sub: "الأسعار بالدينار الجزائري (دج).", mn_note: "قد تتغير القائمة حسب المواسم وتوفّر المنتجات.",
+      l_label: "التوصيل", l_h2: "اطلب التوصيل",
+      l_sub: "اختر أطباقك وأرسل طلبك، ثم نتصل بك لتأكيده وإعلامك بتكلفة التوصيل. الدفع نقدًا عند الاستلام.",
+      l_your: "طلبك", l_empty: "سلّتك فارغة. أضف الأطباق بالضغط على زر +.",
+      l_subtot: "المجموع", l_fees: "تكلفة التوصيل", l_fees_v: "تُعلَن عبر الهاتف", l_pay: "الدفع", l_pay_v: "نقدًا عند الاستلام",
+      f_name: "الاسم واللقب", f_tel: "الهاتف", f_adr: "عنوان التوصيل", ph_adr: "الشارع، الرقم، العمارة، الطابق",
+      f_com: "البلدية / الحي", ph_com: "حيدرة، بن عكنون، الأبيار…",
+      f_day: "اليوم", o_today: "اليوم", o_tomorrow: "غدًا", f_ltime: "وقت التوصيل",
+      f_rem: 'ملاحظة <span class="hint">(اختياري)</span>', ph_lrem: "رمز الباب، حساسية، الصلصة على حدة…",
+      l_wa_hint: "بعد هذه الاستمارة، يجب إرسال رسالة واتساب لتأكيد طلبك.",
+      ok_last: "الخطوة الأخيرة الإلزامية", l_ok_h: "أرسل طلبك عبر واتساب",
+      l_ok_p: "طلبك لم يُسجَّل بعد. اضغط على الزر أدناه: يُفتح واتساب ورسالتك جاهزة، وما عليك إلا الضغط على «إرسال». بدون رسالة الواتساب هذه لن يُؤخذ طلبك بعين الاعتبار. يتصل بك فريقنا بعد ذلك لتأكيده وإعلامك بتكلفة التوصيل.",
+      btn_wa: "أرسل عبر واتساب", l_again: "طلب جديد",
+      r_label: "الحجز", r_h2: "احجز طاولة", r_sub: "أرسل طلبك في دقيقة واحدة، ويتصل بك فريقنا لتأكيده.",
+      r_s1: "تختار الفضاء والتاريخ والساعة، ثم ترسل طلبك.",
+      r_s2: "يتصل بك فريقنا لتأكيد طاولتك.", r_s3: "طاولتك في انتظارك.",
+      r_note: "الحجز عبر الإنترنت حتى 8 أشخاص، قبل ساعة على الأقل، وحتى 30 دقيقة قبل إغلاق الفضاء. يفتح التراس حسب الطقس: إذا كان مغلقًا نقترح عليك طاولة في الداخل عند التأكيد. للمجموعات أو الطلبات في آخر لحظة، اتصل بنا على " + TELH + ".",
+      leg_esp: "الفضاء", c_brunch: "قاعة البرانش", c_gastro: "المطبخ الراقي", c_terr: "التراس", c_terr_t: "9:00 – 22:30 · حسب الطقس",
+      f_date: "التاريخ", f_time: "الساعة", f_pers: "عدد الأشخاص",
+      r_groupe: "لأكثر من 8 أشخاص، اتصل بنا مباشرة على <b>" + TELH + "</b>.",
+      f_email: 'البريد الإلكتروني <span class="hint">(اختياري)</span>', f_occ: 'المناسبة <span class="hint">(اختياري)</span>',
+      occ_none: "بدون", occ_birth: "عيد ميلاد", occ_biz: "وجبة عمل", occ_couple: "موعد ثنائي", occ_family: "وجبة عائلية", occ_other: "أخرى",
+      ph_rrem: "كرسي للرضيع، حساسية، طاولة قرب النافذة…",
+      r_wa_hint: "بعد هذه الاستمارة، يجب إرسال رسالة واتساب لتأكيد طلبك.",
+      r_again: "طلب جديد",
+      i_label: "معلومات عملية", i_h2: "زورونا", i_hours: "أوقات العمل", i_sathu: "السبت – الخميس",
+      i_addr: "العنوان", i_addr_p: "23، شارع الإخوة بن علي<br>حيدرة، الجزائر العاصمة", i_maps: "عرض على خرائط Google",
+      i_contact: "اتصل بنا", copy: "نسخ", i_wa: "راسلنا عبر واتساب",
+      foot: "23، شارع الإخوة بن علي · حيدرة · الجزائر العاصمة"
+    }
+  };
+
+  /* Textes utilisés par les scripts (messages, erreurs, WhatsApp) */
+  var S = {
+    fr: {
+      burger_open: "Ouvrir le menu", burger_close: "Fermer le menu", see_order: "Voir ma commande", asap: "Dès que possible",
+      liv_brunch: "Brunch livré tous les jours jusqu’à 18 h.", add: "Ajouter", remove: "Retirer",
+      e_empty: "Ajoutez au moins un plat à votre commande.",
+      e_noslot_liv: "Plus de livraison possible ce jour-là. Choisissez « Demain » ou appelez le +213 541 55 96 72.",
+      e_asie: "La cuisine asiatique est disponible à partir de 11 h. Choisissez une heure de livraison à partir de 11 h.",
+      e_brunch: "Le brunch est servi jusqu’à 18 h. Choisissez une heure plus tôt ou retirez les plats du brunch.",
+      e_name: "Indiquez votre nom et prénom.", e_tel: "Indiquez un numéro de téléphone valide pour que nous puissions vous rappeler.",
+      e_adr: "Indiquez l’adresse de livraison.", e_com: "Indiquez la commune ou le quartier.",
+      e_noslot: "Choisissez une autre date : il n’y a plus de créneau disponible ce jour-là.",
+      e_group: "Pour plus de 8 personnes, appelez-nous au +213 541 55 96 72.",
+      e_email: "L’adresse e-mail n’est pas valide. Corrigez-la ou laissez le champ vide.",
+      order: "Commande", subtot: "Sous-total", plus_deliv: "+ livraison", delivery: "Livraison", address: "Adresse", phone: "Téléphone",
+      space: "Espace", date: "Date", time: "Heure", guests: "Personnes", name: "Nom", commune: "Commune / quartier", note: "Remarque", occasion: "Occasion",
+      excl_fee: "(hors frais de livraison)", pay: "Paiement", cash: "espèces à la livraison",
+      sending: "Envoi en cours…", "continue": "Continuer",
+      pers_more: "Plus de 8 personnes", noslot_opt: "Plus de créneau ce jour-là",
+      ok_last: "Dernière étape obligatoire", r_ok_h: "Envoyez votre demande sur WhatsApp",
+      r_ok_p: "Votre réservation n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre message déjà rempli, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre demande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour confirmer votre table.",
+      copy: "Copier", copied: "Copié",
+      wa_liv: "Bonjour, je souhaite passer une commande en livraison à La Maison Blanche.",
+      wa_resa: "Bonjour, je souhaite réserver une table à La Maison Blanche.",
+      esp_brunch: "Salle brunch", esp_gastro: "Espace gastronomique", esp_terrasse: "Terrasse",
+      colon: " : ", sep: ", "
+    },
+    en: {
+      burger_open: "Open menu", burger_close: "Close menu", see_order: "View my order", asap: "As soon as possible",
+      liv_brunch: "Brunch delivered every day until 6 pm.", add: "Add", remove: "Remove",
+      e_empty: "Add at least one dish to your order.",
+      e_noslot_liv: "No more deliveries are possible that day. Choose “Tomorrow” or call " + TEL + ".",
+      e_asie: "Asian cuisine is available from 11 am. Choose a delivery time from 11 am.",
+      e_brunch: "Brunch is served until 6 pm. Choose an earlier time or remove the brunch dishes.",
+      e_name: "Please enter your full name.", e_tel: "Please enter a valid phone number so we can call you back.",
+      e_adr: "Please enter the delivery address.", e_com: "Please enter the town or neighbourhood.",
+      e_noslot: "Choose another date: there are no more slots available that day.",
+      e_group: "For more than 8 people, call us on " + TEL + ".",
+      e_email: "The e-mail address is not valid. Correct it or leave the field empty.",
+      order: "Order", subtot: "Subtotal", plus_deliv: "+ delivery", delivery: "Delivery", address: "Address", phone: "Phone",
+      space: "Space", date: "Date", time: "Time", guests: "Guests", name: "Name", commune: "Town / neighbourhood", note: "Note", occasion: "Occasion",
+      excl_fee: "(excluding delivery fee)", pay: "Payment", cash: "cash on delivery",
+      sending: "Sending…", "continue": "Continue",
+      pers_more: "More than 8 people", noslot_opt: "No more slots that day",
+      ok_last: "Final required step", r_ok_h: "Send your request on WhatsApp",
+      r_ok_p: "Your booking is not registered yet. Tap the button below: WhatsApp opens with your message already filled in, just tap Send. Without this WhatsApp message, your request will not be taken into account. Our team will then call you to confirm your table.",
+      copy: "Copy", copied: "Copied",
+      wa_liv: "Hello, I would like to place a delivery order at La Maison Blanche.",
+      wa_resa: "Hello, I would like to book a table at La Maison Blanche.",
+      esp_brunch: "Brunch room", esp_gastro: "Fine-dining room", esp_terrasse: "Terrace",
+      colon: ": ", sep: ", "
+    },
+    ar: {
+      burger_open: "فتح القائمة", burger_close: "إغلاق القائمة", see_order: "عرض طلبي", asap: "في أقرب وقت",
+      liv_brunch: "يُوصَّل البرانش يوميًا حتى 18:00.", add: "إضافة", remove: "إزالة",
+      e_empty: "أضف طبقًا واحدًا على الأقل إلى طلبك.",
+      e_noslot_liv: "لم يعد التوصيل ممكنًا في هذا اليوم. اختر «غدًا» أو اتصل بنا على " + TEL + ".",
+      e_asie: "المطبخ الآسيوي متوفر ابتداءً من 11:00. اختر وقت توصيل ابتداءً من 11:00.",
+      e_brunch: "يُقدَّم البرانش حتى 18:00. اختر وقتًا أبكر أو أزل أطباق البرانش.",
+      e_name: "أدخل اسمك ولقبك.", e_tel: "أدخل رقم هاتف صحيحًا حتى نتمكن من الاتصال بك.",
+      e_adr: "أدخل عنوان التوصيل.", e_com: "أدخل البلدية أو الحي.",
+      e_noslot: "اختر تاريخًا آخر: لم يعد هناك موعد متاح في هذا اليوم.",
+      e_group: "لأكثر من 8 أشخاص، اتصل بنا على " + TEL + ".",
+      e_email: "البريد الإلكتروني غير صحيح. صحّحه أو اترك الخانة فارغة.",
+      order: "الطلب", subtot: "المجموع", plus_deliv: "+ التوصيل", delivery: "التوصيل", address: "العنوان", phone: "الهاتف",
+      space: "الفضاء", date: "التاريخ", time: "الساعة", guests: "عدد الأشخاص", name: "الاسم", commune: "البلدية / الحي", note: "ملاحظة", occasion: "المناسبة",
+      excl_fee: "(دون تكلفة التوصيل)", pay: "الدفع", cash: "نقدًا عند الاستلام",
+      sending: "جارٍ الإرسال…", "continue": "متابعة",
+      pers_more: "أكثر من 8 أشخاص", noslot_opt: "لا مواعيد متاحة في هذا اليوم",
+      ok_last: "الخطوة الأخيرة الإلزامية", r_ok_h: "أرسل طلبك عبر واتساب",
+      r_ok_p: "حجزك لم يُسجَّل بعد. اضغط على الزر أدناه: يُفتح واتساب ورسالتك جاهزة، وما عليك إلا الضغط على «إرسال». بدون رسالة الواتساب هذه لن يُؤخذ طلبك بعين الاعتبار. يتصل بك فريقنا بعد ذلك لتأكيد طاولتك.",
+      copy: "نسخ", copied: "تم النسخ",
+      wa_liv: "السلام عليكم، أود تقديم طلب توصيل من مطعم لا ميزون بلانش.",
+      wa_resa: "السلام عليكم، أود حجز طاولة في مطعم لا ميزون بلانش.",
+      esp_brunch: "قاعة البرانش", esp_gastro: "فضاء المطبخ الراقي", esp_terrasse: "التراس",
+      colon: ": ", sep: "، "
+    }
+  };
+
+  /* La carte : nom français → [anglais, arabe] */
+  var CARTE = {
+    "Brunch": ["Brunch", "البرانش"], "À la carte": ["À la carte", "الأطباق"], "Asiatique": ["Asian", "آسيوي"], "Boissons": ["Drinks", "المشروبات"],
+    "Poisson": ["Fish", "الأسماك"], "Entrée froide": ["Cold starter", "مقبلات باردة"], "Entrée chaude": ["Hot starter", "مقبلات ساخنة"],
+    "Burrata, carpaccio de tomates": ["Burrata, tomato carpaccio", "بوراتا، كارباتشيو الطماطم"],
+    "Frites allumettes en accompagnement": ["Served with shoestring fries", "تُقدَّم مع بطاطا مقلية رفيعة"],
+
+    /* Brunch */
+    "Pour bien commencer la journée": ["To start the day right", "لبداية مثالية لليوم"],
+    "Œuf à la turque": ["Turkish eggs", "بيض على الطريقة التركية"],
+    "Œuf Benedict": ["Eggs Benedict", "بيض بينيديكت"],
+    "Classiques du brunch": ["Brunch classics", "كلاسيكيات البرانش"],
+    "Toast avocat saumon": ["Avocado & salmon toast", "توست بالأفوكادو والسلمون"],
+    "Club sandwich saumon fumé": ["Smoked salmon club sandwich", "كلوب ساندويتش بالسلمون المدخّن"],
+    "Club sandwich poulet fumé": ["Smoked chicken club sandwich", "كلوب ساندويتش بالدجاج المدخّن"],
+    "Croissant croque-monsieur": ["Croque-monsieur croissant", "كرواسون كروك مسيو"],
+    "Poulet fumé artisanal, cheese": ["Artisanal smoked chicken, cheese", "دجاج مدخّن حِرفي، جبن"],
+    "Long toast tunacado": ["Tunacado long toast", "لونغ توست تونكادو"],
+    "Crémeux de thon et avocat, carottes frites en accompagnement": ["Creamy tuna and avocado, served with carrot fries", "كريمة التونة والأفوكادو، تُقدَّم مع جزر مقلي"],
+    "Autres envies": ["Something else", "أطباق أخرى"],
+    "Salade César": ["Caesar salad", "سلطة سيزر"],
+    "Crêpe salée poulet, épinard": ["Savoury crêpe, chicken & spinach", "كريب مالح بالدجاج والسبانخ"],
+    "Sandwich La Maison Blanche": ["La Maison Blanche sandwich", "ساندويتش لا ميزون بلانش"],
+    "Émincé de bœuf, oignons caramélisés, champignons, frites allumettes": ["Sliced beef, caramelised onions, mushrooms, shoestring fries", "شرائح لحم البقر، بصل مكرمل، فطر، بطاطا مقلية رفيعة"],
+    "Sandwich salade César": ["Caesar salad sandwich", "ساندويتش سلطة سيزر"],
+    "Poulet crispy et sauce César": ["Crispy chicken and Caesar dressing", "دجاج مقرمش وصلصة سيزر"],
+    "Le Burger bœuf": ["Beef burger", "برغر لحم البقر"],
+    "Sur crème fromagère aux champignons, frites allumettes": ["On a mushroom cheese cream, shoestring fries", "على كريمة الجبن بالفطر، بطاطا مقلية رفيعة"],
+    "Le Burger poulet crispy": ["Crispy chicken burger", "برغر الدجاج المقرمش"],
+    "Desserts du brunch": ["Brunch desserts", "حلويات البرانش"],
+    "Cake fondant au caramel et crème vanille": ["Caramel fondant cake with vanilla cream", "كيك فوندان بالكراميل وكريمة الفانيليا"],
+    "Hot cookie": ["Hot cookie", "كوكي ساخن"],
+    "Brioche perdue tiramisu": ["Tiramisu French toast brioche", "بريوش بردو بالتيراميسو"],
+    "Brioche perdue caramel beurre salé": ["Salted caramel French toast brioche", "بريوش بردو بكراميل الزبدة المملحة"],
+    "New York roll meringué au citron": ["Lemon meringue New York roll", "نيويورك رول بالليمون والميرينغ"],
+    "New York roll pistache": ["Pistachio New York roll", "نيويورك رول بالفستق"],
+    "Crêpe Suzette et boule de glace vanille": ["Crêpe Suzette with a scoop of vanilla ice cream", "كريب سوزيت مع كرة آيس كريم بالفانيليا"],
+    "Matilda cake": ["Matilda cake", "كيك ماتيلدا"],
+    "Pancake beurre et miel": ["Pancakes with butter & honey", "بان كيك بالزبدة والعسل"],
+    "Gaufre Nutella ou pistache": ["Waffle, Nutella or pistachio", "وافل بالنوتيلا أو الفستق"],
+    "Crêpe Nutella ou pistache": ["Crêpe, Nutella or pistachio", "كريب بالنوتيلا أو الفستق"],
+    "Tiramisu": ["Tiramisu", "تيراميسو"],
+    "Meringue lemon cake": ["Meringue lemon cake", "كيك الليمون بالميرينغ"],
+    "Granola bowl": ["Granola bowl", "بول الغرانولا"],
+    "Crumble pommes et beurre de cacahuète": ["Apple crumble and peanut butter", "كرامبل التفاح وزبدة الفول السوداني"],
+
+    /* À la carte */
+    "Entrées froides": ["Cold starters", "مقبلات باردة"],
+    "Carpaccio de bœuf": ["Beef carpaccio", "كارباتشيو لحم البقر"],
+    "Burrata sur un carpaccio de tomate, sauce pesto": ["Burrata on tomato carpaccio, pesto sauce", "بوراتا على كارباتشيو الطماطم، صلصة البيستو"],
+    "Salade grecque": ["Greek salad", "سلطة يونانية"],
+    "Salade de quinoa gourmande aux crustacés": ["Gourmet quinoa salad with shellfish", "سلطة الكينوا الفاخرة بالقشريات"],
+    "Médaillon de foie gras": ["Foie gras medallion", "ميدالية فوا غرا"],
+    "Entrées chaudes": ["Hot starters", "مقبلات ساخنة"],
+    "Soupe du jour": ["Soup of the day", "شوربة اليوم"],
+    "Velouté aux fruits de mer": ["Seafood velouté", "فلوتيه بثمار البحر"],
+    "Assortiment de bourak × 2": ["Assorted bourek × 2", "تشكيلة بوراك × 2"],
+    "Escargots de Bourgogne": ["Burgundy snails", "حلزون بورغونيا"],
+    "Tarte aux crevettes": ["Shrimp tart", "تارت بالجمبري"],
+    "Noix de Saint-Jacques": ["Scallops", "محار سان جاك"],
+    "Duo de calamars et crevettes sautés à l’ail": ["Squid and shrimp sautéed with garlic", "ثنائي الكاليماري والجمبري المشوّح بالثوم"],
+    "Gambas tempura": ["Tempura king prawns", "قمبري تمبورا"],
+    "Moules frites": ["Mussels and fries", "بلح البحر مع البطاطا المقلية"],
+    "Viande": ["Meat", "اللحوم"],
+    "Cœur de filet de bœuf, sauce aux morilles": ["Beef tenderloin, morel sauce", "قلب فيليه البقر، صلصة فطر الموريل"],
+    "Côte de bœuf poêlée aux herbes": ["Pan-seared rib of beef with herbs", "ضلع البقر المحمّر بالأعشاب"],
+    "Pour 2 personnes": ["For 2 people", "لشخصين"],
+    "Méchoui": ["Méchoui (slow-roasted lamb)", "مشوي"],
+    "Souris d’agneau confite au miel et marjolaine": ["Lamb shank confit with honey and marjoram", "موزة خروف مطهوّة ببطء بالعسل والمردقوش"],
+    "Entrecôte à la sauce poivre vert": ["Entrecôte with green peppercorn sauce", "أنتركوت بصلصة الفلفل الأخضر"],
+    "Saumon à l’orange": ["Salmon with orange", "سلمون بالبرتقال"],
+    "Daurade aux crustacés": ["Sea bream with shellfish", "سمك الدوراد بالقشريات"],
+    "Loup de mer": ["Sea bass", "سمك القاروص"],
+    "Gibier": ["Poultry & game", "الدواجن والطرائد"],
+    "Ballotine de poulet au saumon et sauce suisse": ["Chicken ballotine with salmon, Swiss sauce", "بالوتين الدجاج بالسلمون والصلصة السويسرية"],
+    "Magret de canard au cassis": ["Duck breast with blackcurrant", "صدر البط بالكشمش الأسود"],
+    "La blanquette exotique de La Maison Blanche": ["La Maison Blanche exotic blanquette", "بلانكيت لا ميزون بلانش الاستوائية"],
+    "Pasta": ["Pasta", "باستا"],
+    "Ravioli ricotta et épinards": ["Ricotta & spinach ravioli", "رافيولي بالريكوتا والسبانخ"],
+    "Rigatoni au saumon": ["Salmon rigatoni", "ريغاتوني بالسلمون"],
+    "Tagliatelles poulet et champignons": ["Chicken & mushroom tagliatelle", "تالياتيلي بالدجاج والفطر"],
+    "Linguine alla scoglio": ["Linguine allo scoglio (seafood)", "لينغويني بثمار البحر"],
+    "Spaghetti moules et pesto": ["Spaghetti with mussels & pesto", "سباغيتي ببلح البحر والبيستو"],
+    "Desserts": ["Desserts", "الحلويات"],
+    "Profiteroles au chocolat mou": ["Profiteroles with warm chocolate", "بروفيترول بالشوكولاتة"],
+    "Pavlova": ["Pavlova", "بافلوفا"],
+    "Crème brûlée": ["Crème brûlée", "كريم بروليه"],
+    "Fondant au chocolat et sa boule de glace": ["Chocolate fondant with a scoop of ice cream", "فوندان الشوكولاتة مع كرة آيس كريم"],
+    "Nougat glacé au coulis de fruits rouges": ["Iced nougat with red berry coulis", "نوغا مثلّجة بصلصة الفواكه الحمراء"],
+
+    /* Asiatique */
+    "À partager": ["To share", "للمشاركة"],
+    "Nems au poulet × 3": ["Chicken spring rolls × 3", "نيم بالدجاج × 3"],
+    "Gyoza au poulet × 5": ["Chicken gyoza × 5", "غيوزا بالدجاج × 5"],
+    "Soupe de gyoza": ["Gyoza soup", "شوربة الغيوزا"],
+    "Crispy rice tempura × 5": ["Crispy rice tempura × 5", "كريسبي رايس تمبورا × 5"],
+    "Crispy rice avocat × 5": ["Avocado crispy rice × 5", "كريسبي رايس بالأفوكادو × 5"],
+    "Futomaki × 10": ["Futomaki × 10", "فوتوماكي × 10"],
+    "Saumon, avocat, cheese, concombre, salade à la sauce mayo yuzu": ["Salmon, avocado, cheese, cucumber, lettuce with yuzu mayo", "سلمون، أفوكادو، جبن، خيار، خس بمايونيز اليوزو"],
+    "Maki avocat × 12": ["Avocado maki × 12", "ماكي بالأفوكادو × 12"],
+    "Avocat, cheese": ["Avocado, cheese", "أفوكادو، جبن"],
+    "Maki saumon × 12": ["Salmon maki × 12", "ماكي بالسلمون × 12"],
+    "Saumon": ["Salmon", "سلمون"],
+    "Nigiri saumon × 3": ["Salmon nigiri × 3", "نيغيري بالسلمون × 3"],
+    "Rolls": ["Rolls", "رولز"],
+    "California saumon avocat × 8": ["Salmon & avocado California × 8", "كاليفورنيا سلمون وأفوكادو × 8"],
+    "Dragon saumon roll × 8": ["Salmon dragon roll × 8", "دراغون رول بالسلمون × 8"],
+    "Tempura de crevettes, top saumon": ["Shrimp tempura, topped with salmon", "تمبورا الجمبري، مغطّى بالسلمون"],
+    "Rainbow roll × 8": ["Rainbow roll × 8", "رينبو رول × 8"],
+    "Avocat, cheese, crevettes, top poisson du jour et sauce mayo yuzu": ["Avocado, cheese, shrimp, topped with fish of the day and yuzu mayo", "أفوكادو، جبن، جمبري، مغطّى بسمك اليوم ومايونيز اليوزو"],
+    "Crunchy saumon roll × 8": ["Crunchy salmon roll × 8", "كرانشي رول بالسلمون × 8"],
+    "Saumon frit, avocat, cheese, mayo japonaise épicée et oignons frits": ["Fried salmon, avocado, cheese, spicy Japanese mayo and fried onions", "سلمون مقلي، أفوكادو، جبن، مايونيز ياباني حار وبصل مقلي"],
+    "Crunchy poulet roll × 8": ["Crunchy chicken roll × 8", "كرانشي رول بالدجاج × 8"],
+    "Poulet frit, avocat, cheese, mayo japonaise épicée et oignons frits": ["Fried chicken, avocado, cheese, spicy Japanese mayo and fried onions", "دجاج مقلي، أفوكادو، جبن، مايونيز ياباني حار وبصل مقلي"],
+    "Flamed roll × 8": ["Flamed roll × 8", "فلايمد رول × 8"],
+    "Saumon, cheese, sweet soja sauce, top saumon flambé": ["Salmon, cheese, sweet soy sauce, topped with flamed salmon", "سلمون، جبن، صلصة الصويا الحلوة، مغطّى بسلمون مشوي باللهب"],
+    "Nouveautés": ["New", "الجديد"],
+    "Creamy avocado roll × 8": ["Creamy avocado roll × 8", "كريمي أفوكادو رول × 8"],
+    "Légumes frits, cheese, top avocat, sweet soja sauce et mayo yuzu": ["Fried vegetables, cheese, topped with avocado, sweet soy sauce and yuzu mayo", "خضار مقلية، جبن، مغطّى بالأفوكادو، صلصة الصويا الحلوة ومايونيز اليوزو"],
+    "Veggie roll × 8": ["Veggie roll × 8", "فيجي رول × 8"],
+    "Avocat, cheese, feuille de salade à la mayo yuzu": ["Avocado, cheese, lettuce leaf with yuzu mayo", "أفوكادو، جبن، ورقة خس بمايونيز اليوزو"],
+    "Maki crispy au tartare de saumon × 6": ["Crispy salmon tartare maki × 6", "ماكي مقرمش بتارتار السلمون × 6"],
+    "Sweet soja sauce": ["Sweet soy sauce", "صلصة الصويا الحلوة"],
+    "Crunch tempura × 8": ["Crunch tempura × 8", "كرانش تمبورا × 8"],
+    "Tempura de crevettes, avocat, mayo japonaise épicée": ["Shrimp tempura, avocado, spicy Japanese mayo", "تمبورا الجمبري، أفوكادو، مايونيز ياباني حار"],
+    "Box": ["Boxes", "البوكس"],
+    "Duo signature × 24": ["Signature duo × 24", "ديو سيغنتشر × 24"],
+    "4 california, 4 crunchy, 6 maki, 5 dragon saumon, 5 futomaki": ["4 California, 4 crunchy, 6 maki, 5 salmon dragon, 5 futomaki", "4 كاليفورنيا، 4 كرانشي، 6 ماكي، 5 دراغون سلمون، 5 فوتوماكي"],
+    "Party box × 54": ["Party box × 54", "بارتي بوكس × 54"],
+    "8 california, 8 crunchy, 6 maki crispy, 10 futomaki, 6 maki avocat, 8 choix du chef, 8 creamy avocat": ["8 California, 8 crunchy, 6 crispy maki, 10 futomaki, 6 avocado maki, 8 chef’s choice, 8 creamy avocado", "8 كاليفورنيا، 8 كرانشي، 6 ماكي مقرمش، 10 فوتوماكي، 6 ماكي أفوكادو، 8 اختيار الشيف، 8 كريمي أفوكادو"],
+    "Plats": ["Mains", "الأطباق الرئيسية"],
+    "Poke bowl": ["Poke bowl", "بوكي بول"],
+    "Wok au poulet": ["Chicken wok", "ووك بالدجاج"],
+    "Ramens gyoza": ["Gyoza ramen", "رامن بالغيوزا"],
+    "Ramens aux crevettes": ["Shrimp ramen", "رامن بالجمبري"],
+    "Taco crispy": ["Crispy taco", "تاكو مقرمش"],
+    "Dessert": ["Dessert", "حلوى"],
+    "Mochis glacés × 2": ["Ice cream mochi × 2", "موتشي مثلّج × 2"],
+    "Pistache, framboise, mangue": ["Pistachio, raspberry, mango", "فستق، توت العليق، مانجو"],
+
+    /* Boissons */
+    "Classiques": ["Classics", "الكلاسيكيات"],
+    "Eau minérale ou pétillante": ["Still or sparkling water", "مياه معدنية أو غازية"],
+    "Soda": ["Soft drink", "مشروب غازي"],
+    "Café": ["Coffee", "قهوة"],
+    "Cappuccino": ["Cappuccino", "كابتشينو"],
+    "Chocolat chaud": ["Hot chocolate", "شوكولاتة ساخنة"],
+    "Thé, infusion au choix": ["Tea or herbal tea of your choice", "شاي أو منقوع أعشاب حسب اختيارك"],
+    "Iced or hot (au brunch)": ["Iced or hot (at brunch)", "بارد أو ساخن (في البرانش)"],
+    "Latte vanille": ["Vanilla latte", "لاتيه بالفانيليا"],
+    "Latte caramel beurre salé": ["Salted caramel latte", "لاتيه بكراميل الزبدة المملحة"],
+    "Matcha latte vanille": ["Vanilla matcha latte", "ماتشا لاتيه بالفانيليا"],
+    "Matcha latte fraise": ["Strawberry matcha latte", "ماتشا لاتيه بالفراولة"],
+    "Matcha latte pistache": ["Pistachio matcha latte", "ماتشا لاتيه بالفستق"],
+    "Macchiato nature ou vanille": ["Macchiato, plain or vanilla", "ماكياتو سادة أو بالفانيليا"],
+    "Tiramisu latte": ["Tiramisu latte", "لاتيه تيراميسو"],
+    "Matcha tiramisu latte": ["Matcha tiramisu latte", "ماتشا لاتيه تيراميسو"],
+    "Nos cocktails sans alcool": ["Our alcohol-free cocktails", "كوكتيلاتنا بدون كحول"],
+    "Parfum des femmes": ["Parfum des femmes", "بارفان دي فام"],
+    "Exotic passion": ["Exotic passion", "إكزوتيك باشن"],
+    "Fruit de la passion, coco": ["Passion fruit, coconut", "فاكهة العاطفة، جوز الهند"],
+    "Exotic mango": ["Exotic mango", "إكزوتيك مانغو"],
+    "Mangue, pêche": ["Mango, peach", "مانجو، خوخ"],
+    "Exotic fruits rouges": ["Exotic red berries", "إكزوتيك الفواكه الحمراء"],
+    "Framboise, myrtille": ["Raspberry, blueberry", "توت العليق، توت أزرق"],
+    "Mojito classique": ["Classic mojito", "موهيتو كلاسيكي"],
+    "Mojito fraise": ["Strawberry mojito", "موهيتو بالفراولة"],
+    "Piña colada": ["Piña colada", "بينا كولادا"],
+    "Ice tea pêche ou fruits des bois": ["Iced tea, peach or wild berries", "شاي مثلّج بالخوخ أو بفواكه الغابة"],
+    "Cocktail Maison Blanche": ["Maison Blanche cocktail", "كوكتيل ميزون بلانش"],
+    "Vanille, fruit de la passion, ananas, coco": ["Vanilla, passion fruit, pineapple, coconut", "فانيليا، فاكهة العاطفة، أناناس، جوز الهند"],
+    "Jus detox": ["Detox juices", "عصائر ديتوكس"],
+    "Ananas, pomme, menthe": ["Pineapple, apple, mint", "أناناس، تفاح، نعناع"],
+    "Orange, carotte, dattes": ["Orange, carrot, dates", "برتقال، جزر، تمر"],
+    "Pomme, gingembre, coco": ["Apple, ginger, coconut", "تفاح، زنجبيل، جوز الهند"],
+    "Jus nature et smoothies": ["Fresh juices & smoothies", "عصائر طبيعية وسموذي"],
+    "Jus d’orange": ["Orange juice", "عصير برتقال"],
+    "Jus de citron": ["Lemon juice", "عصير ليمون"],
+    "Jus de mangue": ["Mango juice", "عصير مانجو"],
+    "Jus de fraise": ["Strawberry juice", "عصير فراولة"],
+    "Smoothie pistachio kunafa": ["Pistachio kunafa smoothie", "سموذي الفستق والكنافة"],
+    "Smoothie peanut butter": ["Peanut butter smoothie", "سموذي زبدة الفول السوداني"]
+  };
+
+  var META = {
+    fr: { title: document.title, desc: (document.querySelector('meta[name="description"]') || {}).content },
+    en: { title: "La Maison Blanche Restaurant, Hydra | Brunch, fine dining, terrace", desc: "La Maison Blanche, a restaurant in Hydra (Algiers): brunch, fine dining and Asian cuisine. Online menu and booking." },
+    ar: { title: "مطعم لا ميزون بلانش حيدرة | برانش، مطبخ راقٍ، تراس", desc: "لا ميزون بلانش، مطعم في حيدرة (الجزائر العاصمة): برانش، مطبخ راقٍ وأطباق آسيوية. القائمة والحجز عبر الإنترنت." }
+  };
+  var LOCALES = { fr: "fr-FR", en: "en-GB", ar: "ar-DZ" }, NAMES = { fr: "Français", en: "Anglais", ar: "Arabe" };
+
+  var lang = "fr", subs = [], root = document.documentElement;
+  var nodes = document.querySelectorAll("[data-i18n]"), phs = document.querySelectorAll("[data-i18n-ph]"), trs = document.querySelectorAll("[data-tr]"), das = document.querySelectorAll("[data-da]");
+  Array.prototype.forEach.call(nodes, function (n) { n._fr = n.innerHTML; });
+  Array.prototype.forEach.call(phs, function (n) { n._fr = n.getAttribute("placeholder"); });
+  Array.prototype.forEach.call(trs, function (n) { n._fr = n.textContent; });
+
+  function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  var MB = {
+    get lang() { return lang; },
+    T: function (k) { var d = S[lang] || S.fr; return d[k] != null ? d[k] : (S.fr[k] != null ? S.fr[k] : k); },
+    tr: function (fr) { if (lang === "fr" || !fr) return fr; var t = CARTE[fr]; return t ? t[lang === "en" ? 0 : 1] : fr; },
+    /* Nom d'un plat dans un message envoyé au restaurant : traduit, avec le nom français entre parenthèses */
+    dish: function (fr) { var t = MB.tr(fr); return t === fr ? fr : t + " (" + fr + ")"; },
+    da: function (n) { return fmt(n) + (lang === "ar" ? " دج" : " DA"); },
+    time: function (hm) { return lang === "fr" ? hm.replace(":", " h ") : hm; },
+    pers: function (i) {
+      if (lang === "en") return i + (i > 1 ? " people" : " person");
+      if (lang === "ar") return i === 1 ? "شخص واحد" : i === 2 ? "شخصان" : i + " أشخاص";
+      return i + (i > 1 ? " personnes" : " personne");
+    },
+    locale: function () { return LOCALES[lang]; },
+    langName: function () { return NAMES[lang]; },
+    on: function (cb) { subs.push(cb); },
+    set: function (l) { apply(l, true); }
+  };
+  window.MB = MB;
+
+  function apply(l, user) {
+    if (!LOCALES[l]) l = "fr";
+    lang = l;
+    root.lang = l; root.dir = l === "ar" ? "rtl" : "ltr";
+    var P = PAGE[l];
+    Array.prototype.forEach.call(nodes, function (n) { var k = n.getAttribute("data-i18n"); n.innerHTML = l === "fr" || !P || P[k] == null ? n._fr : P[k]; });
+    Array.prototype.forEach.call(phs, function (n) { var k = n.getAttribute("data-i18n-ph"); n.setAttribute("placeholder", l === "fr" || !P || P[k] == null ? n._fr : P[k]); });
+    Array.prototype.forEach.call(trs, function (n) { n.textContent = MB.tr(n._fr); });
+    Array.prototype.forEach.call(das, function (n) { n.textContent = MB.da(+n.getAttribute("data-da")); });
+    Array.prototype.forEach.call(document.querySelectorAll(".lang button"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-lang") === l ? "true" : "false"); });
+    document.title = META[l].title;
+    var md = document.querySelector('meta[name="description"]'); if (md) md.setAttribute("content", META[l].desc);
+    if (user) {
+      try { localStorage.setItem("mb-lang", l); } catch (e) {}
+      try { var u = new URL(location.href); if (u.searchParams.has("lang")) { u.searchParams.set("lang", l); history.replaceState(null, "", u.toString()); } } catch (e) {}
+      subs.forEach(function (cb) { try { cb(l); } catch (e) {} });
+    }
+  }
+
+  /* Langue de départ : lien ?lang=…, sinon le dernier choix du visiteur, sinon la langue de son téléphone, sinon le français */
+  var start = null;
+  try { start = new URLSearchParams(location.search).get("lang"); } catch (e) {}
+  if (!LOCALES[start]) { try { start = localStorage.getItem("mb-lang"); } catch (e) { start = null; } }
+  if (!LOCALES[start]) { var nav = (navigator.language || "fr").slice(0, 2).toLowerCase(); start = LOCALES[nav] ? nav : "fr"; }
+  apply(start, false);
+
+  Array.prototype.forEach.call(document.querySelectorAll(".lang button"), function (b) {
+    b.addEventListener("click", function () { if (b.getAttribute("data-lang") !== lang) MB.set(b.getAttribute("data-lang")); });
+  });
+})();
+</script>
+<script>
 (function () {
   var b = document.getElementById("burger"), n = document.getElementById("nav");
-  b.addEventListener("click", function () { var o = n.classList.toggle("open"); b.setAttribute("aria-expanded", o ? "true" : "false"); b.setAttribute("aria-label", o ? "Fermer le menu" : "Ouvrir le menu"); });
+  function lbl() { b.setAttribute("aria-label", MB.T(n.classList.contains("open") ? "burger_close" : "burger_open")); }
+  lbl(); MB.on(lbl);
+  b.addEventListener("click", function () { var o = n.classList.toggle("open"); b.setAttribute("aria-expanded", o ? "true" : "false"); lbl(); });
   n.addEventListener("click", function (e) { if (e.target.tagName === "A") { n.classList.remove("open"); b.setAttribute("aria-expanded", "false"); } });
 })();
 </script>
@@ -611,17 +1087,19 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 
   var tabs = document.getElementById("menu-tabs"), panel = document.getElementById("menu-panel");
+  var menuCur = "brunch";
   function showMenu(id) {
+    menuCur = id;
     Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.id === id ? "true" : "false"); });
     panel.innerHTML = "";
     var m = MENU.filter(function (x) { return x.id === id; })[0];
     var sections = m.sections;
     sections.forEach(function (s) {
-      var c = el("div", "course"); c.appendChild(el("h3", null, s.t));
+      var c = el("div", "course"); c.appendChild(el("h3", null, MB.tr(s.t)));
       var ul = el("ul");
       s.items.forEach(function (it) {
-        var li = el("li", "dish"), line = el("span", "line"), n = el("span", "n", it[0]);
-        if (it[2]) n.appendChild(el("small", null, it[2]));
+        var li = el("li", "dish"), line = el("span", "line"), n = el("span", "n", MB.tr(it[0]));
+        if (it[2]) n.appendChild(el("small", null, MB.tr(it[2])));
         if (PHOTOS[it[0]]) { var th = el("img", "thumb"); th.src = "photos/mini/" + PHOTOS[it[0]] + ".jpg"; th.alt = ""; th.loading = "lazy"; li.appendChild(th); }
         line.appendChild(n); line.appendChild(el("span", "dots")); line.appendChild(el("span", "p", fmt(it[1])));
         li.appendChild(line);
@@ -631,11 +1109,15 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     });
   }
   MENU.forEach(function (m, i) {
-    var b = el("button", null, m.nom); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id;
+    var b = el("button", null, MB.tr(m.nom)); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id; b.dataset.nom = m.nom;
     b.addEventListener("click", function () { showMenu(m.id); });
     tabs.appendChild(b);
   });
   showMenu("brunch");
+  MB.on(function () {
+    Array.prototype.forEach.call(document.querySelectorAll("#menu-tabs button, #liv-tabs button"), function (b) { b.textContent = MB.tr(b.dataset.nom); });
+    showMenu(menuCur);
+  });
 
   /* ---------- Livraison ---------- */
   (function () {
@@ -652,7 +1134,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 
     function qtyCtl(mid, it) {
       var k = key(mid, it[0]), w = el("span", "qty"), minus = el("button", "minus", "−"), n = el("span"), plus = el("button", "plus", "+");
-      minus.type = plus.type = "button"; minus.setAttribute("aria-label", "Retirer " + it[0]); plus.setAttribute("aria-label", "Ajouter " + it[0]);
+      minus.type = plus.type = "button"; minus.setAttribute("aria-label", MB.T("remove") + " " + MB.tr(it[0])); plus.setAttribute("aria-label", MB.T("add") + " " + MB.tr(it[0]));
       function sync() { var q = cart[k] ? cart[k].q : 0; n.textContent = q; w.classList.toggle("zero", q === 0); }
       plus.addEventListener("click", function () { if (!cart[k]) cart[k] = { nom: it[0], prix: it[1], carte: mid, q: 0 }; cart[k].q++; sync(); render(); });
       minus.addEventListener("click", function () { if (cart[k] && cart[k].q > 0) cart[k].q--; sync(); render(); });
@@ -664,30 +1146,30 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       lpanel.innerHTML = "";
       var m = MENU.filter(function (x) { return x.id === id; })[0];
       if (m.note) lpanel.appendChild(el("p", "asie-note", m.note));
-      if (id === "brunch") lpanel.appendChild(el("p", "asie-note", "Brunch livré tous les jours jusqu’à 18 h."));
+      if (id === "brunch") lpanel.appendChild(el("p", "asie-note", MB.T("liv_brunch")));
       m.sections.forEach(function (s) {
-        var c = el("div", "course"); c.appendChild(el("h3", null, s.t)); var ul = el("ul");
+        var c = el("div", "course"); c.appendChild(el("h3", null, MB.tr(s.t))); var ul = el("ul");
         s.items.forEach(function (it) {
-          var li = el("li", "liv-dish"), n = el("span", "n", it[0]);
-          if (it[2]) n.appendChild(el("small", null, it[2]));
-          li.appendChild(n); li.appendChild(el("span", "p", fmt(it[1]) + " DA")); li.appendChild(qtyCtl(id, it)); ul.appendChild(li);
+          var li = el("li", "liv-dish"), n = el("span", "n", MB.tr(it[0]));
+          if (it[2]) n.appendChild(el("small", null, MB.tr(it[2])));
+          li.appendChild(n); li.appendChild(el("span", "p", MB.da(it[1]))); li.appendChild(qtyCtl(id, it)); ul.appendChild(li);
         });
         c.appendChild(ul); lpanel.appendChild(c);
       });
     }
     MENU.forEach(function (m) {
-      var b = el("button", null, m.nom); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id;
+      var b = el("button", null, MB.tr(m.nom)); b.type = "button"; b.setAttribute("role", "tab"); b.dataset.id = m.id; b.dataset.nom = m.nom;
       b.addEventListener("click", function () { showLiv(m.id); }); ltabs.appendChild(b);
     });
 
     function render() {
       var list = document.getElementById("cart-list"), its = items(), t = total(), nb = 0;
       list.innerHTML = "";
-      its.forEach(function (x) { nb += x.q; var li = el("li"); li.appendChild(el("span", null, x.q + " × " + x.nom)); li.appendChild(el("b", null, fmt(x.q * x.prix) + " DA")); list.appendChild(li); });
+      its.forEach(function (x) { nb += x.q; var li = el("li"); li.appendChild(el("span", null, x.q + " × " + MB.tr(x.nom))); li.appendChild(el("b", null, MB.da(x.q * x.prix))); list.appendChild(li); });
       document.getElementById("cart-empty").hidden = its.length > 0;
-      document.getElementById("cart-sub").textContent = fmt(t) + " DA";
-      document.getElementById("cart-bar-n").textContent = "Voir ma commande (" + nb + ")";
-      document.getElementById("cart-bar-t").textContent = fmt(t) + " DA";
+      document.getElementById("cart-sub").textContent = MB.da(t);
+      document.getElementById("cart-bar-n").textContent = MB.T("see_order") + " (" + nb + ")";
+      document.getElementById("cart-bar-t").textContent = MB.da(t);
       bar.classList.toggle("show", nb > 0 && lok.hidden);
     }
 
@@ -696,10 +1178,10 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       var d = algerNow(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + +jourIn.value);
       var start = mm(d.getDay() === 5 ? LIV.debutVendredi : LIV.debut), end = mm(LIV.fin);
       var now = algerNow(), nowMin = +jourIn.value === 0 ? now.getHours() * 60 + now.getMinutes() : -1;
-      if (nowMin >= start && nowMin <= end - LIV.delaiMin) { var o = el("option", null, "Dès que possible"); o.value = "asap"; lheure.appendChild(o); }
+      if (nowMin >= start && nowMin <= end - LIV.delaiMin) { var o = el("option", null, MB.T("asap")); o.value = "asap"; lheure.appendChild(o); }
       for (var m = start; m <= end; m += LIV.pas) {
         if (nowMin >= 0 && m < nowMin + LIV.delaiMin) continue;
-        var o2 = el("option", null, hhmm(m).replace(":", " h ")); o2.value = hhmm(m); lheure.appendChild(o2);
+        var o2 = el("option", null, MB.time(hhmm(m))); o2.value = hhmm(m); lheure.appendChild(o2);
       }
     }
     jourIn.addEventListener("change", lslots);
@@ -710,43 +1192,46 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       var adr = document.getElementById("l-adr").value.trim(), com = document.getElementById("l-commune").value.trim(), rem = document.getElementById("l-rem").value.trim();
       var h = lheure.value, hMin = h === "asap" ? (algerNow().getHours() * 60 + algerNow().getMinutes() + LIV.delaiMin) : (h ? mm(h) : 0), problem = "";
       var hasAsie = its.some(function (x) { return x.carte === "asie"; }), hasBrunch = its.some(function (x) { return x.carte === "brunch"; });
-      if (!its.length) problem = "Ajoutez au moins un plat à votre commande.";
-      else if (!h) problem = "Plus de livraison possible ce jour-là. Choisissez « Demain » ou appelez le +213 541 55 96 72.";
-      else if (hasAsie && hMin < mm(LIV.asieDes)) problem = "La cuisine asiatique est disponible à partir de 11 h. Choisissez une heure de livraison à partir de 11 h.";
-      else if (hasBrunch && hMin > mm(LIV.brunchJusqua)) problem = "Le brunch est servi jusqu’à 18 h. Choisissez une heure plus tôt ou retirez les plats du brunch.";
-      else if (!nom) problem = "Indiquez votre nom et prénom.";
-      else if (tel.replace(/\D/g, "").length < 9) problem = "Indiquez un numéro de téléphone valide pour que nous puissions vous rappeler.";
-      else if (!adr) problem = "Indiquez l’adresse de livraison.";
-      else if (!com) problem = "Indiquez la commune ou le quartier.";
+      if (!its.length) problem = MB.T("e_empty");
+      else if (!h) problem = MB.T("e_noslot_liv");
+      else if (hasAsie && hMin < mm(LIV.asieDes)) problem = MB.T("e_asie");
+      else if (hasBrunch && hMin > mm(LIV.brunchJusqua)) problem = MB.T("e_brunch");
+      else if (!nom) problem = MB.T("e_name");
+      else if (tel.replace(/\D/g, "").length < 9) problem = MB.T("e_tel");
+      else if (!adr) problem = MB.T("e_adr");
+      else if (!com) problem = MB.T("e_com");
       if (problem) { lerr.textContent = problem; lerr.hidden = false; return; }
 
       var d = algerNow(); d.setDate(d.getDate() + +jourIn.value);
-      var jourTxt = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-      var heureTxt = h === "asap" ? "Dès que possible" : h.replace(":", " h ");
-      var lignes = its.map(function (x) { return x.q + " × " + x.nom + " (" + fmt(x.q * x.prix) + " DA)"; });
-      var t = fmt(total()) + " DA";
-      var msg = "Bonjour, je souhaite passer une commande en livraison à La Maison Blanche.\n\n" + lignes.join("\n") +
-        "\n\nSous-total : " + t + " (hors frais de livraison)\nPaiement : espèces à la livraison\n\nLivraison : " + jourTxt + ", " + heureTxt +
-        "\nNom : " + nom + "\nTéléphone : " + tel + "\nAdresse : " + adr + "\nCommune / quartier : " + com + (rem ? "\nRemarque : " + rem : "");
+      /* Le client voit tout dans sa langue ; l'e-mail reçu par l'équipe reste en français */
+      var dopt = { weekday: "long", day: "numeric", month: "long" };
+      var jourFr = d.toLocaleDateString("fr-FR", dopt), jourTxt = d.toLocaleDateString(MB.locale(), dopt);
+      var heureFr = h === "asap" ? "Dès que possible" : h.replace(":", " h "), heureTxt = h === "asap" ? MB.T("asap") : MB.time(h);
+      var lignesFr = its.map(function (x) { return x.q + " × " + x.nom + " (" + fmt(x.q * x.prix) + " DA)"; });
+      var lignes = its.map(function (x) { return x.q + " × " + MB.dish(x.nom) + " (" + MB.da(x.q * x.prix) + ")"; });
+      var tFr = fmt(total()) + " DA", t = MB.da(total()), C = MB.T("colon");
+      var msg = MB.T("wa_liv") + "\n\n" + lignes.join("\n") +
+        "\n\n" + MB.T("subtot") + C + t + " " + MB.T("excl_fee") + "\n" + MB.T("pay") + C + MB.T("cash") + "\n\n" + MB.T("delivery") + C + jourTxt + MB.T("sep") + heureTxt +
+        "\n" + MB.T("name") + C + nom + "\n" + MB.T("phone") + C + tel + "\n" + MB.T("address") + C + adr + "\n" + MB.T("commune") + C + com + (rem ? "\n" + MB.T("note") + C + rem : "");
       var waUrl = "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(msg);
 
       function done() {
         var rc = document.getElementById("liv-recap"); rc.innerHTML = "";
-        [["Commande", lignes.join("\n")], ["Sous-total", t + " + livraison"], ["Livraison", jourTxt + ", " + heureTxt], ["Adresse", adr + ", " + com], ["Téléphone", tel]].forEach(function (r) {
+        [[MB.T("order"), lignes.join("\n")], [MB.T("subtot"), t + " " + MB.T("plus_deliv")], [MB.T("delivery"), jourTxt + MB.T("sep") + heureTxt], [MB.T("address"), adr + MB.T("sep") + com], [MB.T("phone"), tel]].forEach(function (r) {
           rc.appendChild(el("dt", null, r[0])); var dd = el("dd", null, r[1]); dd.style.whiteSpace = "pre-line"; rc.appendChild(dd);
         });
         document.getElementById("liv-wa").href = waUrl;
         lform.hidden = true; lok.hidden = false; bar.classList.remove("show");
         document.getElementById("panier").scrollIntoView({ block: "start" }); lok.focus({ preventScroll: true });
-        lsend.disabled = false; lsend.textContent = "Continuer";
+        lsend.disabled = false; lsend.textContent = MB.T("continue");
       }
-      lsend.disabled = true; lsend.textContent = "Envoi en cours…";
+      lsend.disabled = true; lsend.textContent = MB.T("sending");
       var payload = {
         access_key: CONFIG.cle,
-        subject: "Livraison (à valider seulement si reçue sur WhatsApp) : " + nom + ", " + t + ", " + jourTxt + " " + heureTxt,
+        subject: "Livraison (à valider seulement si reçue sur WhatsApp) : " + nom + ", " + tFr + ", " + jourFr + " " + heureFr,
         from_name: "Site La Maison Blanche – Livraison",
-        "Commande": lignes.join("\n"), "Sous-total": t + " (hors frais de livraison)", "Paiement": "Espèces à la livraison",
-        "Jour": jourTxt, "Heure": heureTxt, "Nom": nom, "Téléphone": tel, "Adresse": adr, "Commune / quartier": com, "Remarque": rem || "-"
+        "Commande": lignesFr.join("\n"), "Sous-total": tFr + " (hors frais de livraison)", "Paiement": "Espèces à la livraison",
+        "Jour": jourFr, "Heure": heureFr, "Langue du client": MB.langName(), "Nom": nom, "Téléphone": tel, "Adresse": adr, "Commune / quartier": com, "Remarque": rem || "-"
       };
       var fin = false, timer = setTimeout(function () { if (!fin) { fin = true; done(); } }, 15000);
       fetch(CONFIG.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload) })
@@ -759,6 +1244,12 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       cart = {}; lform.reset(); lslots(); showLiv(current); render(); lok.hidden = true; lform.hidden = false;
     });
     showLiv("brunch"); lslots(); render();
+    lsend.textContent = MB.T("continue");
+    MB.on(function () {
+      var hv = lheure.value; showLiv(current); render(); lslots();
+      if (Array.prototype.some.call(lheure.options, function (o) { return o.value === hv; })) lheure.value = hv;
+      if (!lsend.disabled) lsend.textContent = MB.T("continue");
+    });
   })();
 
   /* ---------- Réservation ---------- */
@@ -776,9 +1267,13 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   var today = algerNow(), maxD = algerNow(); maxD.setDate(maxD.getDate() + CONFIG.joursMax);
   dateIn.min = iso(today); dateIn.max = iso(maxD); dateIn.value = iso(today);
 
-  for (var i = 1; i <= CONFIG.maxPers; i++) { var o = el("option", null, i + (i > 1 ? " personnes" : " personne")); o.value = i; persIn.appendChild(o); }
-  var big = el("option", null, "Plus de " + CONFIG.maxPers + " personnes"); big.value = "plus"; persIn.appendChild(big);
-  persIn.value = "2";
+  function persOpts() {
+    var v = persIn.value || "2"; persIn.innerHTML = "";
+    for (var i = 1; i <= CONFIG.maxPers; i++) { var o = el("option", null, MB.pers(i)); o.value = i; persIn.appendChild(o); }
+    var big = el("option", null, MB.T("pers_more")); big.value = "plus"; persIn.appendChild(big);
+    persIn.value = v;
+  }
+  persOpts();
 
   function slots() {
     var e = CONFIG.espaces[espace()], v = dateIn.value;
@@ -790,10 +1285,10 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     for (var m = start; m <= end; m += CONFIG.pas) {
       var t = new Date(d); t.setHours(Math.floor(m / 60), m % 60, 0, 0);
       if (t < limit) continue;
-      var label = pad(Math.floor(m / 60)) + ":" + pad(m % 60), o = el("option", null, label.replace(":", " h ")); o.value = label;
+      var label = pad(Math.floor(m / 60)) + ":" + pad(m % 60), o = el("option", null, MB.time(label)); o.value = label;
       heureIn.appendChild(o); count++;
     }
-    if (!count) { var none = el("option", null, "Plus de créneau ce jour-là"); none.value = ""; heureIn.appendChild(none); }
+    if (!count) { var none = el("option", null, MB.T("noslot_opt")); none.value = ""; heureIn.appendChild(none); }
     return count;
   }
   form.addEventListener("change", function (ev) {
@@ -807,17 +1302,22 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
     if (!open) { radios[0].checked = true; var dm = algerNow(); dm.setDate(dm.getDate() + 1); dateIn.value = iso(dm); slots(); }
   }
 
-  send.textContent = "Continuer";
+  send.textContent = MB.T("continue");
+  MB.on(function () {
+    persOpts(); var hv = heureIn.value; slots();
+    if (Array.prototype.some.call(heureIn.options, function (o) { return o.value === hv; })) heureIn.value = hv;
+    if (!send.disabled) send.textContent = MB.T("continue");
+  });
 
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     err.hidden = true;
     var nom = form.nom.value.trim(), tel = form.tel.value.trim(), problem = "";
-    if (!heureIn.value) problem = "Choisissez une autre date : il n’y a plus de créneau disponible ce jour-là.";
-    else if (persIn.value === "plus") problem = "Pour plus de 8 personnes, appelez-nous au +213 541 55 96 72.";
-    else if (!nom) problem = "Indiquez votre nom et prénom.";
-    else if (tel.replace(/\D/g, "").length < 9) problem = "Indiquez un numéro de téléphone valide pour que nous puissions vous rappeler.";
-    else if (form.email.value && !form.email.checkValidity()) problem = "L’adresse e-mail n’est pas valide. Corrigez-la ou laissez le champ vide.";
+    if (!heureIn.value) problem = MB.T("e_noslot");
+    else if (persIn.value === "plus") problem = MB.T("e_group");
+    else if (!nom) problem = MB.T("e_name");
+    else if (tel.replace(/\D/g, "").length < 9) problem = MB.T("e_tel");
+    else if (form.email.value && !form.email.checkValidity()) problem = MB.T("e_email");
     if (problem) { err.textContent = problem; err.hidden = false; return; }
 
     var e = CONFIG.espaces[espace()];
@@ -825,14 +1325,16 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       espace: e.nom, date: dateIn.value, heure: heureIn.value, personnes: persIn.value,
       nom: nom, telephone: tel, email: form.email.value.trim(), occasion: form.occasion.value, remarque: form.remarque.value.trim()
     };
-    var dLabel = new Date(data.date + "T00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-
-    var heureTxt = data.heure.replace(":", " h ");
-    var rows = [["Espace", data.espace], ["Date", dLabel], ["Heure", heureTxt], ["Personnes", data.personnes], ["Nom", data.nom], ["Téléphone", data.telephone]];
-    var msg = "Bonjour, je souhaite réserver une table à La Maison Blanche.\n" +
-      "Espace : " + data.espace + "\nDate : " + dLabel + "\nHeure : " + heureTxt +
-      "\nPersonnes : " + data.personnes + "\nNom : " + data.nom + "\nTéléphone : " + data.telephone +
-      (data.occasion ? "\nOccasion : " + data.occasion : "") + (data.remarque ? "\nRemarque : " + data.remarque : "");
+    /* Le client voit tout dans sa langue ; l'e-mail reçu par l'équipe reste en français */
+    var dopt = { weekday: "long", day: "numeric", month: "long" }, dObj = new Date(data.date + "T00:00");
+    var dLabelFr = dObj.toLocaleDateString("fr-FR", dopt), dLabel = dObj.toLocaleDateString(MB.locale(), dopt);
+    var heureFr = data.heure.replace(":", " h "), heureTxt = MB.time(data.heure);
+    var espLoc = MB.T("esp_" + espace()), occLoc = data.occasion ? form.occasion.options[form.occasion.selectedIndex].text : "", C = MB.T("colon");
+    var rows = [[MB.T("space"), espLoc], [MB.T("date"), dLabel], [MB.T("time"), heureTxt], [MB.T("guests"), data.personnes], [MB.T("name"), data.nom], [MB.T("phone"), data.telephone]];
+    var msg = MB.T("wa_resa") + "\n" +
+      MB.T("space") + C + espLoc + "\n" + MB.T("date") + C + dLabel + "\n" + MB.T("time") + C + heureTxt +
+      "\n" + MB.T("guests") + C + data.personnes + "\n" + MB.T("name") + C + data.nom + "\n" + MB.T("phone") + C + data.telephone +
+      (data.occasion ? "\n" + MB.T("occasion") + C + occLoc : "") + (data.remarque ? "\n" + MB.T("note") + C + data.remarque : "");
     var waUrl = "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(msg);
 
     /* sent = true : la demande est partie par e-mail ; false : le client doit l'envoyer sur WhatsApp */
@@ -841,25 +1343,25 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       rows.forEach(function (r) { recap.appendChild(el("dt", null, r[0])); recap.appendChild(el("dd", null, r[1])); });
       document.getElementById("wa").href = waUrl;
       /* L'envoi WhatsApp est obligatoire dans tous les cas : sans message WhatsApp, la demande n'est pas traitée */
-      document.getElementById("ok-label").textContent = "Dernière étape obligatoire";
-      document.getElementById("ok-title").textContent = "Envoyez votre demande sur WhatsApp";
-      document.getElementById("ok-text").textContent = "Votre réservation n’est pas encore enregistrée. Appuyez sur le bouton ci-dessous : WhatsApp s’ouvre avec votre message déjà rempli, il vous suffit d’appuyer sur Envoyer. Sans ce message WhatsApp, votre demande ne sera pas prise en compte. Notre équipe vous rappelle ensuite pour confirmer votre table.";
+      document.getElementById("ok-label").textContent = MB.T("ok_last");
+      document.getElementById("ok-title").textContent = MB.T("r_ok_h");
+      document.getElementById("ok-text").textContent = MB.T("r_ok_p");
       document.getElementById("ok-wa").hidden = true;
       form.hidden = true; ok.hidden = false; ok.focus();
-      send.disabled = false; send.textContent = "Continuer";
+      send.disabled = false; send.textContent = MB.T("continue");
     }
 
     if (form.botcheck && form.botcheck.checked) { done(true); return; }
     if (!CONFIG.endpoint) { done(false); return; }
 
     /* Envoi par e-mail via Web3Forms ; en cas d'échec, le client envoie sa demande sur WhatsApp */
-    send.disabled = true; send.textContent = "Envoi en cours…";
+    send.disabled = true; send.textContent = MB.T("sending");
     var payload = {
       access_key: CONFIG.cle,
-      subject: "Réservation (à valider seulement si reçue sur WhatsApp) : " + dLabel + " à " + heureTxt + ", " + data.personnes + " pers., " + data.nom,
+      subject: "Réservation (à valider seulement si reçue sur WhatsApp) : " + dLabelFr + " à " + heureFr + ", " + data.personnes + " pers., " + data.nom,
       from_name: "Site La Maison Blanche",
-      "Espace": data.espace, "Date": dLabel, "Heure": heureTxt, "Personnes": data.personnes,
-      "Nom": data.nom, "Téléphone": data.telephone, "E-mail": data.email || "-", "Occasion": data.occasion || "-", "Remarque": data.remarque || "-"
+      "Espace": data.espace, "Date": dLabelFr, "Heure": heureFr, "Personnes": data.personnes,
+      "Nom": data.nom, "Téléphone": data.telephone, "E-mail": data.email || "-", "Occasion": data.occasion || "-", "Remarque": data.remarque || "-", "Langue du client": MB.langName()
     };
     if (data.email) payload.replyto = data.email;
     /* Copie de la réservation vers la 2e adresse (n'affecte pas l'envoi principal) */
@@ -879,7 +1381,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 
   Array.prototype.forEach.call(document.querySelectorAll(".copy"), function (b) {
     b.addEventListener("click", function () {
-      var v = b.dataset.copy, done = function () { b.textContent = "Copié"; setTimeout(function () { b.textContent = "Copier"; }, 1600); };
+      var v = b.dataset.copy, done = function () { b.textContent = MB.T("copied"); setTimeout(function () { b.textContent = MB.T("copy"); }, 1600); };
       try { navigator.clipboard.writeText(v).then(done, done); } catch (e) { done(); }
     });
   });
