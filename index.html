@@ -559,6 +559,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
   var CONFIG = {
     endpoint: "https://api.web3forms.com/submit",                 /* service qui envoie chaque demande par e-mail (Web3Forms) */
     cle: "1e505bf1-b6e3-4e34-bb9c-05aa89d567cf",                      /* clé d'accès Web3Forms liée à maisonblanchehydra@gmail.com */
+    cleCopieResa: "f1d2c232-ee2b-4065-8d58-47dc2430a6ff",             /* 2e adresse qui reçoit aussi chaque réservation */
     whatsapp: "213541559672",
     maxPers: 8,
     delaiMinH: 1,
@@ -861,6 +862,11 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       "Nom": data.nom, "Téléphone": data.telephone, "E-mail": data.email || "-", "Occasion": data.occasion || "-", "Remarque": data.remarque || "-"
     };
     if (data.email) payload.replyto = data.email;
+    /* Copie de la réservation vers la 2e adresse (n'affecte pas l'envoi principal) */
+    if (CONFIG.cleCopieResa) {
+      var copie = JSON.parse(JSON.stringify(payload)); copie.access_key = CONFIG.cleCopieResa;
+      fetch(CONFIG.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(copie) }).catch(function () {});
+    }
     var finished = false;
     var timer = setTimeout(function () { if (!finished) { finished = true; done(false); } }, 15000);
     fetch(CONFIG.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload) })
