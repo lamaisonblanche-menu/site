@@ -132,11 +132,6 @@ section.room { padding-block: 112px; }
 @media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-left: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
 
 /* Signatures */
-.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.gallery figure { margin: 0; overflow: hidden; }
-.gallery img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; transition: transform .6s ease; }
-.gallery figure:hover img { transform: scale(1.03); }
-@media (max-width: 860px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .gallery figure:nth-child(9) { display: none; } }
 .sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
 .sig { display: grid; gap: 16px; }
 .sig img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
@@ -227,7 +222,6 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 .btn { transition: background .45s var(--ease), color .45s var(--ease), border-color .45s var(--ease); }
 .site-nav a:not(.btn) { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .5s var(--ease); padding-bottom: 3px; }
 .site-nav a:not(.btn):hover { background-size: 100% 1px; }
-.gallery img { transition: transform 1.2s var(--ease); }
 #menu-panel > * { animation: mb-fade .7s var(--ease) both; }
 #menu-panel > *:nth-child(2) { animation-delay: .06s; } #menu-panel > *:nth-child(3) { animation-delay: .12s; } #menu-panel > *:nth-child(n+4) { animation-delay: .18s; }
 @keyframes mb-fade { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
@@ -259,7 +253,6 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
       <a href="#maison">La maison</a>
       <a href="#espaces">Espaces</a>
       <a href="#signatures">Signatures</a>
-      <a href="#galerie">Galerie</a>
       <a href="#menu">Menu</a>
       <a href="#infos">Infos</a>
       <a class="btn btn-solid" href="#reserver">Réserver</a>
@@ -346,26 +339,6 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
         <article class="sig"><img src="photos/escargots.jpg" alt="Escargots de Bourgogne" loading="lazy" style="object-position:50% 48%"><div class="meta"><div><p class="cat">Entrée chaude</p><h3>Escargots de Bourgogne</h3></div><span class="p">2 300 DA</span></div></article>
         <article class="sig"><img src="photos/club-saumon.jpg" alt="Club sandwich au saumon fumé et mojito" loading="lazy" style="object-position:50% 55%"><div class="meta"><div><p class="cat">Brunch</p><h3>Club sandwich saumon fumé</h3></div><span class="p">2 700 DA</span></div></article>
         <article class="sig"><img src="photos/salle-gastro.jpg" alt="Burrata sur un carpaccio de tomates" loading="lazy" style="object-position:50% 85%"><div class="meta"><div><p class="cat">Entrée froide</p><h3>Burrata, carpaccio de tomates</h3></div><span class="p">2 000 DA</span></div></article>
-      </div>
-    </div>
-  </section>
-
-  <section class="room" id="galerie">
-    <div class="wrap">
-      <div class="head center">
-        <p class="label">En images</p>
-        <h2>À la table de la maison</h2>
-      </div>
-      <div class="gallery">
-        <figure><img src="photos/brioche-caramel.jpg" alt="Brioche perdue caramel beurre salé" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/toast-avocat-saumon.jpg" alt="Toast avocat saumon et burrata" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/rainbow-roll.jpg" alt="Rainbow roll" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/duo-assiettes.jpg" alt="Assiettes de la carte gastronomique" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/burrata.jpg" alt="Burrata, carpaccio de tomates" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/matcha-fraise-pistache.jpg" alt="Matcha latte fraise et pistache" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/tartare.jpg" alt="Tartare de la maison" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/mochis.jpg" alt="Mochis glacés pistache" loading="lazy" decoding="async" width="800" height="1000"></figure>
-        <figure><img src="photos/exotic-mango.jpg" alt="Exotic mango" loading="lazy" decoding="async" width="800" height="1000"></figure>
       </div>
     </div>
   </section>
@@ -742,7 +715,7 @@ footer.site p { margin-top: 26px; font-size: 11px; letter-spacing: .3em; text-tr
 
   /* Apparition des blocs au fil de la lecture */
   if (reduce || !("IntersectionObserver" in window)) return;
-  var groups = [".room .head", ".sig", ".gallery figure", ".space", ".resa", ".room ol li", "#infos .wrap > div > *", ".room .note"];
+  var groups = [".room .head", ".sig", ".space", ".resa", ".room ol li", "#infos .wrap > div > *", ".room .note"];
   var els = [];
   groups.forEach(function (sel) {
     document.querySelectorAll(sel).forEach(function (el) {
