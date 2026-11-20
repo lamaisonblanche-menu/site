@@ -135,6 +135,17 @@ section.room { padding-block: 112px; }
 .space .btn { justify-self: start; margin-top: 10px; }
 @media (max-width: 860px) { .spaces { grid-template-columns: 1fr; } .space, .space:first-child, .space:last-child { padding: 36px 0 8px; } .space + .space { border-inline-start: 0; border-top: 1px solid #d6d5d0; margin-top: 28px; } }
 
+/* Travaux salle gastro */
+.notice { background: var(--ink); color: var(--paper); text-align: center; padding: 12px 20px; font-size: 14px; line-height: 1.5; }
+.notice a { color: inherit; text-decoration: underline; }
+.travaux { max-width: 640px; margin: 0 auto 56px; padding: 32px 36px; background: var(--paper); border: 1px solid var(--ink); display: grid; gap: 14px; }
+.travaux h3 { font-size: clamp(24px, 3vw, 30px); }
+.travaux p { color: var(--muted); margin: 0; }
+.travaux ul { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; }
+.travaux .sign { font-style: italic; color: var(--ink); }
+.space.closed h3, .space.closed > p:not(.label) { opacity: .55; }
+@media (max-width: 640px) { .travaux { padding: 24px 20px; } }
+
 /* Signatures */
 .sig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 28px; }
 .sig { display: grid; gap: 16px; }
@@ -332,6 +343,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
 </header>
 
 <main id="accueil">
+  <div class="notice" role="status" data-i18n="w_notice">🚧 Notre salle gastronomique fait peau neuve et rouvre dans les prochains jours ! En attendant, toute notre carte (brunch, gastro et asiatique) vous attend en salle brunch et sur notre terrasse.</div>
   <section class="hero hero-photo dark">
     <div class="wrap">
       <p class="label" data-i18n="hero_label">Restaurant · Hydra, Alger</p>
@@ -371,20 +383,34 @@ html[lang="ar"] .statement { line-height: 1.6; }
         <h2 data-i18n="e_h2">Trois ambiances</h2>
         <p class="sub" data-i18n="e_sub">Choisissez votre espace au moment de réserver.</p>
       </div>
+      <div class="travaux">
+        <h3 data-i18n="tv_h">Information travaux</h3>
+        <p data-i18n="tv_p1">Notre espace gastronomique est en travaux et rouvrira très prochainement, dans les prochains jours.</p>
+        <p data-i18n="tv_p2">Rien ne change dans vos assiettes : toute notre carte reste disponible. Brunch, cuisine gastronomique et cuisine asiatique vous sont servis dans notre salle brunch et sur notre terrasse.</p>
+        <h3 data-i18n="tv_hh">Nos horaires</h3>
+        <ul>
+          <li data-i18n="tv_l1">Ouvert tous les jours de 9 h à 23 h (le vendredi à partir de 16 h)</li>
+          <li data-i18n="tv_l2">Brunch : de 9 h à 18 h</li>
+          <li data-i18n="tv_l3">Cuisine asiatique : à partir de 11 h</li>
+          <li data-i18n="tv_l4">Cuisine gastronomique : jusqu’à 23 h</li>
+        </ul>
+        <p data-i18n="tv_thanks">Merci de votre compréhension, et à très vite !</p>
+        <p class="sign" data-i18n="tv_sign">La Direction – La Maison Blanche</p>
+      </div>
       <div class="spaces">
         <article class="space">
-            <p class="label" data-i18n="hr_until18">Jusqu’à 18 h</p>
+            <p class="label" data-i18n="allday">Toute la journée</p>
             <h3 data-i18n="sp1_h">Salle brunch</h3>
             <p data-i18n="sp1_p">Œufs, toasts, brioches perdues, pancakes et cocktails maison. Une salle lumineuse pour un brunch entre amis ou en famille.</p>
-            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_b1">9 h – 17 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_b2">16 h – 17 h 30</dd></dl>
+            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_g1">9 h – 22 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_g2">16 h – 22 h 30</dd></dl>
+            <p class="note" style="margin-top:0" data-i18n="sp1_note">En ce moment, toute la carte y est servie : brunch (jusqu’à 18 h), gastro et asiatique (dès 11 h).</p>
             <a class="btn btn-line" href="#reserver" data-i18n="sp1_btn">Réserver au brunch</a>
         </article>
-        <article class="space">
-            <p class="label" data-i18n="allday">Toute la journée</p>
+        <article class="space closed">
+            <p class="label" data-i18n="tv_label">En travaux</p>
             <h3 data-i18n="sp2_h">Espace gastronomique</h3>
             <p data-i18n="sp2_p">Nappes blanches, moulures et appliques dorées. Foie gras, cœur de filet de bœuf, poissons et pâtes, dans un cadre feutré.</p>
-            <dl><dt data-i18n="dt_resa">Réservation</dt><dd data-i18n="dd_g1">9 h – 22 h 30</dd><dt data-i18n="d_fri">Vendredi</dt><dd data-i18n="dd_g2">16 h – 22 h 30</dd></dl>
-            <a class="btn btn-line" href="#reserver" data-i18n="sp2_btn">Réserver en salle</a>
+            <p class="note" style="margin-top:0" data-i18n="sp2_closed">Réouverture dans les prochains jours. En attendant, la carte gastronomique est servie en salle brunch et en terrasse.</p>
         </article>
         <article class="space">
             <p class="label" data-i18n="allday">Toute la journée</p>
@@ -505,8 +531,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
           <fieldset class="field">
             <legend data-i18n="leg_esp">Espace</legend>
             <div class="choices">
-              <label><input type="radio" name="espace" id="esp-brunch" value="brunch" checked><span data-i18n="c_brunch">Salle brunch</span><small data-i18n="dd_b1">9 h – 17 h 30</small></label>
-              <label><input type="radio" name="espace" id="esp-gastro" value="gastro"><span data-i18n="c_gastro">Gastronomique</span><small data-i18n="dd_g1">9 h – 22 h 30</small></label>
+              <label><input type="radio" name="espace" id="esp-brunch" value="brunch" checked><span data-i18n="c_brunch">Salle brunch</span><small data-i18n="dd_g1">9 h – 22 h 30</small></label>
               <label><input type="radio" name="espace" id="esp-terrasse" value="terrasse"><span data-i18n="c_terr">Terrasse</span><small data-i18n="c_terr_t">9 h – 22 h 30 · selon la météo</small></label>
             </div>
           </fieldset>
@@ -606,6 +631,14 @@ html[lang="ar"] .statement { line-height: 1.6; }
       sp1_h: "Brunch room", sp1_p: "Eggs, toasts, French toast brioche, pancakes and house cocktails. A bright room for brunch with friends or family.",
       dt_resa: "Booking", dd_b1: "9 am – 5:30 pm", dd_b2: "4 pm – 5:30 pm", sp1_btn: "Book for brunch",
       allday: "All day",
+      w_notice: "🚧 Our fine-dining room is getting a makeover and reopens in the coming days! In the meantime, our whole menu (brunch, fine dining and Asian) is served in the brunch room and on our terrace.",
+      tv_label: "Under renovation", tv_h: "Renovation notice",
+      tv_p1: "Our fine-dining room is under renovation and will reopen very soon, in the coming days.",
+      tv_p2: "Nothing changes on your plate: our whole menu is still available. Brunch, fine dining and Asian cuisine are served in our brunch room and on our terrace.",
+      tv_hh: "Opening hours", tv_l1: "Open every day from 9 am to 11 pm (Fridays from 4 pm)", tv_l2: "Brunch: 9 am to 6 pm", tv_l3: "Asian cuisine: from 11 am", tv_l4: "Fine dining: until 11 pm",
+      tv_thanks: "Thank you for your understanding, see you soon!", tv_sign: "The Management – La Maison Blanche",
+      sp1_note: "For now, the whole menu is served here: brunch (until 6 pm), fine dining and Asian (from 11 am).",
+      sp2_closed: "Reopening in the coming days. In the meantime, the fine-dining menu is served in the brunch room and on the terrace.",
       sp2_h: "Fine-dining room", sp2_p: "White tablecloths, mouldings and gilded wall lamps. Foie gras, beef tenderloin, fish and pasta, in a hushed setting.",
       dd_g1: "9 am – 10:30 pm", dd_g2: "4 pm – 10:30 pm", sp2_btn: "Book the dining room",
       sp3_h: "Terrace", sp3_p: "The largest space in the house, with its banquettes and greenery, from lunch to dinner.",
@@ -657,6 +690,14 @@ html[lang="ar"] .statement { line-height: 1.6; }
       sp1_h: "قاعة البرانش", sp1_p: "بيض، توست، بريوش بردو، بان كيك وكوكتيلات من إعدادنا. قاعة مضيئة لبرانش مع الأصدقاء أو العائلة.",
       dt_resa: "الحجز", dd_b1: "9:00 – 17:30", dd_b2: "16:00 – 17:30", sp1_btn: "احجز للبرانش",
       allday: "طوال اليوم",
+      w_notice: "🚧 قاعة المطبخ الراقي قيد التجديد وتُفتح من جديد خلال الأيام القادمة! في الأثناء، كل قائمتنا (برانش، مطبخ راقٍ وآسيوي) في انتظاركم في قاعة البرانش وعلى التراس.",
+      tv_label: "قيد الأشغال", tv_h: "إعلان أشغال",
+      tv_p1: "فضاء المطبخ الراقي قيد الأشغال وسيُعاد فتحه قريبًا جدًا، خلال الأيام القادمة.",
+      tv_p2: "لا شيء يتغيّر في أطباقكم: كل قائمتنا متوفرة. البرانش، المطبخ الراقي والمطبخ الآسيوي تُقدَّم في قاعة البرانش وعلى التراس.",
+      tv_hh: "أوقات العمل", tv_l1: "مفتوح كل يوم من 9:00 إلى 23:00 (الجمعة ابتداءً من 16:00)", tv_l2: "البرانش: من 9:00 إلى 18:00", tv_l3: "المطبخ الآسيوي: ابتداءً من 11:00", tv_l4: "المطبخ الراقي: حتى 23:00",
+      tv_thanks: "شكرًا على تفهّمكم، وإلى اللقاء قريبًا!", tv_sign: "الإدارة – La Maison Blanche",
+      sp1_note: "حاليًا تُقدَّم هنا كل القائمة: برانش (حتى 18:00)، مطبخ راقٍ وآسيوي (ابتداءً من 11:00).",
+      sp2_closed: "إعادة الفتح خلال الأيام القادمة. في الأثناء، تُقدَّم قائمة المطبخ الراقي في قاعة البرانش وعلى التراس.",
       sp2_h: "فضاء المطبخ الراقي", sp2_p: "مفارش بيضاء، زخارف جصّية ومصابيح جدارية مذهّبة. فوا غرا، قلب فيليه البقر، أسماك وباستا، في أجواء هادئة.",
       dd_g1: "9:00 – 22:30", dd_g2: "16:00 – 22:30", sp2_btn: "احجز في القاعة",
       sp3_h: "التراس", sp3_p: "أكبر فضاء في المطعم، بمقاعده المريحة وخضرته، من الغداء إلى العشاء.",
@@ -1045,7 +1086,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
     joursMax: 60,
     pas: 30,
     espaces: {
-      brunch:   { nom: "Salle brunch",          debut: "09:00", fin: "17:30", debutVendredi: "16:00" },
+      brunch:   { nom: "Salle brunch",          debut: "09:00", fin: "22:30", debutVendredi: "16:00" },   /* pendant les travaux de la salle gastro, toute la carte est servie en salle brunch */
       gastro:   { nom: "Espace gastronomique",  debut: "09:00", fin: "22:30", debutVendredi: "16:00" },
       terrasse: { nom: "Terrasse",              debut: "09:00", fin: "22:30", debutVendredi: "16:00" }
     }
