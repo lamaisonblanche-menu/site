@@ -14,6 +14,13 @@ Statut : **NON PUBLIABLE — VALIDATION INCOMPLÈTE**
 - Synchronisation explicite du fichier de données sur disque et sauvegarde du ticket avant de déclencher son impression.
 - Tests ciblés ajoutés (`app/tests/caisse.test.js`) et workflow de vérification de syntaxe proposé.
 
+## Résultats de tests automatisés — GitHub Actions
+- Workflow du commit c892ef9b75f94a084f8a7751ec9000e2a43e7b79 : **SUCCESS** (run 45254058649).
+- Syntaxe Node.js du serveur et de l'interface : **réussie**.
+- Tests automatisés : **réussis**, incluant serveur HTTP isolé, ouverture de table, commande avec supplément Frites +500 DA, contrôle du prix, bon simulé, encaissement espèces, refus d'un nouvel encaissement sur table soldée, paiements partiels et mixtes, conservation des tickets sur disque, validation des réservations et limitation des tentatives de connexion.
+- Tests exécutés avec données temporaires : **aucune commande réelle du restaurant créée**.
+- **Attention :** le succès de ces tests ne démontre pas la fiabilité des imprimantes physiques, du logiciel Windows, de l'import Gmail ou de la restauration en conditions réelles.
+
 ## Contrôles effectués
 - Lecture du serveur, de l'interface et des consignes `AGENTS.md`.
 - Vérification de syntaxe du serveur par moteur JavaScript sur plusieurs versions intermédiaires.
@@ -28,7 +35,7 @@ Statut : **NON PUBLIABLE — VALIDATION INCOMPLÈTE**
 5. **Sécurité réseau** : accès HTTP sur le réseau local ; isoler les terminaux de caisse du Wi-Fi public.
 6. **Interface** : aucun test navigateur 1024×768 de commande complète et de supplément.
 7. **Rapports** : tableaux de bord complémentaires et rapprochement chèques/sociétés non développés.
-8. **Automatisation** : aucun résultat de workflow GitHub Actions confirmé.
+8. **Automatisation** : contrôles CI réussis, mais couverture encore partielle (pas de tests de charge, pannes réelles ou matériels).
 9. **Publication** : version du cœur et dossier `maj/` non mis à jour ; ne pas fusionner.
 
 ## Scénarios obligatoires avant publication
