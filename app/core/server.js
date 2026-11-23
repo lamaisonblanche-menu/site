@@ -326,7 +326,9 @@ function saveNow() {
   const limite = Date.now() - 60 * 864e5;
   if (db.bons.length > 5000) db.bons = db.bons.filter(b => b.ts > limite);
   const tmp = DB_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
+  const data = JSON.stringify(db);
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeFileSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   fs.renameSync(tmp, DB_FILE);
   const b = path.join(BACKUPS, 'caisse-' + new Date().toISOString().slice(0, 10) + '.json');
   if (!fs.existsSync(b)) {
@@ -355,11 +357,29 @@ function jourCourant(creer) {
 }
 
 // ---------------------------------------------------------------- Sessions
-const sessions = new Map(); // token -> {userId, ts}
+const sessions = new Map(); // token -> {userId, ts, created}
+const SESSION_IDLE_MS = 2 * 3600000, SESSION_MAX_MS = 12 * 3600000;
+const essaisAcces = new Map();
+function controleEssais(req) {
+  const ip = String(req?.socket?.remoteAddress || 'inconnue');
+  const t = now(), x = essaisAcces.get(ip);
+  if (x && x.bloqueJusqua > t) E('Trop de tentatives. Réessayez dans quelques minutes.', 429);
+  if (essaisAcces.size > 2000) for (const [k, v] of essaisAcces) if (t - v.debut > 3600000) essaisAcces.delete(k);
+  return ip;
+}
+function echecAcces(ip) {
+  const t = now(), ancien = essaisAcces.get(ip);
+  const x = ancien && t - ancien.debut < 5 * 60000 ? ancien : { debut: t, n: 0, bloqueJusqua: 0 };
+  x.n++;
+  if (x.n >= 5) x.bloqueJusqua = t + 5 * 60000;
+  essaisAcces.set(ip, x);
+}
+function succesAcces(ip) { essaisAcces.delete(ip); }
 function userDe(req) {
   const t = req.headers['x-token'];
   const s = t && sessions.get(t);
   if (!s) return null;
+  if (now() - s.ts > SESSION_IDLE_MS || now() - (s.created || s.ts) > SESSION_MAX_MS) { sessions.delete(t); return null; }
   const u = db.users.find(x => x.id === s.userId && x.actif);
   if (!u) return null;
   s.ts = now();
@@ -805,7 +825,9 @@ function verifierResa(b) {
     couverts: parseInt(b.couverts, 10) || 0, salle: String(b.salle || ''), table: String(b.table || '').trim(), note: String(b.note || '').trim().slice(0, 200),
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) E('Choisissez la date');
-  if (!/^\d{2}:\d{2}$/.test(r.heure)) E('Choisissez l\'heure');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.heure)) E('Choisissez une heure valide');
+  const dateTest = new Date(r.date + 'T12:00:00');
+  if (Number.isNaN(dateTest.getTime()) || dateLocale(dateTest.getTime()) !== r.date) E('Date de réservation invalide');
   if (!r.nom) E('Nom du client obligatoire');
   if (!(r.couverts >= 1 && r.couverts <= 200)) E('Nombre de personnes ?');
   if (r.salle && !db.config.salles.some(x => x.id === r.salle)) r.salle = '';
@@ -986,11 +1008,13 @@ function bonsKds(poste) {
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
 const routes = {
-  'POST /api/login': (b) => {
+  'POST /api/login': (b, _u, req) => {
+    const ip = controleEssais(req);
     const u = parCode(b.badge || b.pin);
-    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    if (!u) { echecAcces(ip); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
+    succesAcces(ip);
     const token = crypto.randomBytes(18).toString('hex');
-    sessions.set(token, { userId: u.id, ts: now() });
+    sessions.set(token, { userId: u.id, ts: now(), created: now() });
     journal(u, 'connexion', '');
     return { token, user: { id: u.id, nom: u.nom, role: u.role } };
   },
@@ -1071,7 +1095,12 @@ const routes = {
     if (u.role === 'cuisine') E('Non autorisé', 403);
     const c = getCmd(b.id);
     const besoin = {};
-    for (const x of b.lignes || []) besoin[x.pid] = (besoin[x.pid] || 0) + Math.max(1, parseInt(x.qte, 10) || 1);
+    if (!Array.isArray(b.lignes) || !b.lignes.length) E('Rien à envoyer');
+    for (const x of b.lignes) {
+      const q = Number(x.qte);
+      if (!Number.isInteger(q) || q < 1 || q > 99) E('Quantité invalide (1 à 99)');
+      besoin[x.pid] = (besoin[x.pid] || 0) + q;
+    }
     for (const [pid, q] of Object.entries(besoin)) {
       const p = db.produits.find(p => p.id === pid);
       if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
@@ -1080,13 +1109,17 @@ const routes = {
     for (const x of b.lignes || []) {
       const p = db.produits.find(p => p.id === x.pid);
       if (!p) continue;
-      const qte = Math.max(1, Math.min(99, parseInt(x.qte, 10) || 1));
+      const qte = Number(x.qte);
       const cat = db.categories.find(k => k.id === p.cat) || {};
       // options (cuisson, accompagnement, suppléments…)
       const opts = [];
       for (const gid of p.options || []) {
         const g = db.options.find(o => o.id === gid); if (!g) continue;
-        const choisis = (x.opts || []).filter(o => o.g === gid).map(o => g.choix[o.i]).filter(Boolean);
+        const indices = (x.opts || []).filter(o => o.g === gid).map(o => o.i);
+        if (indices.some(i => !Number.isInteger(i) || i < 0 || i >= g.choix.length)) E('Option invalide pour ' + p.nom);
+        if (new Set(indices).size !== indices.length) E('Option sélectionnée plusieurs fois');
+        if (!g.multiple && indices.length > 1) E('Une seule option autorisée pour « ' + g.nom + ' »');
+        const choisis = indices.map(i => g.choix[i]);
         if (g.obligatoire && !choisis.length) E('Choisissez « ' + g.nom + ' » pour ' + p.nom);
         for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
       }
@@ -1301,6 +1334,7 @@ const routes = {
     // paiements : un seul mode, ou plusieurs (ex. une partie en espèces, le reste par carte)
     let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode, montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
     pays = pays.map(p => ({ mode: p.mode, montant: Math.round(+p.montant || 0), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
+    if (pays.some(p => !Number.isSafeInteger(p.montant) || p.montant < 0)) E('Montant de paiement invalide');
     for (const p of pays) if (!MODES[p.mode]) E('Mode de paiement inconnu');
     const offert = pays.some(p => p.mode === 'offert');
     if (offert && pays.length > 1) E('Une table offerte ne peut pas être payée en plus');
@@ -1346,6 +1380,8 @@ const routes = {
     if (topCache.ids.length < 16) topCache.ts = 0;
     if (!partiel) { c.statut = 'payee'; c.ticket = tk.num; c.ferme = now(); }
     for (const p of paiements) if (p.mode === 'societe' && !db.config.societes.includes(p.societe)) db.config.societes.push(p.societe);
+    // Le ticket est conservé sur disque avant toute impression ou réponse au navigateur.
+    saveNow();
     journal(u, 'encaissement', 'Ticket ' + tk.num + ' table ' + c.table + ' ' + fmt(net) + ' DA (' + paiements.map(p => MODES[p.mode] + ' ' + fmt(p.montant)).join(' + ') + ')' + (remise ? ' remise ' + fmt(remise) : '') + (partiel ? ' — paiement partiel' : ''));
     save();
     const d = ticketDoc(tk);
@@ -1461,13 +1497,15 @@ const routes = {
     return { erreurs: res.ok ? [] : [res.erreur] };
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
-  'POST /api/code-valide': (b) => { const u = parCode(b.pin); return { ok: !!u && String(b.pin).length >= 4 }; },
+  'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
   'POST /api/pointage': (b, _u, req) => {
     // le pointage se fait seulement sur le PC de la caisse principale (pas sur les écrans de salle)
     const ip = String((req && req.socket && req.socket.remoteAddress) || '');
     if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Le pointage se fait uniquement sur la caisse principale', 403);
+    const cle = controleEssais(req);
     const u = parCode(b.badge || b.pin);
-    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    if (!u) { echecAcces(cle); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
+    succesAcces(cle);
     const ouvert = db.pointages.find(p => p.userId === u.id && !p.out && now() - p.in < 20 * 3600e3);
     let type, duree = 0;
     if (ouvert) {
@@ -1594,7 +1632,14 @@ function lireCorps(req) {
     req.on('end', () => { try { res(s ? JSON.parse(s) : {}); } catch (e) { rej(new Err(400, 'JSON invalide')); } });
   });
 }
-function csv(rows) { return '﻿' + rows.map(r => r.map(v => { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';')).join('\r\n'); }
+function csv(rows) {
+  // Empêche qu'un champ libre soit interprété comme formule par un tableur.
+  return '\uFEFF' + rows.map(r => r.map(v => {
+    v = v == null ? '' : String(v);
+    if (/^[\t\r\n ]*[=+@-]/.test(v)) v = "'" + v;
+    return /[;"\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(';')).join('\r\n');
+}
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
@@ -1608,7 +1653,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/export/')) {
       // jeton passé dans l'URL pour les téléchargements
-      const s = sessions.get(q.t); const u = s && db.users.find(x => x.id === s.userId);
+      const s = sessions.get(q.t);
+      const valide = s && now() - s.ts <= SESSION_IDLE_MS && now() - (s.created || s.ts) <= SESSION_MAX_MS;
+      if (s && !valide) sessions.delete(q.t);
+      const u = valide && db.users.find(x => x.id === s.userId && x.actif);
       if (!peut(u, 'admin')) E('Réservé au responsable', 403);
       const du = q.du || '0000', au = q.au || '9999';
       let rows, nom;

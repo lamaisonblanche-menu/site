@@ -1,11 +1,11 @@
 {
- "version": "3.5.3",
- "date": "2026-11-23T19:29:22.364Z",
- "notes": "3.5.3 : suppléments payants (Supplément frites 500 DA) affichés comme un commentaire sur le plat, avec le prix, sur les bons et le ticket",
+ "version": "3.5.4",
+ "date": "2026-11-23T19:58:20.010Z",
+ "notes": "3.5.4 : sécurité des accès et sessions, validation des commandes et réservations, exports CSV protégés, persistance renforcée et tests automatiques.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "50060b8e79abd0beaf59e6309e519a73cba73a94b97defd0f8b68e1c8f6447b2"
+   "sha256": "3836a816a26c3d2e2de4eebb69b8b835fdfea55524df1cd31c4768857f7f60dd"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "a790373e8c828de7824f490e49d584082a882a60f9bfc27ac001d3f4d3b61f93"
+   "sha256": "d1f38ee222094c06cb2a2d0c48fb750f8d895e0a19a6829c296415763ba71026"
   }
  ]
 }

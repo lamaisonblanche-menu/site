@@ -1,0 +1,32 @@
+name: Validation caisse sans publication
+on:
+  pull_request:
+    branches: [caisse]
+  workflow_dispatch:
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check app/core/server.js
+      - run: node --check app/core/public/app.js
+      - run: node --test app/tests/*.test.js
+      - name: Vérifier le manifeste de mise à jour
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'), crypto=require('crypto'), path=require('path');
+          const m=JSON.parse(fs.readFileSync('maj/version.json','utf8'));
+          const v=fs.readFileSync('app/core/VERSION','utf8').trim();
+          if(m.version!==v) throw Error('Version incohérente');
+          for(const f of m.fichiers) {
+            const source=path.join('app/core',f.chemin);
+            const copie=path.join('maj/core',f.chemin);
+            const a=fs.readFileSync(source), b=fs.readFileSync(copie);
+            if(!a.equals(b)) throw Error('Copie différente : '+f.chemin);
+            if(crypto.createHash('sha256').update(b).digest('hex')!==f.sha256) throw Error('SHA256 incorrect : '+f.chemin);
+          }
+          console.log('Version et fichiers du canal de mise à jour vérifiés : '+v);
+          NODE
