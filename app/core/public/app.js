@@ -856,7 +856,7 @@ const A = window.A = {
   },
   choixOptions(p, n, groupes) {
     const sel = {};
-    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length);
+    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length) && (p.id !== 'supplement-fixe' || !!libre.trim());
     const draw = () => modal(mh(esc(p.nom) + (n > 1 ? ' × ' + n : '')) + groupes.map(g => `<p class="muted" style="margin:10px 0 0">${esc(g.nom)}${g.obligatoire ? ' <b style="color:var(--bad)">*</b>' : ''}${g.multiple ? ' (plusieurs possibles)' : ''}</p>
       <div class="chips">${g.choix.map((ch, i) => `<button class="chip big ${(sel[g.id] || []).includes(i) ? 'on' : ''}" onclick="A.och('${g.id}',${i})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div>`).join('') +
       `<div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark big" ${ok() ? '' : 'disabled'} onclick="A.ook()">Ajouter</button></div>`);
@@ -1227,7 +1227,7 @@ Object.assign(A, {
     if (p.stock === 0) return toast(p.nom + ' est épuisé', true);
     const deja = S.draft.filter(d => d.pid === pid).reduce((s, d) => s + d.qte, 0);
     if (p.stock > 0 && deja + 1 > p.stock) return toast('Il ne reste que ' + p.stock + ' « ' + p.nom + ' »', true);
-    if (long || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
+    if (long || pid === 'supplement-fixe' || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
     const j = S.draft.findIndex(d => d.pid === pid && !d.note && !(d.opts || []).length && d.suite == null && !d.emporter);
     if (j >= 0) S.draft[j].qte++; else S.draft.push({ pid, qte: 1, note: '', opts: [], suite: null, emporter: false });
     S.flash = j >= 0 ? j : S.draft.length - 1; clearTimeout(S._fl); S._fl = setTimeout(() => { S.flash = null; }, 400);
@@ -1251,7 +1251,7 @@ Object.assign(A, {
       <div class="fe-row"><span>Quantité</span><div class="qty sm"><button onclick="A.fq(-1)">−</button><span>${d.qte}</span><button onclick="A.fq(1)">+</button></div></div>
       ${groupes.map(g => `<div class="fe-g ${g.obligatoire && !(sel[g.id] || []).length ? 'req' : ''}"><div class="fe-l">${esc(g.nom)}${g.obligatoire ? ' <b>*</b>' : ''}${g.multiple ? ' <span class="muted">(plusieurs possibles)</span>' : ''}</div>
         <div class="chips">${g.choix.map((ch, k) => `<button class="chip big ${(sel[g.id] || []).includes(k) ? 'on' : ''}" onclick="A.fo('${g.id}',${k})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div></div>`).join('')}
-      <div class="fe-g"><div class="fe-l">Commentaire pour la cuisine</div>
+      <div class="fe-g"><div class="fe-l">${p.id === 'supplement-fixe' ? 'Quel supplément ? (obligatoire)' : 'Commentaire pour la cuisine'}</div>
         <div class="chips">${coms.map(x => `<button class="chip ${chips.includes(x) ? 'on' : ''}" onclick="A.fc('${jsq(x)}')">${esc(x)}</button>`).join('')}</div>
         <div class="row"><input id="fe-libre" class="fe-in grow" value="${esc(libre)}" placeholder="Autre commentaire…" oninput="A.fl(this.value)"><button class="btn sm ${S.kbOn ? 'dark' : ''}" onclick="S.kbOn=!S.kbOn;A.fdraw()">⌨</button></div>
         ${S.kbOn ? clavier('fe-libre') : ''}</div>
@@ -1270,12 +1270,13 @@ Object.assign(A, {
       draw();
     };
     A.fc = x => { const j = chips.indexOf(x); if (j >= 0) chips.splice(j, 1); else chips.push(x); draw(); };
-    A.fl = v => { libre = v; };
+    A.fl = v => { libre = v; const b = document.querySelector('.mf .btn.dark.big'); if (b && p.id === 'supplement-fixe') b.disabled = !ok(); };
     A.fe = () => { d.emporter = !d.emporter; draw(); };
     A.fs = s => { d.suite = s === (catDe(p).suite || 0) ? null : s; draw(); };
     A.fdel = () => { S.draft.splice(i, 1); closeModal(); render(); };
     A.fdup = () => { A.fok(true); };
     A.fok = dup => {
+      if (!ok()) return toast('Indiquez quel supplément avant de continuer.', true);
       d.opts = []; for (const g of groupes) for (const k of sel[g.id] || []) d.opts.push({ g: g.id, i: k });
       d.note = [...chips, libre.trim()].filter(Boolean).join(', ');
       if (nouveau) S.draft.push(d); else { S.draft[i] = d; if (dup) S.draft.splice(i + 1, 0, { ...d, opts: [...d.opts] }); }
