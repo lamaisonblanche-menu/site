@@ -843,7 +843,7 @@ async function verifierRaseAuto() {
   if (now() < echeance) {
     if (echeance - now() <= 300000 && raseAutoAverti !== String(echeance)) {
       raseAutoAverti = String(echeance);
-      journal(null, 'avertissement rase automatique', 'Clôture prévue à ' + heure(echeance));
+      journal(null, 'avertissement rase automatique', 'Clôture prévue à ' + new Date(echeance).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
       save();
     }
     return;
@@ -875,7 +875,7 @@ async function verifierRaseAuto() {
     fs.copyFileSync(DB_FILE, copie);
     const fd = fs.openSync(copie, 'r'); try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     const impression = await imprimer('ticket', raseDoc(r, z));
-    if (!impression.ok) journal(null, 'impression rase auto', String(impression.erreur));
+    if (!impression || !impression.ok) journal(null, 'impression rase auto', String(impression && impression.erreur || 'non confirmée'));
     // Retenter le SMTP pendant dix minutes maximum ; le message reste durablement en file.
     const finMail = now() + 10 * 60000;
     while (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')) && now() < finMail) {
