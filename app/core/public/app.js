@@ -814,6 +814,7 @@ const A = window.A = {
     }
   },
   pinTouch(k) { A.pin(k); },
+  reporterRase() { act(async () => { await api('/api/rase-auto/reporter', {}); toast('Rase reportée de 30 minutes'); await refresh(); }); },
   modePointage(on) { S.pointage = !!on; S.pointageAutorisation = null; clearTimeout(S._autorisationTimer); S.pointeMsg = null; pin = ''; render(); },
   logout() { if (S.draft.length && !confirm('Des articles ne sont pas envoyés. Sortir quand même ?')) return; logout(); },
   close: closeModal,
@@ -1469,6 +1470,13 @@ function render() {
   const sc = S._scKey === cle ? sels.map(q => { const e = app.querySelector(q); return e ? e.scrollTop : 0; }) : [];
   const focusSearch = document.activeElement && document.activeElement.id === 'srch';
   if (S.etat && S.view !== 'login') h = `<div class="shell">${rail()}<main class="pane">${h}</main></div>`;
+  if (S.etat && S.view !== 'login') {
+    const z = S.etat.raseAutoEtat;
+    if (z && z.dansCinqMinutes) {
+      const bouton = peut('admin') ? '<button class="btn dark" onclick="A.reporterRase()">Reporter de 30 min</button>' : '';
+      h = '<div style="background:#ffe4ad;color:#362200;padding:12px;text-align:center;font-weight:bold">La caisse va faire la rase à ' + hm(z.ts) + ' ' + bouton + '</div>' + h;
+    }
+  }
   app.innerHTML = h;
   S._scKey = cle;
   sels.forEach((q, i) => { const e = app.querySelector(q); if (e && sc[i]) e.scrollTop = sc[i]; });
