@@ -272,6 +272,16 @@ if (!db.boissons10) {
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
 db.seq.resa = db.seq.resa || 0;
+// Suppléments payants (version 3.5.3) : groupe d'options « Supplément », affiché comme un commentaire
+// sur la ligne (« SUPPLEMENT Frites (500 DA) ») et ajouté au prix du plat. Branché sur tous les plats cuisine/asiatique.
+if (!db.supp1) {
+  let g = db.options.find(o => o.id === 'supplements');
+  if (!g) { g = { id: 'supplements', nom: 'Supplément', obligatoire: false, multiple: true, choix: [] }; db.options.push(g); }
+  if (!g.choix.some(ch => /^frites$/i.test(ch.nom))) g.choix.push({ nom: 'Frites', prix: 500 });
+  const cuisines = new Set(db.categories.filter(k => ['cuisine', 'cuisine2', 'asiatique'].includes(k.poste)).map(k => k.id));
+  for (const p of db.produits) if (cuisines.has(p.cat)) { p.options = p.options || []; if (!p.options.includes('supplements')) p.options.push('supplements'); }
+  db.supp1 = true;
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -483,9 +493,12 @@ function postesDe(pid) {
 }
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
 
+// libellé d'une option sur les bons et tickets : les suppléments montrent leur prix
+const estSupp = o => o.g === 'supplements';
+const optBon = o => estSupp(o) ? 'SUPPLEMENT ' + o.nom + (o.prix ? ' (' + fmt(o.prix) + ' DA)' : '') : o.nom + (o.prix ? ' (+' + fmt(o.prix) + ' DA)' : '');
 function lignesBon(d, l) {
   d.size(3).bold(1).t(l.qte + '  ' + l.nom).bold(0).size(0);
-  for (const o of l.opts || []) d.bold(1).t('    + ' + o.nom).bold(0);
+  for (const o of l.opts || []) d.bold(1).t('    + ' + optBon(o)).bold(0);
   if (l.emporter) d.bold(1).t('    *** A EMPORTER ***').bold(0);
   if (l.note) d.bold(1).t('    >> ' + l.note).bold(0);
 }
@@ -508,7 +521,7 @@ function bon(poste, cmd, lignes, titre, infos) {
   // commande commune asiatique + gastro/brunch : la partie de l'autre cuisine, pour information
   for (const [autre, ls] of Object.entries(infos || {})) {
     d.line('-').center(1).bold(1).t('POUR INFO - FAIT PAR ' + ((db.config.imprimantes[autre] || {}).nom || autre).toUpperCase()).bold(0).center(0);
-    for (const l of ls) { d.t(l.qte + '  ' + l.nom + (l.suite > (cmd.suite || 0) ? ' (' + SUITES[l.suite] + ', attendre)' : '')); for (const o of l.opts || []) d.t('    + ' + o.nom); }
+    for (const l of ls) { d.t(l.qte + '  ' + l.nom + (l.suite > (cmd.suite || 0) ? ' (' + SUITES[l.suite] + ', attendre)' : '')); for (const o of l.opts || []) d.t('    + ' + optBon(o)); }
   }
   d.line();
   d.cut();
@@ -524,7 +537,7 @@ function creerBons(c, lignes, type) {
       db.seq.bon++;
       db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste, ts: now(), suite: s, type: type || 'commande',
         etat: s > (c.suite || 0) && s > 0 ? 'attente' : 'a_faire',
-        lignes: ls.filter(l => (l.suite || 0) === s).map(l => ({ id: l.id, qte: l.qte, nom: l.nom, opts: (l.opts || []).map(o => o.nom), note: l.note, emporter: !!l.emporter })) });
+        lignes: ls.filter(l => (l.suite || 0) === s).map(l => ({ id: l.id, qte: l.qte, nom: l.nom, opts: (l.opts || []).map(o => typeof o === 'string' ? o : optBon(o)), note: l.note, emporter: !!l.emporter })) });
     }
   }
 }
@@ -542,7 +555,7 @@ function piedTicket(d) {
 }
 function lignesTicket(d, lignes, sansPayees) {
   const grp = {};
-  for (const l of lignes) { if (l.annule || (sansPayees && l.paye)) continue; const o = (l.opts || []).filter(x => x.prix).map(x => x.nom).join(', '); const k = l.nom + '|' + o + '|' + l.prix + '|' + (l.offert ? 1 : 0); (grp[k] = grp[k] || { ...l, o, qte: 0 }).qte += l.qte; }
+  for (const l of lignes) { if (l.annule || (sansPayees && l.paye)) continue; const o = (l.opts || []).filter(x => x.prix).map(x => (estSupp(x) ? 'Supplément ' : '') + x.nom + ' ' + fmt(x.prix)).join(', '); const k = l.nom + '|' + o + '|' + l.prix + '|' + (l.offert ? 1 : 0); (grp[k] = grp[k] || { ...l, o, qte: 0 }).qte += l.qte; }
   for (const l of Object.values(grp)) { d.lr(l.qte + ' x ' + l.nom, l.offert ? 'OFFERT' : fmt(l.qte * l.prix)); if (l.o) d.t('    + ' + l.o); }
 }
 // paiements d'un ticket (les anciens tickets n'ont qu'un mode)

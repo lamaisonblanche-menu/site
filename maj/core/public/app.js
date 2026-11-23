@@ -274,10 +274,10 @@ function viewTables() {
 function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId); }
 const prod = id => S.etat.produits.find(x => x.id === id) || {};
 const catDe = p => S.etat.categories.find(k => k.id === p.cat) || {};
-const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x => x.id === o.g); const ch = g && g.choix[o.i]; return ch ? { nom: ch.nom, prix: ch.prix } : null; }).filter(Boolean);
+const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x => x.id === o.g); const ch = g && g.choix[o.i]; return ch ? { g: o.g, nom: ch.nom, prix: ch.prix } : null; }).filter(Boolean);
 const prixDraft = d => (prod(d.pid).prix || 0) + optsDe(d).reduce((s, o) => s + o.prix, 0);
 const suiteDraft = d => d.suite != null ? d.suite : (catDe(prod(d.pid)).suite || 0);
-const optsTxt = os => os.length ? `<small class="o">${os.map(o => esc(o.nom) + (o.prix ? ' +' + fmt(o.prix) : '')).join(' · ')}</small>` : '';
+const optsTxt = os => os.length ? `<small class="o">${os.map(o => (o.g === 'supplements' ? 'Supplément ' : '') + esc(o.nom) + (o.prix ? ' +' + fmt(o.prix) + ' DA' : '')).join(' · ')}</small>` : '';
 const titreCmd = c => c.salle === 'emporter' ? 'À emporter ' + c.table : c.salle === 'comptoir' ? 'Comptoir' : 'Table ' + c.table;
 function universListe() { const u = []; for (const k of S.etat.categories) { const x = k.univers || 'La carte'; if (!u.includes(x)) u.push(x); } return u; }
 const SUITE_NOM = s => s === 0 ? 'Direct' : SUITES[s];
