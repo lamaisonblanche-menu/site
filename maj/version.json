@@ -1,11 +1,11 @@
 {
- "version": "3.3.10",
- "date": "2026-11-23T17:21:26.826Z",
- "notes": "Sprite et Schweppes ajoutés (250 DA)",
+ "version": "3.4.0",
+ "date": "2026-11-23T17:23:43.319Z",
+ "notes": "Les mises à jour s'installent même avec des tables ouvertes (elles sont gardées), après 3 min sans activité ; bouton « Installer maintenant » toujours possible",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "92946641ce45f0abdac522e48f71b115adf8da98953fb1552ffa0d0a8852d56e"
+   "sha256": "f5e3e93e58ffc2a20a3ca53e8025bc50d7c1dccbef4b34e2388aa9bbf8678466"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "5e02c71810fa7a97aa3f0fc178ee4860a74f05e08f051f718a16ba850113345d"
+   "sha256": "cfc7a322a832f6401045d4c701fc01dea4e20c083a7dca6a7e60b15a2f3fa4bc"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "d14df2ddae33c2df7b831bcbfffff8f4311e73819af8747f9e4dd36b0ddd2221"
+   "sha256": "62fbf30958f8b6becebedf0a75fe147d95a6da3858ba4a292e3d1a0df8531d28"
   }
  ]
 }

@@ -50,8 +50,8 @@ maj/                 DERNIÈRE VERSION PUBLIÉE du cœur, lue par les caisses du
    `https://raw.githubusercontent.com/lamaisonblanche-menu/site/caisse/maj/version.json`.
 2. Si `version` est plus grande que la sienne, elle télécharge chaque fichier de `maj/core/`
    et vérifie son SHA-256. Un seul fichier faux = mise à jour refusée.
-3. Elle l'installe quand **aucune table n'est ouverte** et que personne n'a touché la caisse depuis 3 min
-   (`GET /api/calme`), puis redémarre le serveur. Les écrans de salle se rechargent seuls (`/api/version`).
+3. Elle l'installe quand personne n'a touché la caisse depuis 3 min (`GET /api/calme`, qui sauvegarde les données ;
+   depuis 3.4.0 les tables ouvertes n'empêchent plus l'installation, elles sont gardées). « Installer maintenant » dans Gestion → Réglages force l'installation, puis redémarre le serveur. Les écrans de salle se rechargent seuls (`/api/version`).
 4. Si la nouvelle version **plante 2 fois au démarrage**, elle est abandonnée et la caisse revient à l'ancienne.
    ⚠️ Une erreur JavaScript dans l'interface (app.js) ne fait PAS planter le serveur : il n'y a aucun retour
    en arrière automatique dans ce cas. Il faut donc tester avant de publier.

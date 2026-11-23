@@ -1228,12 +1228,12 @@ const routes = {
   },
   'GET /api/version': () => ({ version: VERSION }),
   // « calme » = aucune table ouverte et personne n'a touché la caisse depuis 3 minutes (pour installer une mise à jour)
-  'GET /api/calme': () => ({ calme: !Object.values(db.commandes).some(c => c.statut === 'ouverte') && now() - derniereActivite > 180000 }),
+  // 3.4.0 : les tables ouvertes n'empêchent plus la mise à jour (elles sont gardées) ; il suffit que personne n'ait touché la caisse depuis 3 min
+  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000; if (calme) saveNow(); return { calme }; },
   'GET /api/maj': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return { version: VERSION, app: !!process.send, etat: majEtat }; },
   'POST /api/maj/verifier': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); if (process.send) process.send({ type: 'verifier' }); return {}; },
   'POST /api/maj/installer': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
-    if (Object.values(db.commandes).some(c => c.statut === 'ouverte') && !b.forcer) E('Des tables sont ouvertes : la mise à jour s\'installera toute seule quand elles seront encaissées.');
     journal(u, 'mise à jour', 'installation demandée'); saveNow();
     if (process.send) process.send({ type: 'installer' }); return {};
   },

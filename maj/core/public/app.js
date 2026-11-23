@@ -1112,7 +1112,7 @@ const A = window.A = {
   mtest() { act(async () => { if (adm.cfg) await api('/api/admin/config', adm.cfg); toast('Envoi du mail d’essai…'); const r = await api('/api/admin/mail-test', {}); toast(r.ok ? 'Mail d’essai envoyé ✓ — regardez la boîte de réception' : r.erreur, !r.ok, 7000); }); },
   remail(jour) { act(async () => { toast('Envoi…'); const r = await api('/api/rase/renvoyer-mail', { jour }); toast(r.ok ? 'Rase envoyée ✓' : r.erreur, !r.ok, 6000); await loadCaisse(); render(); }); },
   majVerif() { act(async () => { await api('/api/maj/verifier', {}); toast('Vérification en cours…'); setTimeout(() => A.atab('reglages'), 6000); }); },
-  majInstaller() { if (confirm('Installer la nouvelle version maintenant ? La caisse redémarre en quelques secondes.')) act(async () => { await api('/api/maj/installer', {}); toast('Installation… la caisse redémarre'); }); },
+  majInstaller() { if (confirm('Installer la nouvelle version maintenant ? La caisse redémarre en quelques secondes. Les tables ouvertes sont gardées.')) act(async () => { await api('/api/maj/installer', {}); toast('Installation… la caisse redémarre'); }); },
   quitterApp() { if (confirm('Fermer la caisse sur ce PC ?')) caisseApp.quitter(); },
   saveCarte() { act(async () => { await api('/api/admin/carte', adm.carte); adm.carte = null; toast('Carte enregistrée ✓'); refresh(); }); },
   uset(i, k, v) { adm.users[i][k] = v; if (k === 'actif') render(); },
