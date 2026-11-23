@@ -1265,19 +1265,21 @@ const routes = {
     const c = getCmd(b.id);
     const restantes = () => c.lignes.filter(l => !l.annule && !l.paye);
     if (!restantes().length) E('La table est vide');
-    // Séparation : on ne paie qu'une partie des articles
-    let lignes;
+    // Préparer la séparation sans modifier la commande avant validation du paiement.
+    let selections = [];
     if (Array.isArray(b.lignes) && b.lignes.length) {
-      lignes = [];
+      const deja = new Set();
       for (const x of b.lignes) {
         const l = c.lignes.find(k => k.id === x.id && !k.annule && !k.paye);
         if (!l) E('Article introuvable ou déjà payé');
-        const q = Math.max(1, Math.min(l.qte, parseInt(x.qte, 10) || l.qte));
-        if (q < l.qte) { l.qte -= q; db.seq.ligne++; const n = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(n); lignes.push(n); }
-        else lignes.push(l);
+        if (deja.has(l.id)) E('Article sélectionné plusieurs fois');
+        deja.add(l.id);
+        const q = x.qte == null ? l.qte : Number(x.qte);
+        if (!Number.isInteger(q) || q < 1 || q > l.qte) E('Quantité à encaisser invalide');
+        selections.push({ ligne: l, qte: q });
       }
-    } else lignes = restantes();
-    const total = lignes.reduce((s, l) => s + (l.offert ? 0 : l.qte * l.prix), 0);
+    } else selections = restantes().map(l => ({ ligne: l, qte: l.qte }));
+    const total = selections.reduce((s, x) => s + (x.ligne.offert ? 0 : x.qte * x.ligne.prix), 0);
     let remise = 0;
     if (b.remise && +b.remise.valeur > 0) {
       if (!pinAdmin(b.pin)) E('Code du responsable obligatoire pour une remise', 403);
@@ -1304,6 +1306,17 @@ const routes = {
     for (const p of pays.slice().reverse()) { let m = p.montant; if (p.mode === 'especes' && aDeduire > 0) { const k = Math.min(m, aDeduire); m -= k; aDeduire -= k; } if (m > 0 || offert) paiements.unshift({ ...p, montant: offert ? 0 : m }); }
     const modes = [...new Set(paiements.map(p => p.mode))];
     const mode = modes.length === 1 ? modes[0] : 'mixte';
+    // Toutes les validations sont passées : appliquer les séparations seulement maintenant.
+    const lignes = [];
+    for (const { ligne, qte } of selections) {
+      if (qte < ligne.qte) {
+        ligne.qte -= qte;
+        db.seq.ligne++;
+        const part = { ...ligne, id: 'L' + db.seq.ligne, qte };
+        c.lignes.push(part);
+        lignes.push(part);
+      } else lignes.push(ligne);
+    }
     const j = db.jours.find(x => x.id === c.jour && !x.clos) || jourCourant(true);
     db.seq.ticket++;
     for (const l of lignes) l.paye = db.seq.ticket;
