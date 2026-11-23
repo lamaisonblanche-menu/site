@@ -876,7 +876,13 @@ async function verifierRaseAuto() {
     const fd = fs.openSync(copie, 'r'); try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     const impression = await imprimer('ticket', raseDoc(r, z));
     if (!impression.ok) journal(null, 'impression rase auto', String(impression.erreur));
-    await Promise.race([envoyerAttente(), new Promise(resolve => setTimeout(resolve, 10000))]);
+    // Retenter le SMTP pendant dix minutes maximum ; le message reste durablement en file.
+    const finMail = now() + 10 * 60000;
+    while (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')) && now() < finMail) {
+      await Promise.race([envoyerAttente(), new Promise(resolve => setTimeout(resolve, 15000))]);
+      if (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')))
+        await new Promise(resolve => setTimeout(resolve, 15000));
+    }
     journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
     saveNow();
     if (cfg.extinction && process.platform === 'win32' && process.env.CAISSE_TEST_SHUTDOWN !== '1')
