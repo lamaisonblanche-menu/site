@@ -78,7 +78,7 @@ function dbInitiale() {
       fondCaisse: 15000, tablePatron: '18',
       imprimantes: IMPRIMANTES(),
       largeur: 48, pageCode: 16, sansAccents: false, tiroirAuto: true,
-      deconnexionServeurSec: 60,
+      deconnexionServeurSec: 60, raseAuto: { actif: false, heure: '02:00', extinction: true },
       salles: sallesInitiales(),
       societes: [],
       motifsSortie: ['Influenceuse', 'Dépense du restaurant', 'Achat marché', 'Avance sur salaire', 'Autre'],
@@ -271,7 +271,17 @@ if (!db.boissons10) {
 }
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
+db.config.raseAuto = db.config.raseAuto || { actif: false, heure: '02:00', extinction: true };
 db.seq.resa = db.seq.resa || 0;
+// Article autonome de supplément : migration idempotente, sans modifier les anciennes ventes.
+if (!db.supplementArticle) {
+  if (!db.produits.some(p => p.id === 'supplement-fixe')) {
+    const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
+    if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+  }
+  db.supplementArticle = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Suppléments payants (version 3.5.3) : groupe d'options « Supplément », affiché comme un commentaire
 // sur la ligne (« SUPPLEMENT Frites (500 DA) ») et ajouté au prix du plat. Branché sur tous les plats cuisine/asiatique.
 if (!db.supp1) {
@@ -758,7 +768,7 @@ function raseDoc(r, rase) {
   d.lr('Fond de caisse', fmt(r.fondCaisse));
   if (rase) {
     d.lr('Espèces attendues (rase)', fmt(rase.attendu));
-    d.lr('Espèces comptées', fmt(rase.compte));
+    d.lr('Espèces comptées', rase.compte === null ? 'Non comptées (auto)' : fmt(rase.compte));
     d.bold(1).lr('ÉCART', (rase.ecart > 0 ? '+' : '') + fmt(rase.ecart) + ' DA').bold(0);
     if (rase.completePar) d.t('Écart complété par : ' + rase.completePar);
     if (rase.commentaire) d.t('Note : ' + rase.commentaire);
@@ -809,7 +819,7 @@ async function envoyerAttente() {
   if (envoiEnCours) return;
   envoiEnCours = true;
   try {
-    db.mailsAttente = db.mailsAttente.filter(x => now() - x.ts < 2 * 864e5);
+    db.mailsAttente = db.mailsAttente.filter(x => x.important || now() - x.ts < 2 * 864e5);
     while (db.mailsAttente.length) {
       const x = db.mailsAttente[0];
       const r = await envoyerMail(x.dest, x.sujet, x.texte);
@@ -818,7 +828,72 @@ async function envoyerAttente() {
     }
   } catch (e) {} finally { envoiEnCours = false; }
 }
+
 setInterval(envoyerAttente, 5 * 60000);
+let raseAutoBusy = false, raseAutoReport = 0, raseAutoAverti = '';
+async function verifierRaseAuto() {
+  const cfg = db.config.raseAuto || {};
+  if (raseAutoBusy || !cfg.actif || !/^([01]\d|2[0-3]):[0-5]\d$/.test(cfg.heure || '')) return;
+  const j = jourCourant(false);
+  if (!j || j.clos || j.rase) return;
+  const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
+  const debut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+  if (j.ouvert > debut) return;
+  const echeance = debut + raseAutoReport * 1800000;
+  if (now() < echeance) {
+    if (echeance - now() <= 300000 && raseAutoAverti !== String(echeance)) {
+      raseAutoAverti = String(echeance);
+      journal(null, 'avertissement rase automatique', 'Clôture prévue à ' + new Date(echeance).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+      save();
+    }
+    return;
+  }
+  const r = resumeJour(j);
+  if (r.tablesOuvertes) {
+    raseAutoReport++;
+    journal(null, 'rase automatique reportée', r.tablesOuvertes + ' table(s) ouvertes ; report 30 minutes');
+    save();
+    return;
+  }
+  raseAutoBusy = true;
+  try {
+    const z = { ts: now(), par: 'Rase automatique', automatique: true, compte: null,
+      attendu: r.aRemettre, ecart: null, completePar: '', commentaire: 'Comptage physique à effectuer',
+      ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe,
+      societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
+    j.rase = z; j.clos = now();
+    journal(null, 'rase automatique', 'Journée ' + j.n + ' clôturée sans comptage physique');
+    const mail = db.config.mail || {};
+    if (mail.actif && mail.user && mail.pass) {
+      const jour = new Date(j.date + 'T12:00').toLocaleDateString('fr-FR');
+      const texte = 'Rase automatique du ' + jour + '\\n\\n' + raseDoc(r, z).texte() +
+        '\\nDONNEES-CAISSE ' + JSON.stringify(raseAppli(j, r, z));
+      db.mailsAttente.push({ dest: mail.dest || mail.user, sujet: '[Caisse MB] Rase automatique du ' + jour, texte, ts: now(), important: true });
+    }
+    saveNow();
+    const copie = path.join(BACKUPS, 'rase-auto-' + j.id + '.json');
+    fs.copyFileSync(DB_FILE, copie);
+    const fd = fs.openSync(copie, 'r'); try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    const impression = await imprimer('ticket', raseDoc(r, z));
+    if (!impression || !impression.ok) journal(null, 'impression rase auto', String(impression && impression.erreur || 'non confirmée'));
+    // Retenter le SMTP pendant dix minutes maximum ; le message reste durablement en file.
+    const finMail = now() + 10 * 60000;
+    while (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')) && now() < finMail) {
+      await Promise.race([envoyerAttente(), new Promise(resolve => setTimeout(resolve, 15000))]);
+      if (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')))
+        await new Promise(resolve => setTimeout(resolve, 15000));
+    }
+    journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
+    saveNow();
+    if (cfg.extinction && process.platform === 'win32' && process.env.CAISSE_TEST_SHUTDOWN !== '1')
+      require('child_process').spawn('shutdown.exe', ['/s', '/t', '60'], { detached: true, stdio: 'ignore' }).unref();
+  } catch (e) {
+    journal(null, 'erreur rase automatique', String(e.message || e));
+    try { saveNow(); } catch (_) {}
+  } finally { raseAutoBusy = false; raseAutoReport = 0; }
+}
+setInterval(() => { verifierRaseAuto().catch(e => console.error(e)); }, 15000);
+
 function verifierResa(b) {
   const r = {
     date: String(b.date || ''), heure: String(b.heure || ''), nom: String(b.nom || '').trim().slice(0, 50), tel: String(b.tel || '').trim().slice(0, 30),
@@ -982,6 +1057,15 @@ function etatPublic(u) {
   return {
     user: { id: u.id, nom: u.nom, role: u.role },
     config: c,
+    raseAutoEtat: (() => {
+      const j = jourCourant(false), cfg = db.config.raseAuto || {};
+      if (!cfg.actif || !j || j.clos || j.rase) return null;
+      const d = new Date(), [h, m] = String(cfg.heure || '02:00').split(':').map(Number);
+      const base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+      if (j.ouvert > base) return null;
+      const ts = base + raseAutoReport * 1800000;
+      return { ts, dansCinqMinutes: ts - now() <= 300000, report: raseAutoReport };
+    })(),
     categories: db.categories.slice().sort((a, b) => a.ordre - b.ordre),
     produits: db.produits,
     users: db.users.map(x => ({ id: x.id, nom: x.nom, role: x.role, actif: x.actif })),
@@ -1007,6 +1091,7 @@ function bonsKds(poste) {
 }
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
+const autorisationsPointage = new Map();
 const routes = {
   'POST /api/login': (b, _u, req) => {
     const ip = controleEssais(req);
@@ -1110,6 +1195,7 @@ const routes = {
       const p = db.produits.find(p => p.id === x.pid);
       if (!p) continue;
       const qte = Number(x.qte);
+      if (p.id === 'supplement-fixe' && !String(x.note || '').trim()) E('Quel supplément ? Indiquez son nom avant de l’ajouter.');
       const cat = db.categories.find(k => k.id === p.cat) || {};
       // options (cuisson, accompagnement, suppléments…)
       const opts = [];
@@ -1125,7 +1211,7 @@ const routes = {
       }
       const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
       db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
     }
     if (!nouvelles.length) E('Rien à envoyer');
     for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
@@ -1454,12 +1540,23 @@ const routes = {
     if (j && j.clos) E('Journée déjà clôturée');
     db.sorties.splice(i, 1); journal(u, 'suppression sortie', fmt(s.montant) + ' ' + s.motif); save(); return {};
   },
+  'POST /api/rase-auto/reporter': (b, u) => {
+    if (!peut(u, 'admin')) E('Seul le responsable peut reporter la rase', 403);
+    if (!db.config.raseAuto || !db.config.raseAuto.actif) E('Rase automatique désactivée');
+    const j = jourCourant(false);
+    if (!j || j.clos || j.rase || raseAutoBusy) E('Aucune rase à reporter');
+    raseAutoReport++;
+    journal(u, 'rase automatique reportée', 'Report manuel de 30 minutes');
+    save();
+    return { report: raseAutoReport };
+  },
   'POST /api/rase': async (b, u) => {
     if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const j = jourCourant(false);
     if (!j) E('Aucune journée ouverte');
     const r = resumeJour(j);
     if (r.tablesOuvertes && !b.forcer) E('Il reste ' + r.tablesOuvertes + ' table(s) ouverte(s) (' + fmt(r.montantOuvert) + ' DA). Encaissez-les avant la rase.');
+    if (j.clos || j.rase) E('Journée déjà clôturée');
     const compte = Math.round(+b.compte);
     if (!(compte >= 0)) E('Indiquez le montant compté');
     const attendu = r.aRemettre;
@@ -1498,10 +1595,28 @@ const routes = {
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
   'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
+  'POST /api/pointage/autoriser': (b, _u, req) => {
+    const ip = String(req.socket.remoteAddress || '');
+    if (!/^(::1|127\\.|::ffff:127\\.)/.test(ip)) E('Autorisation uniquement sur la caisse principale', 403);
+    const cle = controleEssais(req);
+    const caissier = parCode(b.badge || b.pin);
+    if (!caissier || !peut(caissier, 'caissier')) {
+      echecAcces(cle); E('Code ou badge du caissier incorrect', 401);
+    }
+    succesAcces(cle);
+    for (const [k, v] of autorisationsPointage) if (v.expire < now()) autorisationsPointage.delete(k);
+    const autorisation = crypto.randomBytes(24).toString('hex');
+    autorisationsPointage.set(autorisation, { ip, caissier: caissier.nom, expire: now() + 60000 });
+    return { autorisation, expireDans: 60 };
+  },
   'POST /api/pointage': (b, _u, req) => {
     // le pointage se fait seulement sur le PC de la caisse principale (pas sur les écrans de salle)
     const ip = String((req && req.socket && req.socket.remoteAddress) || '');
     if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Le pointage se fait uniquement sur la caisse principale', 403);
+    const jeton = String(b.autorisation || '');
+    const accord = autorisationsPointage.get(jeton);
+    autorisationsPointage.delete(jeton); // usage unique, y compris si le code employé est incorrect
+    if (!accord || accord.expire < now() || accord.ip !== ip) E('Autorisation du caissier requise ou expirée', 403);
     const cle = controleEssais(req);
     const u = parCode(b.badge || b.pin);
     if (!u) { echecAcces(cle); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
@@ -1516,9 +1631,9 @@ const routes = {
       db.pointages.push({ id: 'P' + db.seq.pointage, userId: u.id, nom: u.nom, in: now(), out: null });
       type = 'arrivee';
     }
-    journal(u, 'pointage', type === 'arrivee' ? 'arrivée' : 'départ');
+    journal(u, 'pointage', (type === 'arrivee' ? 'arrivée' : 'départ') + ' · autorisé par ' + accord.caissier);
     save();
-    return { nom: u.nom, type, heure: heure(now()), duree };
+    return { nom: u.nom, type, heure: heure(now()), duree, autorisePar: accord.caissier };
   },
   'GET /api/admin/pointages': (b, u, req, q) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
@@ -1588,12 +1703,25 @@ const routes = {
     const partoutAvant = new Set(db.produits.filter(p => p.partout).map(p => p.id));
     const postesAvant = Object.fromEntries(db.produits.filter(p => Array.isArray(p.postes)).map(p => [p.id, p.postes]));
     db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}), ...((Array.isArray(p.postes) ? p.postes : postesAvant[p.id]) ? { postes: Array.isArray(p.postes) ? p.postes : postesAvant[p.id] } : {}) }));
+    // Un article système ne peut pas être supprimé, renommé ou changé de prix depuis Gestion.
+    const supplement = db.produits.find(p => p.id === 'supplement-fixe');
+    if (supplement) {
+      supplement.nom = 'Supplément'; supplement.prix = 500; supplement.actif = true;
+      supplement.options = []; supplement.stock = null;
+    } else {
+      const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
+      if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+    }
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
     save(); return {};
   },
   'POST /api/admin/config': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (b.raseAuto !== undefined) {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.raseAuto.heure || ''))) E('Heure de rase invalide');
+      db.config.raseAuto = { actif: !!b.raseAuto.actif, heure: b.raseAuto.heure, extinction: !!b.raseAuto.extinction };
+    }
     const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation', 'commentaires', 'commentairesCommande', 'qrLien', 'qrTexte', 'logoTicket'];
     for (const k of keep) if (b[k] !== undefined) db.config[k] = b[k];
     if (b.mail) {
@@ -1685,7 +1813,7 @@ const server = http.createServer(async (req, res) => {
       const fn = routes[key];
       if (!fn) E('Inconnu', 404);
       const body = req.method === 'POST' ? await lireCorps(req) : {};
-      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
+      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/pointage/autoriser' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
       if (req.method === 'POST') derniereActivite = now();
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);

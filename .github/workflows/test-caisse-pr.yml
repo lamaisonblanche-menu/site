@@ -1,0 +1,34 @@
+name: Vérification caisse (sans publication)
+on:
+  pull_request:
+    branches: [caisse]
+  workflow_dispatch:
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier la syntaxe du serveur et de l'interface
+        run: |
+          node --check app/core/server.js
+          node --check app/core/public/app.js
+      - name: Démarrage de la caisse avec données de test isolées
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CAISSE_DATA="$RUNNER_TEMP/caisse-test"
+          export PORT=18080
+          mkdir -p "$CAISSE_DATA"
+          node app/core/server.js > "$RUNNER_TEMP/caisse.log" 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18080/api/version > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/api/version
+          test -s "$CAISSE_DATA/caisse.json"
+          echo "Démarrage et sauvegarde initiaux OK"
