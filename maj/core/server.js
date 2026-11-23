@@ -17,6 +17,7 @@ let VERSION = 'dev'; try { VERSION = fs.readFileSync(path.join(DIR, 'VERSION'), 
 let majEtat = null;
 if (process.send) process.on('message', m => { if (m && m.type === 'maj') { majEtat = m.etat; broadcast(); } });
 let derniereActivite = 0;
+let operationsEnCours = 0;
 const DB_FILE = path.join(DATA, 'caisse.json');
 const BACKUPS = path.join(DATA, 'sauvegardes');
 const PRINTS = path.join(DATA, 'impressions-simulees');
@@ -272,6 +273,37 @@ if (!db.boissons10) {
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
 db.seq.resa = db.seq.resa || 0;
+// Conserver le routage des lignes déjà envoyées, lorsqu’un bon d’origine est disponible.
+if (!db.routage353) {
+  const parLigne = new Map();
+  for (const bon of db.bons) {
+    if (bon.type !== 'commande') continue;
+    for (const l of bon.lignes) {
+      if (!l.id) continue;
+      if (!parLigne.has(l.id)) parLigne.set(l.id, new Set());
+      parLigne.get(l.id).add(bon.poste);
+    }
+  }
+  for (const c of Object.values(db.commandes)) {
+    if (c.statut !== 'ouverte') continue;
+    for (const l of c.lignes) {
+      if (!l.postesEnvoi && parLigne.has(l.id)) l.postesEnvoi = [...parLigne.get(l.id)];
+    }
+  }
+  db.routage353 = true;
+}
+// Rattraper les desserts du catalogue initial si les anciennes migrations sont passées avant leur création.
+if (!db.desserts353) {
+  const defaut = db.categories.some(c => c.id === 'desserts' && c.poste === 'comptoir') &&
+    db.categories.some(c => c.id === 'desserts-carte' && c.poste === 'cuisine');
+  if (defaut) for (const p of db.produits) {
+    if (!p.id.startsWith('ps') || p.cat !== 'desserts' || p.partout !== undefined || p.postes !== undefined) continue;
+    if (['Profiteroles chocolat', 'Pavlova', 'Crème brûlée', 'Nougat glacé fruits rouges'].includes(p.nom)) p.cat = 'desserts-carte';
+    if (['Profiteroles chocolat', 'Pavlova'].includes(p.nom)) p.partout = true;
+    if (['Fondant chocolat glace', 'Nougat glacé fruits rouges'].includes(p.nom)) p.postes = ['cuisine', 'comptoir'];
+  }
+  db.desserts353 = true;
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -287,7 +319,11 @@ if (!db.carte2) {
     for (const [nom, prix] of items) {
       if (db.produits.some(p => n(p.nom) === n(nom))) continue;
       db.seq.produit = (db.seq.produit || 0) + 1;
-      db.produits.push({ id: 'ps' + Date.now().toString(36) + db.seq.produit, nom, prix, cat, actif: true, options: [], stock: null });
+      const gastro = cat === 'desserts' && /^(Profiteroles|Pavlova|Crème brûlée|Nougat glacé)/.test(nom);
+      const p = { id: 'ps' + Date.now().toString(36) + db.seq.produit, nom, prix, cat: gastro && db.categories.some(c => c.id === 'desserts-carte') ? 'desserts-carte' : cat, actif: true, options: [], stock: null };
+      if (/^(Profiteroles|Pavlova)/.test(nom)) p.partout = true;
+      if (/^(Fondant chocolat|Nougat glacé)/.test(nom)) p.postes = ['cuisine', 'comptoir'];
+      db.produits.push(p);
     }
   }
   db.carte2 = true;
@@ -307,9 +343,10 @@ for (const s of db.config.salles) {
 }
 
 let saveTimer = null;
-function save() {
+function save(immediat = false) {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 150);
+  if (immediat) saveNow();
+  else saveTimer = setTimeout(saveNow, 150);
   broadcast();
 }
 function saveNow() {
@@ -320,7 +357,8 @@ function saveNow() {
   fs.renameSync(tmp, DB_FILE);
   const b = path.join(BACKUPS, 'caisse-' + new Date().toISOString().slice(0, 10) + '.json');
   if (!fs.existsSync(b)) {
-    fs.copyFileSync(DB_FILE, b);
+    fs.copyFileSync(DB_FILE, b + '.tmp');
+    fs.renameSync(b + '.tmp', b);
     const all = fs.readdirSync(BACKUPS).filter(f => f.endsWith('.json')).sort();
     while (all.length > 90) fs.unlinkSync(path.join(BACKUPS, all.shift()));
   }
@@ -439,8 +477,9 @@ function imprimer(poste, doc) {
   if (p && p.type === 'usb' && p.windows) return imprimerUSB(p, doc.buf());
   return new Promise((resolve) => {
     if (!p || !p.ip) {
-      const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
-      fs.writeFileSync(f, doc.texte(), 'utf8');
+      const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '-' + crypto.randomBytes(4).toString('hex') + '.txt');
+      try { fs.writeFileSync(f, doc.texte(), 'utf8'); }
+      catch (e) { return resolve({ ok: false, erreur: 'Impression simulée ' + poste + ' : ' + e.message }); }
       return resolve({ ok: true, simule: true });
     }
     const sock = net.connect({ host: p.ip, port: +p.port || 9100 });
@@ -478,9 +517,10 @@ function postesDe(pid) {
     if (l.length) return l;
   }
   // article envoyé sur plusieurs imprimantes choisies (3.3.8), ex. Fondant : cuisine + comptoir
-  if (p && Array.isArray(p.postes)) { const l = p.postes.filter(k => db.config.imprimantes[k] && k !== 'ticket'); if (l.length) return l; }
+  if (p && Array.isArray(p.postes)) { const l = p.postes.filter(k => db.config.imprimantes[k] && k !== 'ticket'); if (l.length) return [...new Set(l)]; }
   return [posteDe(pid)];
 }
+function postesLigne(l) { return l.postesEnvoi || postesDe(l.pid); }
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
 
 function lignesBon(d, l) {
@@ -517,7 +557,7 @@ function bon(poste, cmd, lignes, titre, infos) {
 // Écran cuisine : un bon par poste et par suite
 function creerBons(c, lignes, type) {
   const parPoste = {};
-  for (const l of lignes) for (const k of postesDe(l.pid)) (parPoste[k] = parPoste[k] || []).push(l);
+  for (const l of lignes) for (const k of postesLigne(l)) (parPoste[k] = parPoste[k] || []).push(l);
   for (const [poste, ls] of Object.entries(parPoste)) {
     const suites = [...new Set(ls.map(l => l.suite || 0))];
     for (const s of suites) {
@@ -552,6 +592,7 @@ function ticketDoc(tk, duplicata) {
   const d = new Doc();
   enteteTicket(d);
   if (duplicata) d.center(1).bold(1).t('*** DUPLICATA ***').bold(0).center(0);
+  if (tk.annule) d.center(1).bold(1).t('*** TICKET ANNULÉ ***').bold(0).center(0);
   d.t('Ticket n° ' + tk.num + '   ' + dateH(tk.ts));
   if (tk.salle === 'emporter') d.bold(1).t('A EMPORTER ' + tk.table + (tk.client && tk.client.nom ? ' - ' + tk.client.nom : '')).bold(0);
   else d.t(salleNom(tk.salle) + ' - Table ' + tk.table + ' - ' + (tk.couverts || 1) + ' couv.');
@@ -753,7 +794,7 @@ const E = (msg, code = 400) => { throw new Err(code, msg); };
 const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 function jourTxt(date) { const d = new Date(date + 'T12:00'); return JOURS_FR[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS_FR[d.getMonth()]; }
-function resaPublic(r) { return { id: r.id, date: r.date, heure: r.heure, nom: r.nom, tel: r.tel, couverts: r.couverts, salle: r.salle, table: r.table, note: r.note, statut: r.statut, source: r.source, par: r.par, ts: r.ts }; }
+function resaPublic(r) { return { id: r.id, date: r.date, heure: r.heure, nom: r.nom, tel: r.tel, couverts: r.couverts, salle: r.salle, table: r.table, note: r.note, statut: r.statut, source: r.source, par: r.par, ts: r.ts, tsPrevue: heureResa(r) }; }
 function resaTexte(r) {
   return [
     'Client : ' + r.nom + (r.tel ? ' - ' + r.tel : ''),
@@ -791,18 +832,37 @@ function verifierResa(b) {
     date: String(b.date || ''), heure: String(b.heure || ''), nom: String(b.nom || '').trim().slice(0, 50), tel: String(b.tel || '').trim().slice(0, 30),
     couverts: parseInt(b.couverts, 10) || 0, salle: String(b.salle || ''), table: String(b.table || '').trim(), note: String(b.note || '').trim().slice(0, 200),
   };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) E('Choisissez la date');
-  if (!/^\d{2}:\d{2}$/.test(r.heure)) E('Choisissez l\'heure');
+  if (!dateResaValide(r.date)) E('Choisissez la date');
+  if (!heureResaValide(r.heure)) E('Choisissez l\'heure');
   if (!r.nom) E('Nom du client obligatoire');
   if (!(r.couverts >= 1 && r.couverts <= 200)) E('Nombre de personnes ?');
   if (r.salle && !db.config.salles.some(x => x.id === r.salle)) r.salle = '';
   if (!r.salle) r.table = '';
+  if (r.table && !db.config.salles.find(x => x.id === r.salle).tables.some(t => t.n === r.table)) E('Choisissez une table de cette salle');
   return r;
 }
-const minutes = h => +h.slice(0, 2) * 60 + +h.slice(3, 5);
+function dateResaValide(date) {
+  const d = new Date(date + 'T00:00:00Z');
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(+d) && d.toISOString().slice(0, 10) === date;
+}
+const heureResaValide = h => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(h);
+const heureResa = r => new Date(r.date + 'T' + r.heure + ':00').getTime();
 function conflitTable(r, id) {
   if (!r.table) return null;
-  return db.reservations.find(x => x.id !== id && x.date === r.date && x.salle === r.salle && x.table === r.table && ['a_confirmer', 'prevue'].includes(x.statut) && Math.abs(minutes(x.heure) - minutes(r.heure)) < 120);
+  return db.reservations.find(x => x.id !== id && x.salle === r.salle && x.table === r.table && ['a_confirmer', 'prevue'].includes(x.statut) && Math.abs(heureResa(x) - heureResa(r)) < 120 * 60000);
+}
+function reservationProche(salle, table, apres) {
+  const minute = Math.floor(now() / 60000) * 60000;
+  return db.reservations.filter(r => r.salle === salle && r.table === table && r.statut === 'prevue')
+    .sort((a, b) => heureResa(a) - heureResa(b))
+    .find(r => minute >= heureResa(r) - 30 * 60000 && minute <= heureResa(r) + apres * 60000);
+}
+function autoriserTableReservee(salle, table, u, pin) {
+  const r = reservationProche(salle, table, 60);
+  if (!r || peut(u, 'caissier')) return;
+  const chef = parCode(pin);
+  if (!chef || !peut(chef, 'caissier')) E('Table réservée à ' + r.heure + ' pour ' + r.nom + ' : seul un caissier peut l’autoriser', 403);
+  journal(u, 'table réservée autorisée', salleNom(salle) + ' ' + table + ' (' + r.nom + ') par ' + chef.nom);
 }
 // ---- lecture des réservations du site (mails Web3Forms) dans Gmail, par IMAP
 function imapLire(m, depuis) {
@@ -810,21 +870,36 @@ function imapLire(m, depuis) {
     const hote = process.env.CAISSE_IMAP_HOST || 'imap.gmail.com';
     const sock = tls.connect(+process.env.CAISSE_IMAP_PORT || 993, hote, { servername: hote });
     let buf = Buffer.alloc(0), n = 0, attente = null, fini = false;
-    const fin = (err, val) => { if (fini) return; fini = true; try { sock.end(); sock.destroy(); } catch (e) {} err ? reject(err) : resolve(val); };
+    const fin = (err, val) => {
+      if (fini) return;
+      fini = true;
+      if (attente && err) attente.rej(err);
+      sock.destroy();
+      if (err) reject(err); else resolve(val);
+    };
+    sock.on('close', () => fin(new Error('Connexion Gmail interrompue')));
     sock.setTimeout(30000, () => fin(new Error('pas de réponse de Gmail (internet ?)')));
     sock.on('error', e => fin(new Error(e.code === 'ENOTFOUND' || e.code === 'EAI_AGAIN' ? 'pas d\'internet' : e.message)));
-    const cmd = c => new Promise(res => { n++; const tag = 'A' + n; attente = { tag, res }; sock.write(tag + ' ' + c + '\r\n'); });
+    const cmd = c => new Promise((res, rej) => { n++; const tag = 'A' + n; attente = { tag, res, rej }; sock.write(tag + ' ' + c + '\r\n'); });
     sock.on('data', d => {
       buf = Buffer.concat([buf, d]);
       if (!attente) { if (buf.indexOf('\r\n') >= 0) { const l = buf.toString('latin1'); buf = Buffer.alloc(0); if (!/^\* OK/.test(l)) fin(new Error('Gmail : ' + l.slice(0, 80))); else suite(); } return; }
-      const t = buf.toString('latin1'), i = t.search(new RegExp('(^|\\r\\n)' + attente.tag + ' (OK|NO|BAD)'));
-      if (i < 0) return;
-      const j = t.indexOf('\r\n', i + 2);
-      if (j < 0) return;
-      const rep = buf.slice(0, j + 2); buf = buf.slice(j + 2);
-      const a = attente; attente = null; a.res(rep);
+      // Les corps MIME sont des littéraux IMAP de longueur connue.
+      for (let i = 0; i < buf.length;) {
+        const j = buf.indexOf('\r\n', i);
+        if (j < 0) return;
+        const ligne = buf.toString('latin1', i, j);
+        const lit = ligne.match(/\{(\d+)\}$/);
+        i = j + 2 + (lit ? Number(lit[1]) : 0);
+        if (ligne.startsWith(attente.tag + ' ')) {
+          const a = attente; attente = null;
+          const rep = buf.subarray(0, i); buf = buf.subarray(i);
+          a.res(rep);
+          return;
+        }
+      }
     });
-    const ok = (rep, quoi) => { const l = rep.toString('latin1').trim().split('\r\n').pop(); if (!/ OK/.test(l)) throw new Error(quoi + ' : ' + l.slice(0, 120)); };
+    const ok = (rep, quoi) => { const l = rep.toString('latin1').trim().split('\r\n').pop(); if (!/^A\d+ OK(?: |$)/i.test(l)) throw new Error(quoi + ' : ' + l.slice(0, 120)); };
     const dImap = d => d.getDate() + '-' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + '-' + d.getFullYear();
     let lance = false;
     const suite = async () => {
@@ -832,19 +907,20 @@ function imapLire(m, depuis) {
       try {
         const q = x => '"' + String(x).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
         let r = await cmd('LOGIN ' + q(m.user) + ' ' + q(m.pass));
-        const l = r.toString('latin1'); if (!/ OK/.test(l.trim().split('\r\n').pop())) throw new Error(/AUTHENTICATIONFAILED|Invalid credentials/i.test(l) ? 'Gmail refuse le mot de passe d\'application' : 'connexion Gmail refusée');
-        ok(await cmd('SELECT INBOX'), 'boîte de réception');
+        const l = r.toString('latin1'); if (!/^A\d+ OK(?: |$)/i.test(l.trim().split('\r\n').pop())) throw new Error(/AUTHENTICATIONFAILED|Invalid credentials/i.test(l) ? 'Gmail refuse le mot de passe d\'application' : 'connexion Gmail refusée');
+        ok(await cmd('EXAMINE INBOX'), 'boîte de réception');
         r = await cmd('UID SEARCH SINCE ' + dImap(depuis) + ' FROM "web3forms"'); ok(r, 'recherche');
-        const uids = ((r.toString('latin1').match(/\* SEARCH([^\r\n]*)/) || [])[1] || '').trim().split(/\s+/).filter(Boolean).slice(-60);
+        const uids = ((r.toString('latin1').match(/\* SEARCH([^\r\n]*)/) || [])[1] || '').trim().split(/\s+/).filter(uid => /^\d+$/.test(uid));
         const mails = [];
         for (const uid of uids) {
           const f = await cmd('UID FETCH ' + uid + ' (BODY.PEEK[])');
+          ok(f, 'lecture du message');
           const mm = f.toString('latin1').match(/\{(\d+)\}\r\n/);
           if (!mm) continue;
           const debut = f.toString('latin1').indexOf(mm[0]) + mm[0].length;
           mails.push(f.slice(debut, debut + +mm[1]));
         }
-        try { await cmd('LOGOUT'); } catch (e) {}
+        sock.write('ZZ LOGOUT\r\n');
         fin(null, mails);
       } catch (e) { fin(e); }
     };
@@ -882,13 +958,13 @@ function resaDepuisMail(raw) {
   const sujet = decodeMots(h.subject || '');
   if (!/^\s*R[ée]servation/i.test(sujet)) return null;
   const plain = parties.find(p => p.type === 'text/plain'), html = parties.find(p => p.type === 'text/html');
-  const texte = plain && /Personnes|Nom/.test(plain.texte) ? plain.texte : html ? texteDeHtml(html.texte) : (plain ? plain.texte : '');
+  const texte = plain && /Personnes|Nom/i.test(plain.texte) ? plain.texte : html ? texteDeHtml(html.texte) : (plain ? plain.texte : '');
   const lignes = texte.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const champ = nom => {
     const re = new RegExp('^' + nom + '\\s*:\\s*(.*)$', 'i');
     for (let i = 0; i < lignes.length; i++) {
       const m = lignes[i].match(re); if (m && m[1]) return m[1].trim();
-      if (new RegExp('^' + nom + '$', 'i').test(lignes[i]) && lignes[i + 1]) return lignes[i + 1];
+      if (new RegExp('^' + nom + '\\s*:?$', 'i').test(lignes[i]) && lignes[i + 1]) return lignes[i + 1];
     }
     return '';
   };
@@ -902,6 +978,7 @@ function resaDepuisMail(raw) {
   let date = an + '-' + String(mi + 1).padStart(2, '0') + '-' + String(+dt[1]).padStart(2, '0');
   if (!dt[3] && date < dateLocale(now() - 60 * 864e5)) date = (an + 1) + date.slice(4);
   const heure = String(+hr[1]).padStart(2, '0') + ':' + (hr[2] || '00');
+  if (!dateResaValide(date) || !heureResaValide(heure)) return null;
   const esp = champ('Espace').toLowerCase();
   const salle = (db.config.salles.find(x => esp && (esp.includes(x.nom.toLowerCase()) || x.nom.toLowerCase().includes(esp.replace(/^salle\s+|^espace\s+/, '')))) || {}).id || '';
   const pers = parseInt(champ('Personnes') || (sujet.match(/(\d+)\s*pers/) || [])[1], 10) || 1;
@@ -913,14 +990,15 @@ let siteEtat = { dernier: 0, erreur: null, ajoutees: 0 };
 let lectureSite = false;
 async function lireSite() {
   const m = db.config.mail || {};
-  if (!m.actif || !m.user || !m.pass || lectureSite) return siteEtat;
+  if (lectureSite) return { ...siteEtat, erreur: 'Lecture Gmail déjà en cours.' };
+  if (!m.actif || !m.user || !m.pass) return { ...siteEtat, erreur: 'Configurez Gmail dans Gestion → Réglages.' };
   lectureSite = true;
   try {
     const mails = await imapLire(m, new Date(now() - 4 * 864e5));
     let ajout = 0;
     for (const raw of mails) {
       let r; try { r = resaDepuisMail(raw); } catch (e) { r = null; }
-      if (!r || db.siteVus.includes(r.id)) continue;
+      if (!r || db.siteVus.includes(r.id) || db.reservations.some(x => x.ext === r.id)) continue;
       db.siteVus.push(r.id); if (db.siteVus.length > 600) db.siteVus = db.siteVus.slice(-400);
       if (r.date < dateLocale(now())) continue;
       db.seq.resa++;
@@ -928,16 +1006,16 @@ async function lireSite() {
       ajout++;
     }
     siteEtat = { dernier: now(), erreur: null, ajoutees: siteEtat.ajoutees + ajout };
-    if (ajout) save();
+    if (ajout) save(true);
   } catch (e) { siteEtat = { ...siteEtat, dernier: now(), erreur: e.message }; }
   lectureSite = false;
+  broadcast();
   return siteEtat;
 }
 setTimeout(lireSite, 20000); setInterval(lireSite, 5 * 60000);
 // une table réservée devient « arrivée » quand on l'ouvre autour de l'heure prévue
 function arriveeAuto(c) {
-  const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
-  const r = db.reservations.find(x => x.date === auj && x.salle === c.salle && x.table === c.table && x.statut === 'prevue' && mn >= minutes(x.heure) - 30 && mn <= minutes(x.heure) + 90);
+  const r = reservationProche(c.salle, c.table, 90);
   if (r) { r.statut = 'arrivee'; r.arrivee = now(); }
 }
 function etatPublic(u) {
@@ -953,7 +1031,7 @@ function etatPublic(u) {
     commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte'),
     jour: jourCourant(false) || null,
     options: db.options, top: topVentes(), version: VERSION,
-    reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
+    reservations: db.reservations.filter(r => ['a_confirmer', 'prevue'].includes(r.statut) && r.date >= dateLocale(now() - 61 * 60000) && r.date <= dateLocale(now() + 30 * 60000)).map(resaPublic),
     prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
 }
@@ -967,8 +1045,8 @@ function topVentes() {
 }
 function bonsKds(poste) {
   const lim = now() - 20 * 60000;
-  return db.bons.filter(b => (poste === 'tous' || b.poste === poste) && (b.etat === 'a_faire' || b.etat === 'attente' || (b.etat === 'pret' && b.pretTs > lim)))
-    .map(b => { const c = db.commandes[b.cmdId] || {}; return { ...b, table: c.table || b.table, emporter: (c.salle || b.salle) === 'emporter', client: c.client || null, retrait: c.retrait || null, note: c.note || '', salle: salleNom(c.salle || b.salle), serveur: nomUser(b.serveurId), couverts: c.couverts || '' }; });
+  return db.bons.filter(b => b.lignes.some(l => l.qte !== 0) && (poste === 'tous' || b.poste === poste) && (b.etat === 'a_faire' || b.etat === 'attente' || (b.etat === 'pret' && b.pretTs > lim)))
+    .map(b => { const c = db.commandes[b.cmdId] || {}; return { ...b, lignes: b.lignes.filter(l => l.qte !== 0), table: c.table || b.table, emporter: (c.salle || b.salle) === 'emporter', client: c.client || null, retrait: c.retrait || null, note: c.note || '', salle: salleNom(c.salle || b.salle), serveur: nomUser(b.serveurId), couverts: c.couverts || '' }; });
 }
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
@@ -999,14 +1077,14 @@ const routes = {
       const confirme = ex.statut === 'a_confirmer' && b.confirmer;
       if (confirme) ex.statut = 'prevue';
       journal(u, confirme ? 'réservation du site confirmée' : 'réservation modifiée', ex.nom + ' ' + ex.date + ' ' + ex.heure);
-      save(); notifier('[Caisse MB] ' + (confirme ? 'Réservation du site confirmée' : 'Réservation modifiée') + ' : ' + ex.nom + ', ' + ex.couverts + ' pers., ' + jourTxt(ex.date) + ' à ' + ex.heure, resaTexte(ex) + '\n' + (confirme ? 'Confirmée' : 'Modifiée') + ' par : ' + u.nom);
+      save(true); notifier('[Caisse MB] ' + (confirme ? 'Réservation du site confirmée' : 'Réservation modifiée') + ' : ' + ex.nom + ', ' + ex.couverts + ' pers., ' + jourTxt(ex.date) + ' à ' + ex.heure, resaTexte(ex) + '\n' + (confirme ? 'Confirmée' : 'Modifiée') + ' par : ' + u.nom);
       return resaPublic(ex);
     }
     db.seq.resa++;
     const n = { id: 'R' + db.seq.resa, ...r, statut: 'prevue', source: 'telephone', par: u.nom, ts: now() };
     db.reservations.push(n);
     journal(u, 'réservation', n.nom + ' ' + n.date + ' ' + n.heure + ' ' + n.couverts + ' pers.');
-    save(); notifier('[Caisse MB] Nouvelle réservation : ' + n.nom + ', ' + n.couverts + ' pers., ' + jourTxt(n.date) + ' à ' + n.heure, resaTexte(n));
+    save(true); notifier('[Caisse MB] Nouvelle réservation : ' + n.nom + ', ' + n.couverts + ' pers., ' + jourTxt(n.date) + ' à ' + n.heure, resaTexte(n));
     return resaPublic(n);
   },
   'POST /api/reservation/statut': (b, u) => {
@@ -1015,9 +1093,18 @@ const routes = {
     if (!['prevue', 'arrivee', 'annulee', 'absent'].includes(b.statut)) E('Statut inconnu');
     if (!peut(u, 'caissier') && b.statut !== 'arrivee') E('Seuls les caissiers peuvent faire ça', 403);
     const avant = r.statut;
+    if (b.statut === 'arrivee') {
+      if (u.role === 'cuisine') E('Non autorisé', 403);
+      if (avant !== 'prevue') E('Seule une réservation prévue peut être marquée arrivée');
+      if (r.table && reservationProche(r.salle, r.table, 60)) autoriserTableReservee(r.salle, r.table, u, b.pin);
+    }
+    if (b.statut === 'prevue') {
+      const conflit = conflitTable(r, r.id);
+      if (conflit) E('La table est déjà réservée à ' + conflit.heure + ' (' + conflit.nom + ')', 409);
+    }
     r.statut = b.statut; if (b.statut === 'arrivee') r.arrivee = now();
     journal(u, 'réservation ' + b.statut, r.nom + ' ' + r.date + ' ' + r.heure);
-    save();
+    save(true);
     if (b.statut === 'annulee' && avant !== 'annulee') notifier('[Caisse MB] Réservation annulée : ' + r.nom + ', ' + jourTxt(r.date) + ' à ' + r.heure, resaTexte(r) + '\nAnnulée par : ' + u.nom);
     if (b.statut === 'prevue' && avant === 'a_confirmer') notifier('[Caisse MB] Réservation du site confirmée : ' + r.nom + ', ' + r.couverts + ' pers., ' + jourTxt(r.date) + ' à ' + r.heure, resaTexte(r) + '\nConfirmée par : ' + u.nom);
     return resaPublic(r);
@@ -1034,16 +1121,7 @@ const routes = {
     if (!table) E('Table manquante');
     const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
     if (ex) return ex;
-    // table réservée (bloquée 30 min avant) : seul un caissier peut l'ouvrir
-    if (salle !== 'emporter' && salle !== 'comptoir' && !peut(u, 'caissier')) {
-      const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
-      const rs = db.reservations.find(x => x.date === auj && x.salle === salle && x.table === table && x.statut === 'prevue' && mn >= minutes(x.heure) - 30 && mn <= minutes(x.heure) + 60);
-      if (rs) {
-        const chef = parCode(b.pin);
-        if (!chef || !peut(chef, 'caissier')) E('Table réservée à ' + rs.heure + ' pour ' + rs.nom + ' : seul un caissier peut l\'ouvrir', 403);
-        journal(u, 'table réservée ouverte', salleNom(salle) + ' ' + table + ' (' + rs.nom + ') autorisé par ' + chef.nom);
-      }
-    }
+    autoriserTableReservee(salle, table, u, b.pin);
     const j = jourCourant(true);
     db.seq.cmd++;
     const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };
@@ -1051,7 +1129,7 @@ const routes = {
     db.commandes[c.id] = c;
     if (salle !== 'emporter' && salle !== 'comptoir') arriveeAuto(c);
     journal(u, 'ouverture table', salleNom(salle) + ' ' + table);
-    save();
+    save(true);
     return c;
   },
   'POST /api/commande/envoyer': async (b, u) => {
@@ -1066,7 +1144,7 @@ const routes = {
     const nouvelles = [];
     for (const x of b.lignes || []) {
       const p = db.produits.find(p => p.id === x.pid);
-      if (!p) continue;
+      if (!p || !p.actif) E('Un article a été retiré de la carte. Vérifiez la commande.');
       const qte = Math.max(1, Math.min(99, parseInt(x.qte, 10) || 1));
       const cat = db.categories.find(k => k.id === p.cat) || {};
       // options (cuisson, accompagnement, suppléments…)
@@ -1079,7 +1157,7 @@ const routes = {
       }
       const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
       db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), postesEnvoi: postesDe(p.id), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
     }
     if (!nouvelles.length) E('Rien à envoyer');
     for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
@@ -1090,11 +1168,12 @@ const routes = {
     if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
     if (b.couverts) c.couverts = +b.couverts;
     creerBons(c, nouvelles);
-    save();
+    journal(u, 'envoi', 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
+    save(true);
     const erreurs = [];
     // commande commune : l'asiatique voit aussi la partie cuisine (gastro/brunch) et inversement
     const CUISINES = ['cuisine', 'cuisine2', 'asiatique'];
-    const dePoste = k => nouvelles.filter(l => postesDe(l.pid).includes(k));
+    const dePoste = k => nouvelles.filter(l => postesLigne(l).includes(k));
     const commune = dePoste('asiatique').length && (dePoste('cuisine').length || dePoste('cuisine2').length);
     for (const poste of postesBons()) {
       const ls = dePoste(poste);
@@ -1107,7 +1186,6 @@ const routes = {
       const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : '', infos));
       if (!r.ok) erreurs.push(r.erreur);
     }
-    journal(u, 'envoi', 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
     return { commande: c, erreurs };
   },
   'POST /api/commande/reclamer': async (b, u) => {
@@ -1118,10 +1196,11 @@ const routes = {
     c.suite = s;
     const ls = att.filter(l => l.suite === s);
     for (const bn of db.bons) if (bn.cmdId === c.id && bn.etat === 'attente' && bn.suite === s) { bn.etat = 'a_faire'; bn.ts = now(); bn.reclame = true; }
-    save();
+    journal(u, 'réclame', 'Table ' + c.table + ' : ' + SUITES[s]);
+    save(true);
     const erreurs = [];
     for (const poste of postesBons()) {
-      const lp = ls.filter(l => postesDe(l.pid).includes(poste));
+      const lp = ls.filter(l => postesLigne(l).includes(poste));
       if (!lp.length) continue;
       const d = new Doc();
       d.center(1).size(2).bold(1).t('RÉCLAME').t(SUITES[s].toUpperCase()).size(0).bold(0).center(0).line('=');
@@ -1131,7 +1210,6 @@ const routes = {
       const r = await imprimer(poste, d);
       if (!r.ok) erreurs.push(r.erreur);
     }
-    journal(u, 'réclame', 'Table ' + c.table + ' : ' + SUITES[s]);
     return { commande: c, suite: SUITES[s], erreurs };
   },
   'POST /api/commande/message': async (b, u) => {
@@ -1180,7 +1258,7 @@ const routes = {
     const c = getCmd(b.id);
     const erreurs = [];
     for (const poste of postesBons()) {
-      const ls = c.lignes.filter(l => !l.annule && postesDe(l.pid).includes(poste));
+      const ls = c.lignes.filter(l => !l.annule && postesLigne(l).includes(poste));
       if (!ls.length) continue;
       const r = await imprimer(poste, bon(poste, c, ls, '** RÉIMPRESSION **'));
       if (!r.ok) erreurs.push(r.erreur);
@@ -1196,19 +1274,28 @@ const routes = {
     const chef = peut(u, 'caissier') ? u : parCode(b.pin);
     if (!chef || !peut(chef, 'caissier')) E('Seul un caissier peut annuler un plat : passez le badge ou tapez le code d\'un caissier', 403);
     if (!b.motif) E('Motif obligatoire');
-    const q = Math.max(1, Math.min(l.qte, parseInt(b.qte, 10) || l.qte));
+    const q = b.qte == null ? l.qte : Number(b.qte);
+    if (!Number.isInteger(q) || q < 1 || q > l.qte) E('Quantité à annuler invalide');
+    if (b.attendu !== undefined && b.attendu !== l.qte) E('La quantité a changé. Vérifiez la commande.', 409);
     let cible = l;
     if (q < l.qte) { l.qte -= q; db.seq.ligne++; cible = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(cible); }
     cible.annule = { par: chef.nom, demandePar: u.nom, motif: b.motif, ts: now() };
+    for (const bon of db.bons) {
+      if (bon.cmdId !== c.id || bon.type !== 'commande' || !['attente', 'a_faire'].includes(bon.etat)) continue;
+      const ligneBon = bon.lignes.find(article => article.id === (l.ligneBon || l.id));
+      if (!ligneBon) continue;
+      ligneBon.qte = Math.max(0, ligneBon.qte - q);
+    }
     const pr = db.produits.find(p => p.id === l.pid); if (pr && pr.stock !== null && pr.stock !== undefined) pr.stock += q;
-    for (const k of postesDe(l.pid)) { db.seq.bon++; db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: k, ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] }); }
+    for (const k of postesLigne(l)) { db.seq.bon++; db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: k, ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: (l.opts || []).map(o => o.nom), note: b.motif, emporter: !!l.emporter }] }); }
     journal(u, 'annulation article', 'Table ' + c.table + ' : ' + q + ' ' + l.nom + ' (' + b.motif + ') autorisé par ' + chef.nom);
-    save();
+    save(true);
     const d = new Doc();
-    d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t('Table ' + c.table + ' - ' + heure(now())).line();
-    d.size(3).bold(1).t(q + '  ' + l.nom).size(0).bold(0).t('Motif : ' + b.motif).cut();
+    d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t(titreCmd(c) + ' - ' + heure(now())).line();
+    lignesBon(d, { ...l, qte: q, note: 'Motif : ' + b.motif });
+    d.cut();
     const erreurs = [];
-    for (const k of postesDe(l.pid)) { const r = await imprimer(k, d); if (!r.ok) erreurs.push(r.erreur); }
+    for (const k of postesLigne(l)) { const r = await imprimer(k, d); if (!r.ok) erreurs.push(r.erreur); }
     return { commande: c, erreurs };
   },
   'POST /api/commande/offrir-ligne': (b, u) => {
@@ -1224,7 +1311,9 @@ const routes = {
     return c;
   },
   'POST /api/commande/modifier': (b, u) => {
+    if (u.role === 'cuisine') E('Non autorisé', 403);
     const c = getCmd(b.id);
+    if (b.salle && b.table && (b.salle !== c.salle || String(b.table) !== c.table)) autoriserTableReservee(b.salle, String(b.table), u, b.pin);
     if (b.couverts) c.couverts = Math.max(1, +b.couverts);
     if (b.salle && b.table) {
       const t = String(b.table);
@@ -1232,17 +1321,22 @@ const routes = {
       if (occ) {
         // fusion des deux tables
         occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = [];
+        for (const bon of db.bons) if (bon.cmdId === c.id) {
+          bon.cmdId = occ.id; bon.salle = occ.salle; bon.table = occ.table;
+        }
         journal(u, 'fusion tables', c.table + ' -> ' + t);
-        save(); return occ;
+        save(true); return occ;
       }
       journal(u, 'transfert table', salleNom(c.salle) + ' ' + c.table + ' -> ' + salleNom(b.salle) + ' ' + t);
       c.salle = b.salle; c.table = t;
+      for (const bon of db.bons) if (bon.cmdId === c.id) { bon.salle = c.salle; bon.table = c.table; }
+      arriveeAuto(c);
     }
     if (b.serveurId && peut(u, 'caissier')) c.serveurId = b.serveurId;
     if (b.note !== undefined) c.note = String(b.note).slice(0, 160);
     if (b.client) c.client = { nom: String(b.client.nom || '').slice(0, 40), tel: String(b.client.tel || '').slice(0, 20) };
     if (b.retrait !== undefined) c.retrait = +b.retrait || null;
-    save();
+    save(true);
     return c;
   },
   'POST /api/commande/fermer-vide': (b, u) => {
@@ -1265,35 +1359,44 @@ const routes = {
     const c = getCmd(b.id);
     const restantes = () => c.lignes.filter(l => !l.annule && !l.paye);
     if (!restantes().length) E('La table est vide');
-    // Séparation : on ne paie qu'une partie des articles
-    let lignes;
-    if (Array.isArray(b.lignes) && b.lignes.length) {
-      lignes = [];
+    if (b.attendu !== undefined && JSON.stringify(b.attendu) !== JSON.stringify(restantes().map(l => [l.id, l.qte, l.offert]))) E('La commande a changé. Vérifiez les articles avant d’encaisser.', 409);
+    // Préparer la séparation sans modifier la commande avant validation du paiement.
+    let selections = [];
+    if (Array.isArray(b.lignes)) {
+      if (!b.lignes.length) E('Sélectionnez les articles à encaisser');
+      const deja = new Set();
       for (const x of b.lignes) {
         const l = c.lignes.find(k => k.id === x.id && !k.annule && !k.paye);
         if (!l) E('Article introuvable ou déjà payé');
-        const q = Math.max(1, Math.min(l.qte, parseInt(x.qte, 10) || l.qte));
-        if (q < l.qte) { l.qte -= q; db.seq.ligne++; const n = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(n); lignes.push(n); }
-        else lignes.push(l);
+        if (deja.has(l.id)) E('Article sélectionné plusieurs fois');
+        deja.add(l.id);
+        const q = x.qte == null ? l.qte : Number(x.qte);
+        if (!Number.isInteger(q) || q < 1 || q > l.qte) E('Quantité à encaisser invalide');
+        selections.push({ ligne: l, qte: q });
       }
-    } else lignes = restantes();
-    const total = lignes.reduce((s, l) => s + (l.offert ? 0 : l.qte * l.prix), 0);
+    } else selections = restantes().map(l => ({ ligne: l, qte: l.qte }));
+    const total = selections.reduce((s, x) => s + (x.ligne.offert ? 0 : x.qte * x.ligne.prix), 0);
     let remise = 0;
     if (b.remise && +b.remise.valeur > 0) {
       if (!pinAdmin(b.pin)) E('Code du responsable obligatoire pour une remise', 403);
       remise = b.remise.type === 'pct' ? Math.round(total * Math.min(100, +b.remise.valeur) / 100) : Math.min(total, Math.round(+b.remise.valeur));
     }
     // paiements : un seul mode, ou plusieurs (ex. une partie en espèces, le reste par carte)
-    let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode, montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
-    pays = pays.map(p => ({ mode: p.mode, montant: Math.round(+p.montant || 0), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
-    for (const p of pays) if (!MODES[p.mode]) E('Mode de paiement inconnu');
+    if (Array.isArray(b.paiements) && !b.paiements.length && total - remise > 0) E('Indiquez un mode de paiement');
+    let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode || (Array.isArray(b.paiements) && total === remise ? 'especes' : ''), montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
+    pays = pays.map(p => ({ mode: p.mode, montant: p.montant == null ? 0 : Number(p.montant), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
+    for (const p of pays) {
+      if (!Object.hasOwn(MODES, p.mode) || p.mode === 'mixte') E('Mode de paiement inconnu');
+      if (!Number.isSafeInteger(p.montant) || p.montant < 0) E('Montant de paiement invalide');
+    }
     const offert = pays.some(p => p.mode === 'offert');
     if (offert && pays.length > 1) E('Une table offerte ne peut pas être payée en plus');
     if (offert && !pinAdmin(b.pin)) E('Code du responsable obligatoire pour offrir la table', 403);
     for (const p of pays) if (p.mode === 'societe' && !p.societe) E('Nom de la société obligatoire');
     const net = offert ? 0 : total - remise;
-    if (pays.length === 1 && !offert && !(pays[0].montant > 0)) pays[0].montant = net;
+    if (!Array.isArray(b.paiements) && pays.length === 1 && !offert && pays[0].montant === 0) pays[0].montant = net;
     const somme = offert ? 0 : pays.reduce((s, p) => s + p.montant, 0);
+    if (!Number.isSafeInteger(somme)) E('Montant de paiement invalide');
     if (somme < net) E('Il manque ' + fmt(net - somme) + ' DA');
     const recu = pays.filter(p => p.mode === 'especes').reduce((s, p) => s + p.montant, 0);
     const rendu = somme - net;
@@ -1303,7 +1406,18 @@ const routes = {
     const paiements = [];
     for (const p of pays.slice().reverse()) { let m = p.montant; if (p.mode === 'especes' && aDeduire > 0) { const k = Math.min(m, aDeduire); m -= k; aDeduire -= k; } if (m > 0 || offert) paiements.unshift({ ...p, montant: offert ? 0 : m }); }
     const modes = [...new Set(paiements.map(p => p.mode))];
-    const mode = modes.length === 1 ? modes[0] : 'mixte';
+    const mode = modes.length > 1 ? 'mixte' : modes[0] || pays[0].mode;
+    // Toutes les validations sont passées : appliquer les séparations seulement maintenant.
+    const lignes = [];
+    for (const { ligne, qte } of selections) {
+      if (qte < ligne.qte) {
+        ligne.qte -= qte;
+        db.seq.ligne++;
+        const part = { ...ligne, id: 'L' + db.seq.ligne, qte, ligneBon: ligne.ligneBon || ligne.id };
+        c.lignes.push(part);
+        lignes.push(part);
+      } else lignes.push(ligne);
+    }
     const j = db.jours.find(x => x.id === c.jour && !x.clos) || jourCourant(true);
     db.seq.ticket++;
     for (const l of lignes) l.paye = db.seq.ticket;
@@ -1321,7 +1435,7 @@ const routes = {
     if (!partiel) { c.statut = 'payee'; c.ticket = tk.num; c.ferme = now(); }
     for (const p of paiements) if (p.mode === 'societe' && !db.config.societes.includes(p.societe)) db.config.societes.push(p.societe);
     journal(u, 'encaissement', 'Ticket ' + tk.num + ' table ' + c.table + ' ' + fmt(net) + ' DA (' + paiements.map(p => MODES[p.mode] + ' ' + fmt(p.montant)).join(' + ') + ')' + (remise ? ' remise ' + fmt(remise) : '') + (partiel ? ' — paiement partiel' : ''));
-    save();
+    save(true);
     const d = ticketDoc(tk);
     const tiroir = recu > 0 && db.config.tiroirAuto;
     if (tiroir) d.drawer();
@@ -1359,17 +1473,18 @@ const routes = {
     const j = db.jours.find(x => x.id === tk.jour);
     if (j && j.clos) E('La journée de ce ticket est déjà clôturée');
     if (!b.motif) E('Motif obligatoire');
-    tk.annule = { par: chef.nom, motif: b.motif, ts: now() };
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
     if (b.rouvrir) {
-      const c = db.commandes[tk.cmdId];
-      if (c) {
-        if (c.statut !== 'ouverte' && Object.values(db.commandes).some(x => x.statut === 'ouverte' && x.salle === c.salle && x.table === c.table && x.id !== c.id)) E('La table ' + c.table + ' est de nouveau occupée : impossible de la rouvrir. Annulez sans rouvrir.');
-        for (const l of c.lignes) if (l.paye === tk.num) l.paye = null;
-        c.statut = 'ouverte'; delete c.ticket;
-      }
+      // Après un regroupement, les articles peuvent appartenir à une autre commande.
+      const c = Object.values(db.commandes).find(x => x.lignes.some(l => l.paye === tk.num)) || db.commandes[tk.cmdId];
+      if (!c || !c.lignes.some(l => l.paye === tk.num)) E('Articles du ticket introuvables. Annulez sans rouvrir.');
+      if (c.statut !== 'ouverte' && c.salle !== 'comptoir' && Object.values(db.commandes).some(x => x.statut === 'ouverte' && x.salle === c.salle && x.table === c.table && x.id !== c.id)) E('La table ' + c.table + ' est de nouveau occupée : impossible de la rouvrir. Annulez sans rouvrir.', 409);
+      for (const l of c.lignes) if (l.paye === tk.num) l.paye = null;
+      c.statut = 'ouverte'; delete c.ticket; delete c.ferme;
     }
+    tk.annule = { par: chef.nom, motif: b.motif, ts: now() };
     journal(u, 'annulation ticket', 'Ticket ' + tk.num + ' ' + fmt(tk.net) + ' DA (' + b.motif + ') par ' + chef.nom + (b.rouvrir ? ', table rouverte' : ''));
-    save(); return {};
+    save(true); return {};
   },
   'POST /api/sortie': (b, u) => {
     if (!peut(u, 'caissier')) E('Non autorisé', 403);
@@ -1474,13 +1589,13 @@ const routes = {
     journal(u, 'pointage corrigé', b.id || 'ajout'); save(); return {};
   },
   'GET /api/version': () => ({ version: VERSION }),
-  // « calme » = aucune table ouverte et personne n'a touché la caisse depuis 3 minutes (pour installer une mise à jour)
-  // 3.4.0 : les tables ouvertes n'empêchent plus la mise à jour (elles sont gardées) ; il suffit que personne n'ait touché la caisse depuis 3 min
-  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000; if (calme) saveNow(); return { calme }; },
+  // Les tables ouvertes sont sauvegardées et conservées à la mise à jour.
+  'GET /api/calme': () => { const calme = !operationsEnCours && now() - derniereActivite > 180000; if (calme) saveNow(); return { calme }; },
   'GET /api/maj': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return { version: VERSION, app: !!process.send, etat: majEtat }; },
   'POST /api/maj/verifier': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); if (process.send) process.send({ type: 'verifier' }); return {}; },
   'POST /api/maj/installer': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (operationsEnCours > 1) E('Une opération est en cours. Réessayez dans un instant.', 409);
     journal(u, 'mise à jour', 'installation demandée'); saveNow();
     if (process.send) process.send({ type: 'installer' }); return {};
   },
@@ -1615,7 +1730,12 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST') derniereActivite = now();
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);
-      const out = await fn(body, u, req, q);
+      let out;
+      if (req.method === 'POST') {
+        operationsEnCours++;
+        try { out = await fn(body, u, req, q); }
+        finally { operationsEnCours--; }
+      } else out = await fn(body, u, req, q);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(JSON.stringify(out));
     }

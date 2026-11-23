@@ -1,11 +1,11 @@
 {
- "version": "3.5.2",
- "date": "2026-11-23T17:42:58.803Z",
- "notes": "Table réservée bloquée : seul un caissier peut l'ouvrir (badge ou code du caissier pour un serveur)",
+ "version": "3.5.3",
+ "date": "2026-11-23T18:39:28.531Z",
+ "notes": "Sécurise les encaissements et annulations, fiabilise les réservations et l’import Gmail, et conserve le routage des bons de cuisine.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "36e68867ce939b2464649670eb1b3f9759d1a99e7326dac3c79d0942e01f5d65"
+   "sha256": "50060b8e79abd0beaf59e6309e519a73cba73a94b97defd0f8b68e1c8f6447b2"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "61f6ac44a29461f9903bc79c1de767ef6f8864e5ef6840f638a67948022ba46f"
+   "sha256": "31ce4a102399219ae4b82bfcaee9c350f8e9d58bfceea03c2409a2a0c566958f"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "d564234041b91b7923f4a269cca729159e05dcba6b94bddde541dd6a776077fc"
+   "sha256": "b5df257ad70ac7d5fa36a3a953b379ca945f0f428efcee4c7575bae1cd3c8e13"
   }
  ]
 }
