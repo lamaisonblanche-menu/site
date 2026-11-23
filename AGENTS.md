@@ -130,3 +130,21 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - **Pointage** : seulement sur la caisse principale (requête venant de 127.0.0.1) ; le bouton est caché sur les écrans de salle et l'API refuse.
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.
+
+## 8. Passation (23/11/2026, version 3.5.0 publiée)
+
+État : caisse lancée au restaurant le 23/11/2026. Versions du jour : 3.3.2 → 3.5.0 (voir `git log`).
+Toutes les modifications de la carte ou des codes passent par une **migration avec drapeau** dans server.js
+(`if (!db.xxx) { …; db.xxx = true; }`) placée juste avant le bloc « Carte complétée avec le site (version 3.3.1) ».
+
+À faire / en attente du patron :
+- Groupes à envoyer sur l'imprimante « Cuisine 2 » (aucun pour l'instant).
+- Groupes FrontCash manquants : Plats traditionnels, Formules, Suppléments (le patron doit donner articles + prix).
+- Jus de banane : pas sur la carte (prix à demander).
+- Sociétés payées par chèque : proposé un récap par société (Gestion → Rapports) + envoi du détail dans le suivi des chèques de l'appli de gestion. Pas encore validé.
+- Lyes (maître d'hôtel, code 1515) est « serveur » : il ne peut ni annuler un plat ni prendre une réservation. Le passer en caissier seulement si le patron le demande.
+- Réservations : vérifier au restaurant que la lecture IMAP de Gmail marche (Gestion → Réglages : mot de passe d'application Gmail, puis Résa → « Lire maintenant »). En cas d'erreur, le message s'affiche en bas de l'écran Résa.
+- Pas encore testé sur les vraies imprimantes ni sur l'imprimante USB des tickets.
+
+Tester avant chaque publication (obligatoire) : `node --check`, une commande complète au navigateur en 1024×768
+(ouvrir une table, plats, Envoyer, encaisser en espèces) et lire `impressions-simulees/`.
