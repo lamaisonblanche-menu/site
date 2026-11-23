@@ -1,11 +1,11 @@
 {
- "version": "3.1.0",
- "date": "2026-11-23T13:47:45.085Z",
- "notes": "Première version de l'application Windows",
+ "version": "3.1.1",
+ "date": "2026-11-23T13:48:55.028Z",
+ "notes": "Test du canal de mises à jour",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "b2f44d3b6e29f8b1b73ea4735f006affc4d198e1fd9c7d50e736159b1ef636c6"
+   "sha256": "6dc3b2dc3139b7d421b6fc26a7f853389a9b035ea4f2e9047b9516050dd6ac73"
   },
   {
    "chemin": "public/app.js",
