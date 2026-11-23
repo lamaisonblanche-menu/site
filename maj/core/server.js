@@ -63,13 +63,13 @@ function dbInitiale() {
   const categories = [], produits = [];
   seed.forEach(([nom, poste, couleur, items], i) => {
     const id = slug(nom);
-    categories.push({ id, nom, poste, couleur, suite: suiteParDefaut(nom, poste), ordre: i });
+    categories.push({ id, nom, poste, couleur, suite: suiteParDefaut(nom, poste), univers: universDefaut(nom, poste), ordre: i });
     items.forEach(([n, prix]) => produits.push({ id: 'p' + (produits.length + 1), nom: n, prix, cat: id, actif: true, options: [], stock: null }));
   });
   const options = optionsInitiales();
   for (const p of produits) if (CUISSON.test(p.nom)) p.options = ['cuisson'];
   return {
-    version: 3, options,
+    version: 4, options,
     config: {
       nom: 'La Maison Blanche', adresse: '23 rue des Frères Ben Ali, Hydra - Alger', tel: '+213 541 55 96 72',
       piedTicket: 'Merci de votre visite - A bientot !',
@@ -81,6 +81,7 @@ function dbInitiale() {
       societes: [],
       motifsSortie: ['Influenceuse', 'Dépense du restaurant', 'Achat marché', 'Avance sur salaire', 'Autre'],
       motifsAnnulation: ['Erreur de saisie', 'Client a changé d\'avis', 'Plat refusé / retour', 'Rupture', 'Autre'],
+      ...COMMENTAIRES(), ...TICKET_DEFAUT(),
     },
     users: [
       { id: 'u1', nom: 'Patron', role: 'admin', pin: '1234', badge: '', actif: true },
@@ -90,7 +91,7 @@ function dbInitiale() {
     categories, produits,
     commandes: {}, tickets: [], sorties: [], jours: [], journal: [],
     bons: [], pointages: [],
-    seq: { ticket: 0, cmd: 0, ligne: 0, sortie: 0, jour: 0, bon: 0, pointage: 0 },
+    seq: { ticket: 0, cmd: 0, ligne: 0, sortie: 0, jour: 0, bon: 0, pointage: 0, emporter: 0 },
   };
 }
 // Suites (ordre d'envoi en cuisine) : 0 = direct (boissons), 1 = entrées, 2 = plats, 3 = desserts
@@ -124,6 +125,21 @@ if ((db.version || 1) < 2) {
   for (const u of db.users) if (u.badge === undefined) u.badge = '';
   db.version = 2;
 }
+// Commentaires rapides proposés aux serveurs (modifiables dans Gestion > Réglages)
+function COMMENTAIRES() {
+  return {
+    commentaires: ['Sans oignon', 'Sans sauce', 'Sauce à part', 'Sans fromage', 'Sans gluten', 'Allergie', 'Peu épicé', 'Bien épicé', 'Bien chaud', 'Sans glaçons', 'Peu sucré', 'Sans sucre', 'À partager', 'Assiette enfant', 'Servir en premier'],
+    commentairesCommande: ['Client pressé', 'Anniversaire', 'Allergie à signaler', 'Bébé à table', 'Tout servir ensemble', 'Client régulier', 'Prévoir une bougie'],
+  };
+}
+function TICKET_DEFAUT() { return { logoTicket: true, qrLien: 'https://lamaisonblanchehydra.com', qrTexte: 'Réservez votre table en ligne - Instagram @restaurant_lamaisonblanche' }; }
+function universDefaut(nom, poste) {
+  if (/brunch|burger/i.test(nom)) return 'Brunch';
+  if (/asiat/i.test(nom)) return 'Asiatique';
+  if (/dessert|cr[êe]pe|gaufre/i.test(nom)) return 'Desserts';
+  if (poste === 'comptoir' || /boisson|mocktail|jus|smoothie/i.test(nom)) return 'Boissons';
+  return 'La carte';
+}
 // Mise à jour vers la version 3 (suites, options, ruptures, écran cuisine, pointage)
 if (db.version < 3) {
   for (const c of db.categories) if (c.suite === undefined) c.suite = suiteParDefaut(c.nom, c.poste);
@@ -132,6 +148,14 @@ if (db.version < 3) {
   db.bons = db.bons || []; db.pointages = db.pointages || [];
   db.seq.bon = db.seq.bon || 0; db.seq.pointage = db.seq.pointage || 0;
   db.version = 3;
+}
+// version 4 : univers de la carte, commentaires, à emporter
+if (db.version < 4) {
+  for (const c of db.categories) if (!c.univers) c.univers = universDefaut(c.nom, c.poste);
+  Object.assign(db.config, { ...COMMENTAIRES(), ...Object.fromEntries(Object.entries(db.config).filter(([k]) => k.startsWith('commentaires'))) });
+  db.seq.emporter = db.seq.emporter || 0;
+  for (const [k, v] of Object.entries(TICKET_DEFAUT())) if (db.config[k] === undefined) db.config[k] = v;
+  db.version = 4;
 }
 for (const s of db.config.salles) {
   if (s.tables.length && typeof s.tables[0] === 'string') s.tables = s.tables.map((n, i) => ({ n, x: 8 + (i % 10) * 9.5, y: 12 + Math.floor(i / 10) * 20 }));
@@ -206,6 +230,7 @@ function enc(str) {
   }
   return Buffer.from(out);
 }
+let LOGO = null; try { LOGO = fs.readFileSync(path.join(DIR, 'logo-ticket.bin')); } catch (e) {}
 class Doc {
   constructor() { this.parts = [Buffer.from([ESC, 0x40, ESC, 0x74, db.config.pageCode || 16])]; this.w = db.config.largeur || 48; this.txt = []; }
   raw(...b) { this.parts.push(Buffer.from(b)); return this; }
@@ -218,6 +243,23 @@ class Doc {
   feed(n = 4) { return this.raw(ESC, 0x64, n); }
   cut() { this.feed(4); return this.raw(GS, 0x56, 66, 0); }
   drawer() { return this.raw(ESC, 0x70, 0, 25, 250); }
+  // QR code imprimé par l'imprimante elle-même (commande ESC/POS standard Epson)
+  qr(texte, taille = 6) {
+    const data = Buffer.from(String(texte), 'utf8'), n = data.length + 3;
+    this.raw(GS, 0x28, 0x6b, 4, 0, 49, 65, 50, 0).raw(GS, 0x28, 0x6b, 3, 0, 49, 67, taille).raw(GS, 0x28, 0x6b, 3, 0, 49, 69, 49);
+    this.parts.push(Buffer.from([GS, 0x28, 0x6b, n & 255, n >> 8, 49, 80, 48]), data);
+    this.raw(GS, 0x28, 0x6b, 3, 0, 49, 81, 48);
+    this.txt.push('[QR : ' + texte + ']');
+    return this;
+  }
+  // logo de La Maison Blanche (image noir et blanc)
+  logo() {
+    if (!LOGO) return this;
+    const wb = LOGO[0] | (LOGO[1] << 8), h = LOGO[2] | (LOGO[3] << 8);
+    this.parts.push(Buffer.from([GS, 0x76, 0x30, 0, wb & 255, wb >> 8, h & 255, h >> 8]), LOGO.subarray(4));
+    this.txt.push('[LOGO]');
+    return this;
+  }
   buf() { return Buffer.concat(this.parts); }
   texte() { return this.txt.join('\n') + '\n'; }
 }
@@ -240,7 +282,14 @@ function imprimer(poste, doc) {
 const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const heure = ts => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const dateH = ts => new Date(ts).toLocaleDateString('fr-FR') + ' ' + heure(ts);
-function salleNom(id) { const s = db.config.salles.find(x => x.id === id); return s ? s.nom : (id === 'comptoir' ? 'Comptoir' : id); }
+function salleNom(id) { const s = db.config.salles.find(x => x.id === id); return s ? s.nom : (id === 'comptoir' ? 'Comptoir' : id === 'emporter' ? 'À emporter' : id); }
+// titre d'une commande sur les bons : « TABLE 7 » ou « À EMPORTER E3 »
+function titreCmd(c) { return c.salle === 'emporter' ? 'À EMPORTER ' + c.table : c.salle === 'comptoir' ? 'COMPTOIR' : 'TABLE ' + c.table; }
+function infosEmporter(d, c) {
+  if (c.salle !== 'emporter') return;
+  if (c.client && c.client.nom) d.bold(1).t('Client : ' + c.client.nom + (c.client.tel ? '  ' + c.client.tel : '')).bold(0);
+  d.bold(1).t('Retrait : ' + (c.retrait ? heure(c.retrait) : 'dès que possible')).bold(0);
+}
 function nomUser(id) { const u = db.users.find(x => x.id === id); return u ? u.nom : '-'; }
 function postesBons() { return Object.keys(db.config.imprimantes).filter(k => k !== 'ticket'); }
 function posteDe(pid) {
@@ -253,6 +302,7 @@ const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', soci
 function lignesBon(d, l) {
   d.size(3).bold(1).t(l.qte + '  ' + l.nom).bold(0).size(0);
   for (const o of l.opts || []) d.bold(1).t('    + ' + o.nom).bold(0);
+  if (l.emporter) d.bold(1).t('    *** A EMPORTER ***').bold(0);
   if (l.note) d.bold(1).t('    >> ' + l.note).bold(0);
 }
 function bon(poste, cmd, lignes, titre) {
@@ -260,9 +310,10 @@ function bon(poste, cmd, lignes, titre) {
   d.center(1).size(2).bold(1).t(((db.config.imprimantes[poste] || {}).nom || poste).toUpperCase()).size(0);
   if (titre) d.t(titre);
   d.bold(0).center(0).line('=');
-  d.size(2).bold(1).t('TABLE ' + cmd.table).size(0).bold(0);
-  d.t(salleNom(cmd.salle) + ' - ' + (cmd.couverts || '?') + ' couv.');
+  d.size(2).bold(1).t(titreCmd(cmd)).size(0).bold(0);
+  if (cmd.salle === 'emporter') infosEmporter(d, cmd); else d.t(salleNom(cmd.salle) + ' - ' + (cmd.couverts || '?') + ' couv.');
   d.t('Serveur : ' + nomUser(cmd.serveurId) + '   ' + heure(now()));
+  if (cmd.note) d.bold(1).t('NOTE : ' + cmd.note).bold(0);
   d.line();
   const suites = [...new Set(lignes.map(l => l.suite || 0))].sort((a, b) => a - b);
   for (const s of suites) {
@@ -284,13 +335,21 @@ function creerBons(c, lignes, type) {
       db.seq.bon++;
       db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste, ts: now(), suite: s, type: type || 'commande',
         etat: s > (c.suite || 0) && s > 0 ? 'attente' : 'a_faire',
-        lignes: ls.filter(l => (l.suite || 0) === s).map(l => ({ id: l.id, qte: l.qte, nom: l.nom, opts: (l.opts || []).map(o => o.nom), note: l.note })) });
+        lignes: ls.filter(l => (l.suite || 0) === s).map(l => ({ id: l.id, qte: l.qte, nom: l.nom, opts: (l.opts || []).map(o => o.nom), note: l.note, emporter: !!l.emporter })) });
     }
   }
 }
 function enteteTicket(d) {
   const c = db.config;
-  d.center(1).size(2).bold(1).t(c.nom.toUpperCase()).size(0).bold(0).t(c.adresse).t('Tel ' + c.tel).center(0).line();
+  d.center(1);
+  if (c.logoTicket !== false && LOGO) d.logo().t(''); else d.size(2).bold(1).t(c.nom.toUpperCase()).size(0).bold(0);
+  d.t(c.adresse).t('Tel ' + c.tel).center(0).line();
+}
+function piedTicket(d) {
+  const c = db.config;
+  d.line().center(1).bold(1).t(c.piedTicket).bold(0);
+  if (c.qrLien) { d.t(''); d.qr(c.qrLien); if (c.qrTexte) d.t(c.qrTexte); }
+  d.center(0);
 }
 function lignesTicket(d, lignes, sansPayees) {
   const grp = {};
@@ -305,7 +364,8 @@ function ticketDoc(tk, duplicata) {
   enteteTicket(d);
   if (duplicata) d.center(1).bold(1).t('*** DUPLICATA ***').bold(0).center(0);
   d.t('Ticket n° ' + tk.num + '   ' + dateH(tk.ts));
-  d.t(salleNom(tk.salle) + ' - Table ' + tk.table + ' - ' + (tk.couverts || 1) + ' couv.');
+  if (tk.salle === 'emporter') d.bold(1).t('A EMPORTER ' + tk.table + (tk.client && tk.client.nom ? ' - ' + tk.client.nom : '')).bold(0);
+  else d.t(salleNom(tk.salle) + ' - Table ' + tk.table + ' - ' + (tk.couverts || 1) + ' couv.');
   d.t('Serveur : ' + tk.serveur + '   Caisse : ' + tk.caissier);
   d.line();
   lignesTicket(d, tk.lignes);
@@ -316,7 +376,7 @@ function ticketDoc(tk, duplicata) {
   if (tk.mode === 'offert') d.t('Offert - ' + (tk.motif || ''));
   else for (const p of paiementsDe(tk)) d.lr(MODES[p.mode] + (p.mode === 'societe' ? ' ' + p.societe : '') + (p.reference ? ' n° ' + p.reference : ''), fmt(p.montant) + ' DA');
   if (tk.recu && tk.rendu > 0) { d.lr('Espèces reçues', fmt(tk.recu) + ' DA'); d.lr('Rendu', fmt(tk.rendu) + ' DA'); }
-  d.line().center(1).t(db.config.piedTicket).center(0);
+  piedTicket(d);
   d.cut();
   return d;
 }
@@ -324,7 +384,7 @@ function additionDoc(cmd) {
   const d = new Doc();
   enteteTicket(d);
   d.center(1).bold(1).t('ADDITION').bold(0).center(0);
-  d.t(salleNom(cmd.salle) + ' - Table ' + cmd.table + '   ' + dateH(now()));
+  d.t((cmd.salle === 'emporter' ? 'A emporter ' + cmd.table + (cmd.client && cmd.client.nom ? ' - ' + cmd.client.nom : '') : salleNom(cmd.salle) + ' - Table ' + cmd.table) + '   ' + dateH(now()));
   d.t('Serveur : ' + nomUser(cmd.serveurId));
   d.line();
   lignesTicket(d, cmd.lignes, true);
@@ -332,7 +392,8 @@ function additionDoc(cmd) {
   if (cmd.lignes.some(l => l.paye)) d.t('(articles déjà réglés non repris)');
   d.size(2).bold(1).lr('TOTAL', fmt(totalCmd(cmd)) + ' DA', Math.floor(d.w / 2)).size(0).bold(0);
   if (cmd.couverts > 1) d.lr('Soit par personne (' + cmd.couverts + ')', fmt(totalCmd(cmd) / cmd.couverts) + ' DA');
-  d.line().center(1).t('Ceci n\'est pas un ticket de caisse').center(0);
+  d.center(1).t('Ceci n\'est pas un ticket de caisse').center(0);
+  piedTicket(d);
   d.cut();
   return d;
 }
@@ -471,7 +532,7 @@ function topVentes() {
 function bonsKds(poste) {
   const lim = now() - 20 * 60000;
   return db.bons.filter(b => (poste === 'tous' || b.poste === poste) && (b.etat === 'a_faire' || b.etat === 'attente' || (b.etat === 'pret' && b.pretTs > lim)))
-    .map(b => { const c = db.commandes[b.cmdId]; return { ...b, table: c ? c.table : b.table, salle: salleNom(c ? c.salle : b.salle), serveur: nomUser(b.serveurId), couverts: c ? c.couverts : '' }; });
+    .map(b => { const c = db.commandes[b.cmdId] || {}; return { ...b, table: c.table || b.table, emporter: (c.salle || b.salle) === 'emporter', client: c.client || null, retrait: c.retrait || null, note: c.note || '', salle: salleNom(c.salle || b.salle), serveur: nomUser(b.serveurId), couverts: c.couverts || '' }; });
 }
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
@@ -489,13 +550,17 @@ const routes = {
 
   'POST /api/commande/ouvrir': (b, u) => {
     if (u.role === 'cuisine') E('Non autorisé', 403);
-    const salle = b.salle, table = String(b.table || '');
+    const salle = b.salle;
+    let table = String(b.table || '');
+    // numéro du jour pour les commandes à emporter : E1, E2…
+    if (salle === 'emporter') { const jj = jourCourant(true); table = 'E' + (Object.values(db.commandes).filter(x => x.salle === 'emporter' && x.jour === jj.id).length + 1); }
     if (!table) E('Table manquante');
     const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
     if (ex) return ex;
     const j = jourCourant(true);
     db.seq.cmd++;
-    const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null };
+    const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };
+    if (salle === 'emporter') { c.client = { nom: String(b.client && b.client.nom || '').slice(0, 40), tel: String(b.client && b.client.tel || '').slice(0, 20) }; c.retrait = +b.retrait || null; }
     db.commandes[c.id] = c;
     journal(u, 'ouverture table', salleNom(salle) + ' ' + table);
     save();
@@ -526,7 +591,7 @@ const routes = {
       }
       const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
       db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 80), envoye: now(), par: u.id, annule: null, offert: false });
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
     }
     if (!nouvelles.length) E('Rien à envoyer');
     for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
@@ -563,7 +628,7 @@ const routes = {
       if (!lp.length) continue;
       const d = new Doc();
       d.center(1).size(2).bold(1).t('RÉCLAME').t(SUITES[s].toUpperCase()).size(0).bold(0).center(0).line('=');
-      d.size(2).bold(1).t('TABLE ' + c.table).size(0).bold(0).t(salleNom(c.salle) + '   ' + heure(now()) + '   ' + nomUser(c.serveurId)).line();
+      d.size(2).bold(1).t(titreCmd(c)).size(0).bold(0).t(salleNom(c.salle) + '   ' + heure(now()) + '   ' + nomUser(c.serveurId)).line();
       for (const l of lp) lignesBon(d, l);
       d.line().cut();
       const r = await imprimer(poste, d);
@@ -584,7 +649,7 @@ const routes = {
       db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: u.id, poste, ts: now(), suite: 0, type: 'message', etat: 'a_faire', lignes: [{ qte: '', nom: texte, opts: [], note: '' }] });
       const d = new Doc();
       d.center(1).size(2).bold(1).t('MESSAGE').size(0).bold(0).center(0).line('=');
-      d.size(2).bold(1).t('TABLE ' + c.table).size(0).bold(0).t(nomUser(u.id) + '   ' + heure(now())).line();
+      d.size(2).bold(1).t(titreCmd(c)).size(0).bold(0).t(nomUser(u.id) + '   ' + heure(now())).line();
       d.size(3).bold(1).t(texte).size(0).bold(0).line().cut();
       const r = await imprimer(poste, d); if (!r.ok) erreurs.push(r.erreur);
     }
@@ -677,6 +742,9 @@ const routes = {
       c.salle = b.salle; c.table = t;
     }
     if (b.serveurId && peut(u, 'caissier')) c.serveurId = b.serveurId;
+    if (b.note !== undefined) c.note = String(b.note).slice(0, 160);
+    if (b.client) c.client = { nom: String(b.client.nom || '').slice(0, 40), tel: String(b.client.tel || '').slice(0, 20) };
+    if (b.retrait !== undefined) c.retrait = +b.retrait || null;
     save();
     return c;
   },
@@ -744,6 +812,7 @@ const routes = {
     for (const l of lignes) l.paye = db.seq.ticket;
     const partiel = restantes().length > 0;
     const tk = {
+      client: c.client || null,
       num: db.seq.ticket, cmdId: c.id, jour: j.id, date: j.date, ts: now(), salle: c.salle, table: c.table, couverts: partiel ? 0 : c.couverts,
       serveur: nomUser(c.serveurId), serveurId: c.serveurId, caissier: u.nom, lignes: lignes.map(l => ({ ...l })), total, remise: offert ? 0 : remise, net,
       mode, paiements, societe: paiements.filter(p => p.mode === 'societe').map(p => p.societe).join(', '), reference: paiements.map(p => p.reference).filter(Boolean).join(', '),
@@ -931,7 +1000,7 @@ const routes = {
     if (!Array.isArray(b.categories) || !Array.isArray(b.produits)) E('Données invalides');
     if (Array.isArray(b.options)) db.options = b.options.filter(g => g.nom && Array.isArray(g.choix)).map((g, i) => ({ id: g.id || ('o' + now() + i), nom: String(g.nom).slice(0, 30), obligatoire: !!g.obligatoire, multiple: !!g.multiple, choix: g.choix.filter(ch => ch.nom).map(ch => ({ nom: String(ch.nom).slice(0, 30), prix: Math.max(0, Math.round(+ch.prix || 0)) })) }));
     const gids = new Set(db.options.map(g => g.id));
-    db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), ordre: i }));
+    db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), univers: String(c.univers || 'La carte').slice(0, 20), ordre: i }));
     db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0) }));
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
@@ -939,7 +1008,7 @@ const routes = {
   },
   'POST /api/admin/config': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
-    const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation'];
+    const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation', 'commentaires', 'commentairesCommande', 'qrLien', 'qrTexte', 'logoTicket'];
     for (const k of keep) if (b[k] !== undefined) db.config[k] = b[k];
     if (!db.config.imprimantes.ticket) db.config.imprimantes.ticket = IMPRIMANTES().ticket;
     if (!postesBons().length) db.config.imprimantes.cuisine = IMPRIMANTES().cuisine;
@@ -952,8 +1021,11 @@ const routes = {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const p = db.config.imprimantes[b.poste]; if (!p) E('Imprimante inconnue');
     const d = new Doc();
+    if (b.poste === 'ticket') enteteTicket(d);
     d.center(1).size(2).bold(1).t('TEST').size(0).bold(0).t(p.nom).t(dateH(now())).t('Accents : é è à ç ô œ ù').center(0).line();
-    d.lr('Gauche', 'Droite').cut();
+    d.lr('Gauche', 'Droite');
+    if (b.poste === 'ticket') piedTicket(d);
+    d.cut();
     if (b.poste === 'ticket' && b.tiroir) d.drawer();
     const r = await imprimer(b.poste, d);
     return r;

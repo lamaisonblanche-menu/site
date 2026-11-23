@@ -1,15 +1,19 @@
 {
- "version": "3.1.1",
- "date": "2026-11-23T13:48:55.028Z",
- "notes": "Test du canal de mises à jour",
+ "version": "3.2.0",
+ "date": "2026-11-23T14:14:12.496Z",
+ "notes": "Nouvelle prise de commande, encaissement rapide en espèces, commentaires, à emporter, logo et QR code sur les tickets",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "6dc3b2dc3139b7d421b6fc26a7f853389a9b035ea4f2e9047b9516050dd6ac73"
+   "sha256": "33bdaf9e2d6bcbde2e4e613e865e403f8fe21fc621078d34c30b0bdc7f68d903"
+  },
+  {
+   "chemin": "logo-ticket.bin",
+   "sha256": "18c8c4bc4dd3b9b19e17335491d463379b76f83aaf2a1aa3c321789bcdd9d9f3"
   },
   {
    "chemin": "public/app.js",
-   "sha256": "482fb251340878e97cb15f57d7adc68ba8e7ec38c21b23f7e96e3aacd041bf53"
+   "sha256": "8111d68f993dbfcdf03512b4791f69793b09886bdef2aeb018471125a133351e"
   },
   {
    "chemin": "public/index.html",
@@ -25,7 +29,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "ab29d745298e902151a9dda0ac06e392e9a044c2121ae022049bd12f759b1706"
+   "sha256": "afa3c58d12c70b8a071d90848ce3b456c25b8e0a15a3ed1b3babd3ebd39467ba"
   },
   {
    "chemin": "seed-menu.json",
@@ -33,7 +37,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "8a42e5a237f5e151291dc16d7f592a4253020f8ad7c7eb829b908aba1710ab17"
+   "sha256": "1f1acb9bc660c98a927c5459189b641e014a73989e391e114f183a050bb093c7"
   }
  ]
 }

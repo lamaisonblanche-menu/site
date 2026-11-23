@@ -230,19 +230,23 @@ window.addEventListener('resize', fitPlans);
 
 function viewTables() {
   const cfg = S.etat.config;
-  if (S.salle !== 'comptoir' && !cfg.salles.find(s => s.id === S.salle)) S.salle = cfg.salles[0].id;
+  if (S.salle !== 'emporter' && !cfg.salles.find(s => s.id === S.salle)) S.salle = cfg.salles[0].id;
   const salle = cfg.salles.find(s => s.id === S.salle);
-  const comptoir = cmdsSalle('comptoir');
+  const emp = S.etat.commandes.filter(c => c.salle === 'emporter' || c.salle === 'comptoir').sort((a, b) => (a.retrait || a.ouverte) - (b.retrait || b.ouverte));
   const tabs = cfg.salles.map(s => { const n = cmdsSalle(s.id).length; return `<button class="tab ${s.id === S.salle ? 'on' : ''}" onclick="A.salle('${s.id}')">${esc(s.nom)}${n ? `<span class="n">${n}</span>` : ''}</button>`; }).join('')
-    + (comptoir.length || peut('caissier') ? `<button class="tab ${S.salle === 'comptoir' ? 'on' : ''}" onclick="A.salle('comptoir')">Comptoir${comptoir.length ? `<span class="n">${comptoir.length}</span>` : ''}</button>` : '');
+    + `<button class="tab ${S.salle === 'emporter' ? 'on' : ''}" onclick="A.salle('emporter')">🥡 À emporter${emp.length ? `<span class="n">${emp.length}</span>` : ''}</button>`;
   let body;
-  if (S.salle === 'comptoir') {
-    body = `<div class="main"><div class="tables">${comptoir.map(c => `<button class="tbl occ" onclick="A.voir('${c.id}')"><span class="t">${esc(c.table)}</span><span class="m num">${da(totalCmd(c))}</span><span class="s">${hm(c.ouverte)}</span></button>`).join('')}
-      ${peut('caissier') ? `<button class="tbl" onclick="A.comptoir()"><span class="t">+</span><span class="s">Vente comptoir / à emporter</span></button>` : ''}</div></div>`;
+  if (S.salle === 'emporter') {
+    body = `<div class="main"><div class="row" style="margin-bottom:14px"><button class="btn dark big" onclick="A.nouvelEmporter()">+ Nouvelle commande à emporter</button>${peut('caissier') ? '<button class="btn big" onclick="A.comptoir()">+ Vente rapide au comptoir</button>' : ''}</div>
+      <div class="emps">${emp.map(c => { const pret = S.etat.prets.some(p => p.cmdId === c.id); const retard = c.retrait && c.retrait < Date.now(); return `<button class="empc ${pret ? 'pret' : ''} ${retard ? 'retard' : ''}" onclick="A.voir('${c.id}')">
+        <div class="et"><b>${c.salle === 'comptoir' ? 'Comptoir' : esc(c.table)}</b>${pret ? '<span>🔔 prêt</span>' : ''}</div>
+        <div class="en">${c.salle === 'emporter' ? esc((c.client && c.client.nom) || 'Client') : 'Vente rapide'}${c.client && c.client.tel ? ' · ' + esc(c.client.tel) : ''}</div>
+        <div class="er">${c.salle === 'emporter' ? 'Retrait ' + (c.retrait ? hm(c.retrait) : 'dès que possible') : 'depuis ' + hm(c.ouverte)}</div>
+        <div class="em num">${da(totalCmd(c))}</div></button>`; }).join('') || '<p class="muted">Aucune commande à emporter en cours.</p>'}</div></div>`;
   } else body = planHtml(salle);
-  const occ = S.salle === 'comptoir' ? comptoir.length : cmdsSalle(S.salle).length;
+  const occ = S.salle === 'emporter' ? emp.length : cmdsSalle(S.salle).length;
   return topbar() + `<div class="tbar"><div class="tabs">${tabs}</div>
-    <div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span>🔔 Prêt en cuisine</span><span>⏸ Suite à réclamer</span><b>${occ} table${occ > 1 ? 's' : ''} en cours</b></div></div>${body}`;
+    ${S.salle === 'emporter' ? '' : `<div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span>🔔 Prêt</span><span>⏸ Suite à réclamer</span><b>${occ} en cours</b></div>`}</div>${body}`;
 }
 
 // ------------------------------------------------------------ Commande (écran type FrontCash)
@@ -253,66 +257,109 @@ const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x =>
 const prixDraft = d => (prod(d.pid).prix || 0) + optsDe(d).reduce((s, o) => s + o.prix, 0);
 const suiteDraft = d => d.suite != null ? d.suite : (catDe(prod(d.pid)).suite || 0);
 const optsTxt = os => os.length ? `<small class="o">${os.map(o => esc(o.nom) + (o.prix ? ' +' + fmt(o.prix) : '')).join(' · ')}</small>` : '';
+const titreCmd = c => c.salle === 'emporter' ? 'À emporter ' + c.table : c.salle === 'comptoir' ? 'Comptoir' : 'Table ' + c.table;
+function universListe() { const u = []; for (const k of S.etat.categories) { const x = k.univers || 'La carte'; if (!u.includes(x)) u.push(x); } return u; }
+const SUITE_NOM = s => s === 0 ? 'Direct' : SUITES[s];
+
+// ------------------------------------------------------------ Prise de commande
 function viewCommande() {
   const c = cmd();
   if (!c) { S.view = 'tables'; return viewTables(); }
-  const cats = S.etat.categories;
+  const caisse = peut('caissier');
+  const univs = universListe();
   const top = (S.etat.top || []).filter(id => S.etat.produits.some(p => p.id === id && p.actif));
-  if (!S.cat || (S.cat !== '__top' && !cats.find(k => k.id === S.cat)) || (S.cat === '__top' && !top.length)) S.cat = top.length ? '__top' : cats[0] && cats[0].id;
-  const grpHtml = (top.length ? `<button class="g fav ${S.cat === '__top' && !S.search ? 'on' : ''}" style="--c:#fff3c4" onclick="A.cat('__top')">★ Les plus vendus</button>` : '')
-    + cats.map(k => `<button class="g ${k.id === S.cat && !S.search ? 'on' : ''}" style="--c:${k.couleur || '#eee'}" onclick="A.cat('${k.id}')">${esc(k.nom)}</button>`).join('');
-  const q = S.search.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const prods = q ? S.etat.produits.filter(p => p.actif && p.nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q))
-    : S.cat === '__top' ? top.map(prod) : S.etat.produits.filter(p => p.actif && p.cat === S.cat);
+  if (!S.univ || (S.univ !== '★' && !univs.includes(S.univ)) || (S.univ === '★' && !top.length)) S.univ = top.length ? '★' : univs[0];
   const qd = {}; S.draft.forEach(d => (qd[d.pid] = (qd[d.pid] || 0) + d.qte));
-  const artHtml = prods.map(p => {
-    const ep = p.stock === 0;
-    return `<button class="a ${ep ? 'ep' : ''}" style="--c:${catDe(p).couleur || '#eee'}" onclick="A.add('${p.id}')">${qd[p.id] ? `<span class="q">${qd[p.id]}</span>` : ''}<span class="an">${esc(p.nom)}</span><span class="ap num">${ep ? 'ÉPUISÉ' : fmt(p.prix)}</span>${p.stock > 0 ? `<span class="st">reste ${p.stock}</span>` : ''}${(p.options || []).length ? '<span class="op">…</span>' : ''}</button>`;
-  }).join('') || '<p class="muted" style="padding:10px">Aucun article.</p>';
+  const tile = p => `<button class="pt ${p.stock === 0 ? 'ep' : ''} ${qd[p.id] ? 'has' : ''}" data-pid="${p.id}" style="--c:${catDe(p).couleur || '#eee'}">
+      <span class="pn">${esc(p.nom)}</span><span class="pp num">${p.stock === 0 ? 'ÉPUISÉ' : fmt(p.prix)}</span>
+      ${qd[p.id] ? `<span class="q">${qd[p.id]}</span>` : ''}${p.stock > 0 ? `<span class="st">reste ${p.stock}</span>` : ''}${(p.options || []).length ? '<span class="op" title="Options">⚙</span>' : ''}</button>`;
+  const q = S.search.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  let cat;
+  if (q) {
+    const r = S.etat.produits.filter(p => p.actif && p.nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q));
+    cat = `<section><h4>Résultats pour « ${esc(S.search)} »</h4><div class="pg">${r.map(tile).join('') || '<p class="muted">Aucun article.</p>'}</div></section>`;
+  } else if (S.univ === '★') {
+    cat = `<section><h4 style="--c:#e9c46a">★ Les plus vendus (30 derniers jours)</h4><div class="pg">${top.map(prod).map(tile).join('')}</div></section>`;
+  } else {
+    const cats = S.etat.categories.filter(k => (k.univers || 'La carte') === S.univ);
+    cat = (cats.length > 1 ? `<div class="jump">${cats.map(k => `<button style="--c:${k.couleur}" onclick="A.saut('${k.id}')">${esc(k.nom)}</button>`).join('')}</div>` : '')
+      + cats.map(k => { const ps = S.etat.produits.filter(p => p.actif && p.cat === k.id); return ps.length ? `<section id="sec-${k.id}"><h4 style="--c:${k.couleur}">${esc(k.nom)}</h4><div class="pg">${ps.map(tile).join('')}</div></section>` : ''; }).join('');
+  }
 
-  const sel = S.sel;
-  const suiteTag = (s, att) => s ? `<span class="su ${att ? 'att' : ''}">${SUITES[s]}${att ? ' · attente' : ''}</span>` : '';
-  const sentHtml = c.lignes.map(l => `<tr class="${l.annule ? 'cancel' : ''} ${l.offert ? 'off' : ''} ${l.paye ? 'paid' : ''} ${sel && sel.t === 's' && sel.id === l.id ? 'sel' : ''}" onclick="A.selS('${l.id}')">
-      <td class="lq">${l.qte}</td><td class="lx">${esc(l.nom)} ${!l.annule && !l.paye ? suiteTag(l.suite, l.suite > (c.suite || 0)) : ''}${optsTxt(l.opts || [])}${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.annule ? `<small>Annulé : ${esc(l.annule.motif)}</small>` : ''}${l.paye ? '<small class="ok">Payé · ticket ' + l.paye + '</small>' : ''}</td>
-      <td class="lp num">${l.offert ? 'offert' : fmt(l.qte * l.prix)}</td></tr>`).join('');
-  const draftHtml = S.draft.map((d, i) => { const p = prod(d.pid); return `<tr class="new ${sel && sel.t === 'd' && sel.i === i ? 'sel' : ''}" onclick="A.selD(${i})"><td class="lq">${d.qte}</td><td class="lx">${esc(p.nom)} ${suiteTag(suiteDraft(d))}${optsTxt(optsDe(d))}${d.note ? `<small>${esc(d.note)}</small>` : ''}</td><td class="lp num">${fmt(d.qte * prixDraft(d))}</td></tr>`; }).join('');
+  // ---- ticket, rangé par suite (direct, entrées, plats, desserts)
+  const items = c.lignes.map(l => ({ s: l.suite || 0, sent: true, l })).concat(S.draft.map((d, i) => ({ s: suiteDraft(d), sent: false, d, i })));
+  const suites = [...new Set(items.map(x => x.s))].sort((a, b) => a - b);
+  const ligneS = l => `<div class="tl s ${l.annule ? 'cancel' : ''} ${l.paye ? 'paid' : ''} ${l.offert ? 'off' : ''}" onclick="A.ligneEnvoyee('${l.id}')">
+      <span class="tq">${l.qte}</span><span class="tn">${esc(l.nom)}${l.emporter && c.salle !== 'emporter' ? ' <span class="emp">🥡</span>' : ''}${optsTxt(l.opts || [])}${l.note ? `<small class="n">${esc(l.note)}</small>` : ''}${l.annule ? `<small class="n">Annulé : ${esc(l.annule.motif)}</small>` : ''}${l.paye ? `<small class="ok">Payé · ticket ${l.paye}</small>` : ''}</span>
+      <span class="tp num">${l.offert ? 'offert' : fmt(l.qte * l.prix)}</span><span class="tok">✓</span></div>`;
+  const ligneD = (d, i) => { const p = prod(d.pid); return `<div class="tl d ${S.flash === i ? 'flash' : ''}">
+      <button class="qb" onclick="A.dqte(${i},-1)">−</button><span class="tq">${d.qte}</span><button class="qb" onclick="A.dqte(${i},1)">+</button>
+      <span class="tn" onclick="A.feuille(${i})">${esc(p.nom)}${d.emporter && c.salle !== 'emporter' ? ' <span class="emp">🥡</span>' : ''}${optsTxt(optsDe(d))}${d.note ? `<small class="n">${esc(d.note)}</small>` : ''}</span><button class="qb ed" onclick="A.feuille(${i})" title="Cuisson, commentaire, à emporter, suite">✎</button>
+      <span class="tp num">${fmt(d.qte * prixDraft(d))}</span></div>`; };
+  const att = enAttente(c);
+  const blocs = suites.map(s => {
+    const xs = items.filter(x => x.s === s);
+    const attente = s > (c.suite || 0) && s > 0 && xs.some(x => x.sent && !x.l.annule && !x.l.paye);
+    return `${suites.length > 1 || attente ? `<div class="ts ${attente ? 'att' : ''}">${SUITE_NOM(s)}${attente ? ' · en attente' : ''}</div>` : ''}${xs.map(x => x.sent ? ligneS(x.l) : ligneD(x.d, x.i)).join('')}`;
+  }).join('');
   const totDraft = S.draft.reduce((s, d) => s + d.qte * prixDraft(d), 0);
   const total = totalCmd(c) + totDraft;
-  const serv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
-  const salleNom = c.salle === 'comptoir' ? 'Comptoir' : (S.etat.config.salles.find(s => s.id === c.salle) || {}).nom;
   const nbDraft = S.draft.reduce((s, d) => s + d.qte, 0);
-  const aPayer = c.lignes.some(l => !l.annule && !l.paye);
-  const caisse = peut('caissier');
-  const att = enAttente(c);
+  const aPayer = c.lignes.some(l => !l.annule && !l.paye) || S.draft.length;
+  const serv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
+  const salleNom = c.salle === 'comptoir' ? 'Comptoir' : c.salle === 'emporter' ? 'À emporter' : (S.etat.config.salles.find(s => s.id === c.salle) || {}).nom;
   const prochaine = att.length ? SUITES[Math.min(...att.map(l => l.suite))] : '';
   const prets = S.etat.prets.filter(p => p.cmdId === c.id);
 
-  const k = (lab, fn, cls = '', dis = false) => `<button class="k ${cls}" ${dis ? 'disabled' : ''} onclick="${fn}">${lab}</button>`;
-  return topbar() + `<div class="fc-h">
-      <div class="fc-tot">Total : <b class="num">${fmt(total)}</b> <small>DA</small></div>
-      <div class="fc-info"><span>${c.salle === 'comptoir' ? 'Comptoir' : 'Table <b>' + esc(c.table) + '</b>'}</span><span>${esc(salleNom)}</span><span>Couverts <b>${c.couverts}</b></span><span>${esc(serv)}</span><span>depuis ${hm(c.ouverte)}</span></div>
-      <button class="btn sm" onclick="A.go('tables')">← Tables</button></div>
-    ${prets.length ? `<div class="pret-ban">🔔 <b>Prêt</b> ${prets.map(p => esc(p.poste) + ' : ' + esc(p.lignes.join(', '))).join(' — ')}<button class="btn sm ok" onclick="A.servi()">C’est servi</button></div>` : ''}
-    <div class="fc">
-      <div class="fc-grp">${grpHtml}</div>
-      <div class="fc-art"><div class="search"><input placeholder="Rechercher un article…" value="${esc(S.search)}" oninput="A.search(this.value)" id="srch">${S.search ? '<button class="btn sm" onclick="A.search(\'\')">✕</button>' : ''}</div>${artHtml}</div>
-      <div class="fc-lines"><table><thead><tr><th class="lq">Qté</th><th>Article</th><th class="lp">Valeur</th></tr></thead>
-        <tbody>${sentHtml}${draftHtml}</tbody></table>
-        ${!c.lignes.length && !S.draft.length ? '<p class="muted" style="padding:14px">Touchez un groupe puis les articles. Pour en mettre plusieurs, tapez d’abord la quantité sur le pavé.</p>' : ''}</div>
-      <div class="fc-keys ${caisse ? '' : 'serv'}">
-        <div class="fc-np"><div class="npd">${S.qty ? '× ' + S.qty : (sel ? 'ligne choisie' : 'Quantité')}</div>
-          ${[7, 8, 9, 4, 5, 6, 1, 2, 3].map(n => `<button onclick="A.nq('${n}')">${n}</button>`).join('')}<button onclick="A.nq('0')">0</button><button onclick="A.nq('C')">C</button></div>
-        <div class="fc-act">
-          ${k('Commande' + (nbDraft ? ' (' + nbDraft + ')' : ''), 'A.envoyer()', 'gold big3', !S.draft.length)}
-          ${k(prochaine ? 'Réclamer<br><small>' + prochaine + '</small>' : 'Réclamer', 'A.reclamer()', att.length ? 'blue' : '', !att.length)}
-          ${k('Note', 'A.note()')}${k('Suite' + (sel && sel.t === 'd' ? '<br><small>' + SUITES[suiteDraft(S.draft[sel.i])] + '</small>' : ''), 'A.suite()')}
-          ${k('Annulation', 'A.annuler()', 'warn')}${k('Message', 'A.message()')}${k('Addition', 'A.addition()', '', !aPayer)}
-          ${k('Couverts', 'A.couverts()')}${k('Transfert', 'A.transfert()')}${k('Séparation', 'A.separer()', '', !caisse || !aPayer)}
-          ${k('Remise', 'A.encaisser(\'especes\',null,true)', '', !caisse || !aPayer)}${k('Rupture', 'A.ruptures()', '', !caisse)}${k('Options', 'A.plus()')}
-        </div>
-        ${caisse ? `<div class="fc-pay">${k('Espèces', 'A.encaisser(\'especes\')', 'p-esp', !aPayer)}${k('Chèque', 'A.encaisser(\'cheque\')', 'p-chq', !aPayer)}${k('TPE', 'A.encaisser(\'tpe\')', 'p-tpe', !aPayer)}${k('Facture', 'A.encaisser(\'societe\')', 'p-fac', !aPayer)}${k('Offert', 'A.encaisser(\'offert\')', 'p-off', !aPayer)}</div>` : ''}
+  return topbar() + `<div class="oc">
+    <div class="tk">
+      <div class="tk-h">
+        <button class="back" onclick="A.go('tables')">←</button>
+        <div class="grow"><div class="tk-t">${esc(titreCmd(c))}</div>
+          <div class="tk-s">${c.salle === 'emporter' ? '' : esc(salleNom) + ' · '}<button class="lk" onclick="A.couverts()">${c.couverts} couv.</button> · ${esc(serv)} · ${hm(c.ouverte)}</div></div>
+        <button class="ib ${c.note ? 'on' : ''}" onclick="A.noteCmd()" title="Note pour toute la commande">💬</button>
+        <button class="ib" onclick="A.menuCmd()" title="Plus d'actions">⋯</button>
       </div>
-    </div>`;
+      ${c.salle === 'emporter' ? `<div class="tk-b emp" onclick="A.infosEmporter()">🥡 <b>${esc((c.client && c.client.nom) || 'Client')}</b>${c.client && c.client.tel ? ' · ' + esc(c.client.tel) : ''} · retrait ${c.retrait ? hm(c.retrait) : 'dès que possible'} <span class="lk">modifier</span></div>` : ''}
+      ${c.note ? `<div class="tk-b note" onclick="A.noteCmd()">💬 ${esc(c.note)}</div>` : ''}
+      ${prets.length ? `<div class="tk-b pret">🔔 Prêt : ${prets.map(p => esc(p.lignes.join(', '))).join(' — ')}<button class="btn sm ok" onclick="A.servi()">Servi</button></div>` : ''}
+      ${att.length ? `<div class="tk-b wait">⏸ ${prochaine} en attente<button class="btn sm blue" onclick="A.reclamer()">Réclamer ${prochaine.toLowerCase()}</button></div>` : ''}
+      <div class="tk-l">${blocs || '<div class="vide">Touchez les plats à droite pour les ajouter.<br><small>Appui long sur un plat = commentaire, à emporter, suite…</small></div>'}</div>
+      <div class="tk-f">
+        <div class="tk-tot"><span>Total</span><b class="num">${fmt(total)} <small>DA</small></b></div>
+        <div class="tk-a">
+          <button class="b-env" onclick="A.envoyer()" ${S.draft.length ? '' : 'disabled'}>Envoyer${nbDraft ? ' <span>' + nbDraft + '</span>' : ''}</button>
+          ${caisse ? `<button class="b-cash" onclick="A.payer()" ${aPayer ? '' : 'disabled'}>Encaisser</button>` : `<button class="b-add" onclick="A.addition()" ${c.lignes.some(l => !l.annule && !l.paye) ? '' : 'disabled'}>🧾 Addition</button>`}
+        </div>
+      </div>
+    </div>
+    <div class="ca">
+      <div class="ca-h"><div class="srch"><input placeholder="🔍 Rechercher un plat…" value="${esc(S.search)}" oninput="A.search(this.value)" id="srch">${S.search ? '<button onclick="A.search(\'\')">✕</button>' : ''}</div></div>
+      <div class="uv">${top.length ? `<button class="${S.univ === '★' && !q ? 'on' : ''}" onclick="A.univ('★')">★ Top</button>` : ''}${univs.map(u => `<button class="${S.univ === u && !q ? 'on' : ''}" onclick="A.univ('${jsq(u)}')">${esc(u)}</button>`).join('')}</div>
+      <div class="cat" id="cat">${cat}</div>
+    </div>
+  </div>`;
+}
+
+// ---- appui court = ajouter, appui long = ajouter avec commentaire / options
+let lp = null;
+document.addEventListener('pointerdown', e => {
+  const t = e.target.closest('.pt[data-pid]'); if (!t || S.view !== 'commande') return;
+  lp = { pid: t.dataset.pid, fired: false, x: e.clientX, y: e.clientY, tm: setTimeout(() => { lp.fired = true; A.add(lp.pid, true); }, 480) };
+});
+document.addEventListener('pointermove', e => { if (lp && Math.abs(e.clientX - lp.x) + Math.abs(e.clientY - lp.y) > 12) { clearTimeout(lp.tm); lp.cancel = true; } });
+document.addEventListener('pointerup', e => {
+  if (!lp) return; clearTimeout(lp.tm);
+  const t = e.target.closest('.pt[data-pid]');
+  if (!lp.fired && !lp.cancel && t && t.dataset.pid === lp.pid) A.add(lp.pid);
+  lp = null;
+});
+document.addEventListener('contextmenu', e => { if (e.target.closest('.pt')) e.preventDefault(); });
+
+// ---- petit clavier à l'écran (écrans tactiles sans clavier)
+function clavier(id) {
+  const rangs = ['1234567890', 'azertyuiop', 'qsdfghjklm', 'wxcvbn\'-,.', 'éèàçù'];
+  return `<div class="kb">${rangs.map(r => `<div>${[...r].map(k => `<button onclick="A.kb('${id}','${k === "'" ? "\\'" : k}')">${k}</button>`).join('')}${r.startsWith('w') ? `<button class="w2" onclick="A.kb('${id}','⌫')">⌫</button>` : ''}</div>`).join('')}<div><button class="sp" onclick="A.kb('${id}',' ')">espace</button><button class="w2" onclick="A.kb('${id}','C')">Effacer</button></div></div>`;
 }
 
 // ------------------------------------------------------------ Écran cuisine
@@ -328,11 +375,13 @@ function viewKds() {
     const m = Math.floor((Date.now() - b.ts) / 60000);
     const lvl = b.etat === 'attente' ? 'att' : b.etat === 'pret' ? 'ok' : m >= 20 ? 'r' : m >= 10 ? 'o' : 'v';
     return `<div class="kc k-${lvl} t-${b.type}">
-      <div class="kh"><b>${b.type === 'message' ? '✉ ' : b.type === 'annulation' ? '✕ ' : ''}Table ${esc(b.table)}</b><span class="kt">${b.etat === 'pret' ? 'prêt ' + hm(b.pretTs) : m + ' min'}</span></div>
+      <div class="kh"><b>${b.type === 'message' ? '✉ ' : b.type === 'annulation' ? '✕ ' : ''}${b.emporter ? '🥡 ' + esc(b.table) + (b.client && b.client.nom ? ' ' + esc(b.client.nom) : '') : 'Table ' + esc(b.table)}</b><span class="kt">${b.etat === 'pret' ? 'prêt ' + hm(b.pretTs) : m + ' min'}</span></div>
       <div class="ks">${esc(b.salle)} · ${esc(b.serveur)}${b.couverts ? ' · ' + b.couverts + ' couv.' : ''}${S.kdsPoste === 'tous' ? ' · ' + esc(nomP(b.poste)) : ''}</div>
       ${b.type === 'commande' && b.suite ? `<div class="ksu">${b.reclame ? 'RÉCLAMÉ · ' : ''}${SUITES[b.suite]}${b.etat === 'attente' ? ' · attendre la réclame' : ''}</div>` : ''}
       ${b.type === 'annulation' ? '<div class="ksu bad">ANNULATION</div>' : ''}
-      <ul>${b.lignes.map(l => `<li><b>${l.qte}</b> ${esc(l.nom)}${(l.opts || []).map(o => `<i>+ ${esc(o)}</i>`).join('')}${l.note ? `<em>${esc(l.note)}</em>` : ''}</li>`).join('')}</ul>
+      ${b.emporter ? `<div class="ksu emp">À EMPORTER · retrait ${b.retrait ? hm(b.retrait) : 'dès que possible'}</div>` : ''}
+      ${b.note ? `<div class="knote">💬 ${esc(b.note)}</div>` : ''}
+      <ul>${b.lignes.map(l => `<li><b>${l.qte}</b> ${esc(l.nom)}${(l.opts || []).map(o => `<i>+ ${esc(o)}</i>`).join('')}${l.emporter && !b.emporter ? '<i class="emp">🥡 à emporter</i>' : ''}${l.note ? `<em>${esc(l.note)}</em>` : ''}</li>`).join('')}</ul>
       ${b.etat === 'a_faire' ? `<button class="kbtn" onclick="A.kPret('${b.id}')">${b.type === 'commande' ? 'PRÊT' : 'VU'}</button>` : b.etat === 'pret' ? `<button class="kbtn ghost" onclick="A.kRappel('${b.id}')">Rappeler</button>` : ''}
     </div>`;
   };
@@ -466,9 +515,11 @@ function admCarte() {
       <div class="chips">${g.choix.map((ch, ci) => `<span class="ch"><input value="${esc(ch.nom)}" onchange="A.chset(${gi},${ci},'nom',this.value)"><input type="number" value="${ch.prix}" title="Supplément (DA)" onchange="A.chset(${gi},${ci},'prix',+this.value)"><button onclick="A.delCh(${gi},${ci})">✕</button></span>`).join('')}<button class="chip" onclick="A.addCh(${gi})">+ choix</button></div>
       <p class="muted" style="font-size:13px;margin:0">Utilisé par : ${C.produits.filter(p => (p.options || []).includes(g.id)).map(p => esc(p.nom)).join(', ') || 'aucun plat (cochez-le sur les plats ci-dessous)'}</p></div>`).join('') || '<p class="muted">Aucune option.</p>'}</div>`;
   return `<div class="row" style="margin-bottom:12px"><p class="muted grow">Chaque groupe a sa couleur, son imprimante et sa <b>suite</b> (Direct = part tout de suite, Entrées, Plats, Desserts : les plats attendent que le serveur « réclame »). Stock vide = illimité.</p><button class="btn" onclick="A.addCat()">+ Groupe</button><button class="btn dark" onclick="A.saveCarte()">Enregistrer la carte</button></div>
+  <datalist id="univs">${[...new Set(C.categories.map(k => k.univers).filter(Boolean))].map(u => `<option value="${esc(u)}">`).join('')}</datalist>
   ${optHtml}
   ${C.categories.map((k, ci) => `<div class="panel" style="border-left:8px solid ${k.couleur}"><h3><input value="${esc(k.nom)}" onchange="A.cset(${ci},'nom',this.value)" class="hin">
     <input type="color" value="${k.couleur || '#efe3cc'}" onchange="A.cset(${ci},'couleur',this.value);A.rr()" class="col" title="Couleur du bouton">
+    <input list="univs" value="${esc(k.univers || '')}" onchange="A.cset(${ci},'univers',this.value)" class="hsel" style="width:130px" title="Onglet de la prise de commande" placeholder="Onglet">
     <select onchange="A.cset(${ci},'poste',this.value)" class="hsel">${postes().map(([pk, p]) => `<option value="${pk}" ${k.poste === pk ? 'selected' : ''}>→ ${esc(p.nom)}</option>`).join('')}</select>
     <select onchange="A.cset(${ci},'suite',+this.value)" class="hsel">${SUITES.slice(0, 4).map((n, i) => `<option value="${i}" ${(k.suite || 0) === i ? 'selected' : ''}>${n}</option>`).join('')}</select>
     <button class="btn sm" onclick="A.addProd('${k.id}')">+ Article</button><button class="btn sm ghost" onclick="A.mvCat(${ci},-1)">↑</button><button class="btn sm ghost" onclick="A.mvCat(${ci},1)">↓</button></h3>
@@ -597,6 +648,13 @@ function admReglages() {
     <div class="field"><label>Motifs de sortie de caisse (un par ligne)</label><textarea onchange="adm.cfg.motifsSortie=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(c.motifsSortie.join('\n'))}</textarea></div>
     <div class="field"><label>Motifs d’annulation (un par ligne)</label><textarea onchange="adm.cfg.motifsAnnulation=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(c.motifsAnnulation.join('\n'))}</textarea></div>
     <div class="field"><label>Sociétés clientes (sur facture, une par ligne)</label><textarea onchange="adm.cfg.societes=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc(c.societes.join('\n'))}</textarea></div></div></div>
+  <div class="cols"><div class="panel"><h3>Commentaires rapides des plats</h3><p class="muted">Proposés quand le serveur touche un plat (un par ligne).</p><textarea style="min-height:220px;width:100%" onchange="adm.cfg.commentaires=this.value.split('\n').map(s=>s.trim()).filter(Boolean)">${esc((c.commentaires || []).join('\n'))}</textarea></div>
+  <div class="panel"><h3>Notes de commande</h3><p class="muted">Pour toute la table, imprimées en haut des bons (une par ligne).</p><textarea style="min-height:220px;width:100%" onchange="adm.cfg.commentairesCommande=this.value.split('\n').map(s=>s.trim()).filter(Boolean)">${esc((c.commentairesCommande || []).join('\n'))}</textarea></div></div>
+  <div class="panel"><h3>Ticket de caisse</h3>
+    <label class="chk"><input type="checkbox" ${c.logoTicket !== false ? 'checked' : ''} onchange="adm.cfg.logoTicket=this.checked"> Imprimer le logo de La Maison Blanche en haut du ticket</label>
+    <div class="field"><label>Lien du QR code imprimé en bas du ticket et de l’addition (vide = pas de QR code)</label><input value="${esc(c.qrLien || '')}" onchange="adm.cfg.qrLien=this.value.trim()"></div>
+    <div class="field"><label>Texte sous le QR code</label><input value="${esc(c.qrTexte || '')}" onchange="adm.cfg.qrTexte=this.value"></div>
+    <button class="btn" onclick="A.testPrint('ticket')">Imprimer un ticket d’essai</button></div>
   <div class="panel"><h3>Application et mises à jour</h3>${admApp()}</div>
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
@@ -671,7 +729,7 @@ const A = window.A = {
     A.ok = () => act(async () => { const c = await api('/api/commande/ouvrir', { salle: S.salle, table: t, couverts: n }); closeModal(); if (!S.etat.commandes.find(x => x.id === c.id)) S.etat.commandes.push(c); A.voir(c.id); });
     draw();
   },
-  comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'comptoir'; A.voir(c.id); }); },
+  comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },
   voir(id) { S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
   cat(id) { S.cat = id; S.search = ''; render(); },
   search(v) { S.search = v; render(); const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
@@ -1046,6 +1104,185 @@ const A = window.A = {
   saveCfg() { act(async () => { await api('/api/admin/config', adm.cfg); const keep = { si: adm.si }; adm = keep; toast('Réglages enregistrés ✓'); await refresh(); }); },
   testPrint(poste, tiroir) { act(async () => { if (adm.cfg) await api('/api/admin/config', adm.cfg); const r = await api('/api/admin/test-impression', { poste, tiroir }); toast(r.ok ? (r.simule ? 'Pas d’adresse IP : test simulé (fichier dans data)' : 'Test envoyé ✓') : r.erreur, !r.ok, 6000); }); },
 };
+
+// ------------------------------------------------------------ Actions de la prise de commande (v4)
+Object.assign(A, {
+  univ(u) { S.univ = u; S.search = ''; render(); const c = $('#cat'); if (c) c.scrollTop = 0; },
+  saut(id) { const e = document.getElementById('sec-' + id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  add(pid, long) {
+    const p = prod(pid);
+    if (p.stock === 0) return toast(p.nom + ' est épuisé', true);
+    const deja = S.draft.filter(d => d.pid === pid).reduce((s, d) => s + d.qte, 0);
+    if (p.stock > 0 && deja + 1 > p.stock) return toast('Il ne reste que ' + p.stock + ' « ' + p.nom + ' »', true);
+    if (long || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
+    const j = S.draft.findIndex(d => d.pid === pid && !d.note && !(d.opts || []).length && d.suite == null && !d.emporter);
+    if (j >= 0) S.draft[j].qte++; else S.draft.push({ pid, qte: 1, note: '', opts: [], suite: null, emporter: false });
+    S.flash = j >= 0 ? j : S.draft.length - 1; clearTimeout(S._fl); S._fl = setTimeout(() => { S.flash = null; }, 400);
+    render();
+    const l = $('.tk-l'); if (l) { const e = l.querySelector('.tl.d.flash'); if (e) e.scrollIntoView({ block: 'nearest' }); }
+  },
+  dqte(i, k) { const d = S.draft[i]; if (!d) return; d.qte += k; if (d.qte <= 0) S.draft.splice(i, 1); render(); },
+  // fiche d'un article : quantité, cuisson/options, commentaires, à emporter, suite
+  feuille(i, nouveau, rapide) {
+    const c = cmd();
+    const d = nouveau ? { ...nouveau } : { ...S.draft[i], opts: [...(S.draft[i].opts || [])] };
+    const p = prod(d.pid);
+    const groupes = (p.options || []).map(id => (S.etat.options || []).find(g => g.id === id)).filter(Boolean);
+    const coms = S.etat.config.commentaires || [];
+    const sel = {}; for (const o of d.opts || []) (sel[o.g] = sel[o.g] || []).push(o.i);
+    const parts = d.note ? d.note.split(', ') : [];
+    let chips = parts.filter(x => coms.includes(x)), libre = parts.filter(x => !coms.includes(x)).join(', ');
+    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length);
+    const prixU = () => (p.prix || 0) + groupes.reduce((s, g) => s + (sel[g.id] || []).reduce((a, k) => a + (+g.choix[k].prix || 0), 0), 0);
+    const draw = () => modal(mh(esc(p.nom) + ` <small class="muted">${fmt(prixU())} DA</small>`) + `<div class="fe">
+      <div class="fe-row"><span>Quantité</span><div class="qty sm"><button onclick="A.fq(-1)">−</button><span>${d.qte}</span><button onclick="A.fq(1)">+</button></div></div>
+      ${groupes.map(g => `<div class="fe-g ${g.obligatoire && !(sel[g.id] || []).length ? 'req' : ''}"><div class="fe-l">${esc(g.nom)}${g.obligatoire ? ' <b>*</b>' : ''}${g.multiple ? ' <span class="muted">(plusieurs possibles)</span>' : ''}</div>
+        <div class="chips">${g.choix.map((ch, k) => `<button class="chip big ${(sel[g.id] || []).includes(k) ? 'on' : ''}" onclick="A.fo('${g.id}',${k})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div></div>`).join('')}
+      <div class="fe-g"><div class="fe-l">Commentaire pour la cuisine</div>
+        <div class="chips">${coms.map(x => `<button class="chip ${chips.includes(x) ? 'on' : ''}" onclick="A.fc('${jsq(x)}')">${esc(x)}</button>`).join('')}</div>
+        <div class="row"><input id="fe-libre" class="fe-in grow" value="${esc(libre)}" placeholder="Autre commentaire…" oninput="A.fl(this.value)"><button class="btn sm ${S.kbOn ? 'dark' : ''}" onclick="S.kbOn=!S.kbOn;A.fdraw()">⌨</button></div>
+        ${S.kbOn ? clavier('fe-libre') : ''}</div>
+      ${c.salle !== 'emporter' ? `<div class="fe-row"><span>🥡 À emporter</span><button class="tog ${d.emporter ? 'on' : ''}" onclick="A.fe()">${d.emporter ? 'Oui' : 'Non'}</button></div>` : ''}
+      <div class="fe-row"><span>Part en cuisine</span><div class="seg">${[0, 1, 2, 3].map(s => `<button class="${suiteDraft(d) === s ? 'on' : ''}" onclick="A.fs(${s})">${SUITE_NOM(s)}</button>`).join('')}</div></div>
+      </div>
+      <div class="mf">${nouveau ? '<button class="btn" onclick="A.close()">Annuler</button>' : '<button class="btn bad" onclick="A.fdel()">Retirer</button><button class="btn" onclick="A.fdup()">Dupliquer</button>'}<button class="btn dark big" ${ok() ? '' : 'disabled'} onclick="A.fok()">${nouveau ? 'Ajouter ' + fmt(prixU() * d.qte) + ' DA' : 'OK'}</button></div>`, true);
+    A.fdraw = draw;
+    A.fq = k => { d.qte = Math.max(1, d.qte + k); draw(); };
+    A.fo = (gid, k) => {
+      const g = groupes.find(x => x.id === gid), a = sel[gid] || [];
+      if (g.multiple) { const j = a.indexOf(k); if (j >= 0) a.splice(j, 1); else a.push(k); sel[gid] = a; }
+      else sel[gid] = a[0] === k && !g.obligatoire ? [] : [k];
+      // cuisson choisie en un geste : l'article est ajouté tout de suite
+      if (rapide && nouveau && groupes.length === 1 && !g.multiple && ok()) return A.fok();
+      draw();
+    };
+    A.fc = x => { const j = chips.indexOf(x); if (j >= 0) chips.splice(j, 1); else chips.push(x); draw(); };
+    A.fl = v => { libre = v; };
+    A.fe = () => { d.emporter = !d.emporter; draw(); };
+    A.fs = s => { d.suite = s === (catDe(p).suite || 0) ? null : s; draw(); };
+    A.fdel = () => { S.draft.splice(i, 1); closeModal(); render(); };
+    A.fdup = () => { A.fok(true); };
+    A.fok = dup => {
+      d.opts = []; for (const g of groupes) for (const k of sel[g.id] || []) d.opts.push({ g: g.id, i: k });
+      d.note = [...chips, libre.trim()].filter(Boolean).join(', ');
+      if (nouveau) S.draft.push(d); else { S.draft[i] = d; if (dup) S.draft.splice(i + 1, 0, { ...d, opts: [...d.opts] }); }
+      closeModal(); render();
+    };
+    draw();
+  },
+  ligneEnvoyee(id) {
+    const c = cmd(), l = c.lignes.find(x => x.id === id);
+    if (!l) return;
+    modal(mh(l.qte + ' × ' + esc(l.nom)) + `<p class="muted">Envoyé à ${hm(l.envoye)}${(l.opts || []).length ? ' · ' + l.opts.map(o => esc(o.nom)).join(', ') : ''}${l.note ? ' · ' + esc(l.note) : ''}</p>
+      <div class="grille">
+        <button class="gb" onclick="A.recommander('${id}')">↻<span>Recommander le même</span></button>
+        ${!l.annule && !l.paye ? `<button class="gb" onclick="A.offrir('${id}')">🎁<span>${l.offert ? 'Ne plus offrir' : 'Offrir'}</span></button><button class="gb bad" onclick="A.annLigne('${id}')">✕<span>Annuler l’article</span></button>` : ''}
+      </div><div class="mf"><button class="btn ghost" onclick="A.close()">Fermer</button></div>`);
+  },
+  recommander(id) {
+    const l = cmd().lignes.find(x => x.id === id); if (!l) return;
+    const p = prod(l.pid); const opts = (l.opts || []).map(o => { const g = (S.etat.options || []).find(x => x.id === o.g); return g ? { g: g.id, i: g.choix.findIndex(ch => ch.nom === o.nom) } : null; }).filter(o => o && o.i >= 0);
+    S.draft.push({ pid: l.pid, qte: 1, note: l.note || '', opts, suite: l.suite === (catDe(p).suite || 0) ? null : l.suite, emporter: !!l.emporter });
+    closeModal(); render(); toast('Ajouté : ' + l.nom + ' — appuyez sur Envoyer');
+  },
+  kb(id, k) {
+    const i = document.getElementById(id); if (!i) return;
+    let v = i.value;
+    if (k === '⌫') v = v.slice(0, -1); else if (k === 'C') v = ''; else v += (!v || /[.!?]\s$/.test(v)) && k.length === 1 && /[a-zéèàçù]/.test(k) ? k.toUpperCase() : k;
+    i.value = v; i.dispatchEvent(new Event('input'));
+  },
+  // note pour toute la commande (imprimée en haut des bons)
+  noteCmd() {
+    const c = cmd(); const coms = S.etat.config.commentairesCommande || [];
+    const parts = c.note ? c.note.split(', ') : [];
+    let chips = parts.filter(x => coms.includes(x)), libre = parts.filter(x => !coms.includes(x)).join(', ');
+    const draw = () => modal(mh('Note pour toute la commande') + `<p class="muted">Elle s’imprime en haut des bons de cuisine et s’affiche sur l’écran cuisine.</p>
+      <div class="chips">${coms.map(x => `<button class="chip big ${chips.includes(x) ? 'on' : ''}" onclick="A.nc('${jsq(x)}')">${esc(x)}</button>`).join('')}</div>
+      <input id="nc-libre" class="fe-in" style="width:100%" value="${esc(libre)}" placeholder="Autre note…" oninput="A.nl(this.value)">${clavier('nc-libre')}
+      <div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark" onclick="A.nok()">Enregistrer</button></div>`, true);
+    A.nc = x => { const j = chips.indexOf(x); if (j >= 0) chips.splice(j, 1); else chips.push(x); draw(); };
+    A.nl = v => { libre = v; };
+    A.nok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, note: [...chips, libre.trim()].filter(Boolean).join(', ') }); closeModal(); refresh(); });
+    draw();
+  },
+  menuCmd() {
+    const c = cmd(); const caisse = peut('caissier');
+    const b = (ic, t, fn, cls = '') => `<button class="gb ${cls}" onclick="A.close();${fn}">${ic}<span>${t}</span></button>`;
+    modal(mh(esc(titreCmd(c))) + `<div class="grille">
+      ${b('🧾', 'Addition', 'A.addition()')}${b('⇄', 'Transférer / regrouper', 'A.transfert()')}${b('👥', 'Couverts', 'A.couverts()')}
+      ${b('✉', 'Message à la cuisine', 'A.message()')}${b('🖨', 'Réimprimer les bons', 'A.rebons()')}${enAttente(c).length ? b('⏩', 'Tout lancer maintenant', 'A.toutEnvoyer()') : ''}
+      ${c.salle === 'emporter' ? b('🥡', 'Client et heure de retrait', 'A.infosEmporter()') : ''}
+      ${caisse ? b('✂', 'Séparer l’addition', 'A.separer()') + b('％', 'Remise', 'A.encaisser(\'especes\',null,true)') + b('💳', 'Autres paiements', 'A.encaisser(\'tpe\')') + b('🧑‍🍳', 'Changer de serveur', 'A.chServeur()') + b('⛔', 'Ruptures', 'A.ruptures()') : ''}
+      ${b('🗑', 'Fermer la table vide', 'A.fermerVide()', 'bad')}
+    </div>`, true);
+  },
+  infosEmporter(c0) {
+    const c = c0 === undefined ? cmd() : null;
+    const st = { nom: c && c.client ? c.client.nom : '', tel: c && c.client ? c.client.tel : '', retrait: c ? c.retrait : null, champ: 'em-nom' };
+    const heures = [0, 15, 20, 30, 45, 60];
+    const draw = () => modal(mh(c ? 'Commande à emporter ' + esc(c.table) : 'Nouvelle commande à emporter') + `
+      <div class="row"><div class="field grow"><label>Nom du client</label><input id="em-nom" value="${esc(st.nom)}" onfocus="A.emf('em-nom')" oninput="A.ems('nom',this.value)"></div>
+      <div class="field grow"><label>Téléphone</label><input id="em-tel" inputmode="tel" value="${esc(st.tel)}" onfocus="A.emf('em-tel')" oninput="A.ems('tel',this.value)"></div></div>
+      ${clavier(st.champ)}
+      <p class="muted" style="margin:10px 0 0">Heure de retrait</p>
+      <div class="chips">${heures.map(m => { const v = m ? Date.now() + m * 60000 : null; const on = m === 0 ? !st.retrait : st.retrait && Math.abs(st.retrait - v) < 60000; return `<button class="chip big ${on ? 'on' : ''}" onclick="A.emr(${m})">${m ? '+ ' + m + ' min (' + hm(v) + ')' : 'Dès que possible'}</button>`; }).join('')}
+</div>
+      <div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark big" onclick="A.emok()">${c ? 'Enregistrer' : 'Commencer la commande'}</button></div>`, true);
+    A.emf = id => { if (st.champ !== id) { st.champ = id; draw(); const i = document.getElementById(id); if (i) i.focus(); } };
+    A.ems = (k, v) => { st[k] = v; };
+    A.emr = m => { st.retrait = m ? Date.now() + m * 60000 : null; draw(); };
+    A.emok = () => act(async () => {
+      if (c) { await api('/api/commande/modifier', { id: c.id, client: { nom: st.nom, tel: st.tel }, retrait: st.retrait }); closeModal(); refresh(); return; }
+      const n = await api('/api/commande/ouvrir', { salle: 'emporter', client: { nom: st.nom, tel: st.tel }, retrait: st.retrait });
+      closeModal(); S.etat.commandes.push(n); S.salle = 'emporter'; A.voir(n.id);
+    });
+    draw();
+  },
+  nouvelEmporter() { A.infosEmporter(null); },
+  // ---- encaissement rapide en espèces (le cas habituel)
+  async payer() {
+    let c = cmd();
+    if (S.draft.length) {
+      const r = await act(() => api('/api/commande/envoyer', { id: c.id, lignes: S.draft.slice() }));
+      if (!r) return; S.draft = []; showErrs(r); await refresh(); c = cmd(); if (!c) return;
+    }
+    const n = totalCmd(c);
+    let recu = '';
+    const ticket = () => localStorage.getItem('mb_ticket') !== '0';
+    const billets = () => { const s = new Set(); for (const m of [500, 1000, 2000, 5000, 10000]) { const v = Math.ceil(n / m) * m; if (v > n) s.add(v); } [1000, 2000, 5000, 10000].forEach(v => { if (v > n) s.add(v); }); return [...s].sort((a, b) => a - b).slice(0, 5); };
+    const draw = () => {
+      const r = +recu || 0, rendu = r - n;
+      modal(mh('Encaisser · ' + esc(titreCmd(c))) + `<div class="cash">
+        <div><div class="cl">À payer</div><div class="cbig num">${fmt(n)} <small>DA</small></div>
+          <button class="cexact" onclick="A.cgo(${n})">Compte juste · ${fmt(n)} DA</button>
+          <div class="cl" style="margin-top:12px">Le client donne :</div>
+          <div class="cbil">${billets().map(b => `<button class="${r === b ? 'on' : ''}" onclick="A.cb(${b})">${fmt(b)}</button>`).join('')}</div>
+          <div class="crow"><span>Reçu</span><b class="num">${r ? da(r) : '—'}</b></div>
+          <div class="crow rendu ${r && rendu < 0 ? 'bad' : ''}"><span>${r && rendu < 0 ? 'Il manque' : 'À rendre'}</span><b class="num">${r ? da(Math.abs(rendu)) : '—'}</b></div>
+        </div>
+        <div>${numpad('cash', v => { recu = v; draw(); })}
+          <button class="btn ok big" style="width:100%;margin-top:10px" ${r >= n ? '' : 'disabled'} onclick="A.cgo(${r})">Valider ${r > n ? '· rendre ' + da(rendu) : ''}</button></div>
+      </div>
+      <div class="cother"><span class="muted">Autre paiement :</span>
+        <button class="chip" onclick="A.encaisser('tpe')">Carte TPE</button><button class="chip" onclick="A.encaisser('cheque')">Chèque</button><button class="chip" onclick="A.encaisser('societe')">Facture société</button><button class="chip" onclick="A.encaisser('offert')">Offert</button><button class="chip" onclick="A.encaisser('especes')">Partager / plusieurs paiements</button><button class="chip" onclick="A.encaisser('especes',null,true)">Remise</button><button class="chip" onclick="A.separer()">Séparer par articles</button>
+        <label class="chk" style="margin-left:auto"><input type="checkbox" ${ticket() ? 'checked' : ''} onchange="localStorage.setItem('mb_ticket',this.checked?'1':'0')"> Ticket</label></div>`, true);
+      npv.cash = recu;
+    };
+    A.cb = b => { recu = String(b); draw(); };
+    A.cgo = montant => act(async () => {
+      const r = await api('/api/commande/encaisser', { id: c.id, paiements: [{ mode: 'especes', montant }], imprimer: ticket() });
+      closeModal(); showErrs(r);
+      const t = r.ticket;
+      if (t.rendu > 0) modal(`<div class="rendu-big"><div>Rendre au client</div><b class="num">${da(t.rendu)}</b><button class="btn dark big" onclick="A.close()">OK</button></div>`);
+      else toast('Encaissé ✓ ' + da(t.net), false, 3000);
+      if (t.rendu > 0) setTimeout(() => { if ($('.rendu-big')) closeModal(); }, 8000);
+      S.draft = []; S.cmdId = null; S.view = c.salle === 'comptoir' || c.salle === 'emporter' ? (peut('caissier') && c.salle === 'comptoir' ? 'caisse' : 'tables') : 'tables';
+      if (S.view === 'caisse') await loadCaisse();
+      refresh();
+    });
+    npv.cash = ''; draw();
+  },
+});
 
 // ------------------------------------------------------------ Rendu
 function render() {
