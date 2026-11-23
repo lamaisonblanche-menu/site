@@ -1,11 +1,11 @@
 {
- "version": "3.2.5",
- "date": "2026-11-23T16:24:01.448Z",
- "notes": "Équipe : Rayan, Lyes (maître d'hôtel)",
+ "version": "3.2.6",
+ "date": "2026-11-23T16:30:21.352Z",
+ "notes": "Envoi automatique de la rase par mail pour l'appli de gestion",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "a37fa49d02e50f3371b05c5046958650772ecbedb21882a542229792b81578b2"
+   "sha256": "c17fbb4bde718de57b503e111478cd6035c936d2c440c6a9b49b446733472355"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "c3a3ed7bc84312b7389a1b11a4169d92dabd8fc63721f3a8b38d0cf1f038f64b"
+   "sha256": "3e1e962a7674c52c9cf05bb3e02395ce42d45bcdce41e2eb9c0a7f00f736b989"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "e0adb998379a3b47c2715adacd94c6e6f149ea6847d32dedd6892b5e5ea69197"
+   "sha256": "1f4c4513ebca3649b1d469da454e0f71b6b49bccc3162ba30073e066c8be2113"
   }
  ]
 }

@@ -429,6 +429,7 @@ function viewCaisse() {
       <button class="btn" onclick="A.tiroir()">Ouvrir le tiroir</button>
       <button class="btn" onclick="A.rapportX()" ${r ? '' : 'disabled'}>Rapport X</button>
       ${C.derniereRase ? `<button class="btn" onclick="A.reZ('${C.derniereRase.id}')">Réimprimer la dernière rase</button>` : ''}
+      ${C.derniereRase && S.etat.config.mail && S.etat.config.mail.actif ? (C.derniereRase.mailEnvoye ? `<span class="pill ok">Rase envoyée au patron ✓</span>` : `<span class="pill ${C.derniereRase.mailErreur ? 'bad' : 'warn'}">${C.derniereRase.mailErreur ? esc(C.derniereRase.mailErreur) : 'Rase pas encore envoyée'}</span><button class="btn sm" onclick="A.remail('${C.derniereRase.id}')">Renvoyer la rase</button>`) : ''}
       <button class="btn gold" style="margin-left:auto" onclick="A.rase()" ${r ? '' : 'disabled'}>Rase de fin de journée</button>
     </div>
     <div class="cols">
@@ -660,6 +661,13 @@ function admReglages() {
     <div class="field"><label>Lien du QR code imprimé en bas du ticket et de l’addition (vide = pas de QR code)</label><input value="${esc(c.qrLien || '')}" onchange="adm.cfg.qrLien=this.value.trim()"></div>
     <div class="field"><label>Texte sous le QR code</label><input value="${esc(c.qrTexte || '')}" onchange="adm.cfg.qrTexte=this.value"></div>
     <button class="btn" onclick="A.testPrint('ticket')">Imprimer un ticket d’essai</button></div>
+  <div class="panel"><h3>Envoi automatique de la rase</h3>
+    <p class="muted">Après chaque rase, la caisse envoie le rapport par mail. Il est ensuite rangé automatiquement dans l’appli de gestion. Il faut un « mot de passe d’application » Gmail (16 lettres), pas le mot de passe habituel.</p>
+    <label class="chk"><input type="checkbox" ${(c.mail || {}).actif ? 'checked' : ''} onchange="A.mset('actif',this.checked)"> Envoyer la rase automatiquement chaque soir</label>
+    <div class="row"><div class="field grow"><label>Adresse Gmail qui envoie</label><input value="${esc((c.mail || {}).user || 'maisonblanchehydra@gmail.com')}" onchange="A.mset('user',this.value)"></div>
+    <div class="field grow"><label>Mot de passe d’application</label><input type="password" value="${esc((c.mail || {}).pass || '')}" placeholder="16 lettres" onchange="A.mset('pass',this.value)"></div></div>
+    <div class="field"><label>Envoyer à</label><input value="${esc((c.mail || {}).dest || 'maisonblanchehydra@gmail.com')}" onchange="A.mset('dest',this.value)"></div>
+    <div class="row"><button class="btn dark" onclick="A.saveCfg()">Enregistrer</button><button class="btn" onclick="A.mtest()">Envoyer un mail d’essai</button></div></div>
   <div class="panel"><h3>Application et mises à jour</h3>${admApp()}</div>
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
@@ -1086,6 +1094,9 @@ const A = window.A = {
     A.pa = (k, v) => { st[k] = v; };
     A.pgo = () => { if (!st.userId) return toast('Choisissez la personne', true); const tin = new Date(st.date + 'T' + st.a).getTime(); let tout = st.d ? new Date(st.date + 'T' + st.d).getTime() : null; if (tout && tout < tin) tout += 864e5; act(async () => { await api('/api/admin/pointage', { nouveau: true, userId: st.userId, in: tin, out: tout }); closeModal(); adm.pointages = null; A.atab('pointage'); }); };
   },
+  mset(k, v) { adm.cfg.mail = adm.cfg.mail || { actif: false, user: 'maisonblanchehydra@gmail.com', dest: 'maisonblanchehydra@gmail.com', pass: '' }; if (!adm.cfg.mail.user) adm.cfg.mail.user = 'maisonblanchehydra@gmail.com'; if (!adm.cfg.mail.dest) adm.cfg.mail.dest = 'maisonblanchehydra@gmail.com'; adm.cfg.mail[k] = v; },
+  mtest() { act(async () => { if (adm.cfg) await api('/api/admin/config', adm.cfg); toast('Envoi du mail d’essai…'); const r = await api('/api/admin/mail-test', {}); toast(r.ok ? 'Mail d’essai envoyé ✓ — regardez la boîte de réception' : r.erreur, !r.ok, 7000); }); },
+  remail(jour) { act(async () => { toast('Envoi…'); const r = await api('/api/rase/renvoyer-mail', { jour }); toast(r.ok ? 'Rase envoyée ✓' : r.erreur, !r.ok, 6000); await loadCaisse(); render(); }); },
   majVerif() { act(async () => { await api('/api/maj/verifier', {}); toast('Vérification en cours…'); setTimeout(() => A.atab('reglages'), 6000); }); },
   majInstaller() { if (confirm('Installer la nouvelle version maintenant ? La caisse redémarre en quelques secondes.')) act(async () => { await api('/api/maj/installer', {}); toast('Installation… la caisse redémarre'); }); },
   quitterApp() { if (confirm('Fermer la caisse sur ce PC ?')) caisseApp.quitter(); },

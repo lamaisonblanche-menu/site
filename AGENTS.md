@@ -100,6 +100,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - **Équipe** : serveurs, caissiers et comptes « cuisine » (bar et cuisine) ajoutés en 3.2.3 (une seule fois, drapeau `db.equipeInitiale`).
 - **Badges** (lecteur USB qui tape comme un clavier) pour se connecter, autoriser, pointer arrivée/départ.
 - **Gestion** : rapports, carte et prix, options, équipe/codes/badges, plans, imprimantes, pointage, réglages, journal.
+- **Rase envoyée par mail** (Gmail, mot de passe d'application dans `config.mail`, jamais envoyé aux écrans) au format de la collection `caisse` de l'appli de gestion (ligne `DONNEES-CAISSE {json}`), rangée chaque nuit par une tâche planifiée Claude.
 - **Rase** de fin de journée avec écart, sorties de caisse, exports CSV.
 
 ## 6. Repères techniques

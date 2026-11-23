@@ -7,6 +7,7 @@ const net = require('net');
 const crypto = require('crypto');
 const os = require('os');
 const { execFile } = require('child_process');
+const tls = require('tls');
 
 const PORT = +process.env.PORT || 8080;
 const DIR = __dirname;
@@ -513,6 +514,59 @@ function rapport(du, au) {
     rases: db.jours.filter(j => j.rase && j.date >= du && j.date <= au).map(j => ({ n: j.n, date: j.date, ...j.rase })),
   };
 }
+// ---- envoi de mails (Gmail, avec un mot de passe d'application), sans module externe
+function envoyerMail(dest, sujet, texte) {
+  const m = db.config.mail || {};
+  return new Promise(resolve => {
+    let fini = false, buf = '', etape = 0;
+    const fin = r => { if (fini) return; fini = true; try { sock.end(); } catch (e) {} resolve(r); };
+    const b64 = x => Buffer.from(x, 'utf8').toString('base64');
+    const corps = b64(texte).replace(/.{76}/g, '$&\r\n');
+    const msg = ['From: Caisse La Maison Blanche <' + m.user + '>', 'To: ' + dest, 'Subject: =?UTF-8?B?' + b64(sujet) + '?=', 'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', 'Date: ' + new Date().toUTCString(), '', corps, '.'].join('\r\n');
+    const suite = [
+      [220, () => 'EHLO caisse-maison-blanche'], [250, () => 'AUTH LOGIN'], [334, () => b64(m.user)], [334, () => b64(m.pass)],
+      [235, () => 'MAIL FROM:<' + m.user + '>'], [250, () => 'RCPT TO:<' + dest + '>'], [250, () => 'DATA'], [354, () => msg], [250, () => 'QUIT'],
+    ];
+    const hote = process.env.CAISSE_SMTP_HOST || 'smtp.gmail.com';
+    const sock = tls.connect(+process.env.CAISSE_SMTP_PORT || 465, hote, { servername: hote });
+    sock.setTimeout(20000, () => fin({ ok: false, erreur: 'Pas de réponse du serveur mail (internet ?)' }));
+    sock.on('error', e => fin({ ok: false, erreur: 'Mail : ' + (e.code === 'ENOTFOUND' || e.code === 'EAI_AGAIN' ? 'pas d\'internet' : e.message) }));
+    sock.on('data', d => {
+      buf += d.toString('utf8');
+      const lignes = buf.split('\r\n'); buf = lignes.pop();
+      for (const l of lignes) {
+        if (!/^\d{3} /.test(l)) continue; // réponse sur plusieurs lignes : on attend la dernière
+        const code = +l.slice(0, 3);
+        if (etape >= suite.length) return fin({ ok: true });
+        const [attendu, cmd] = suite[etape];
+        if (code !== attendu) return fin({ ok: false, erreur: code === 535 || code === 534 ? 'Gmail refuse le mot de passe : il faut un « mot de passe d\'application »' : 'Mail refusé (' + l.slice(0, 80) + ')' });
+        etape++;
+        if (etape === suite.length) { sock.write(cmd() + '\r\n'); return fin({ ok: true }); }
+        sock.write(cmd() + '\r\n');
+      }
+    });
+  });
+}
+// la rase au format de l'appli de gestion (collection « caisse »)
+function raseAppli(j, r, rase) {
+  return {
+    id: 'J' + j.date, date: j.date, source: 'caisse', ca: r.ca, especes: r.especes, tpe: r.tpe, cheque: r.cheque, societe: r.societe, nbTickets: r.nbTickets, couverts: r.couverts,
+    theorique: rase.attendu, compte: rase.compte, ecart: rase.ecart, caissier: rase.par,
+    sorties: r.sorties.map(s => ({ montant: s.montant, note: [s.motif, s.detail].filter(Boolean).join(' - ') + (s.par ? ' (' + s.par + ')' : ''), type: /influen/i.test(s.motif) ? 'influenceuse' : 'depense', pj: null })),
+    totalSorties: r.totalSorties, explication: rase.commentaire || '', parQui: rase.completePar || '', complete: !!(rase.ecart && rase.completePar),
+    montantComplete: rase.ecart < 0 && rase.completePar ? -rase.ecart : 0, patron: r.patron, remises: r.remises, offert: r.offert, annulations: r.totalAnnulations,
+    envoyeLe: new Date(rase.ts).toISOString(), photoX: 'caisse', statut: 'envoyee',
+  };
+}
+function envoyerRase(j, r, rase) {
+  const m = db.config.mail || {};
+  const d = raseAppli(j, r, rase);
+  const jour = new Date(j.date + 'T12:00').toLocaleDateString('fr-FR');
+  const texte = 'Rase de la journée n° ' + j.n + ' du ' + jour + '\n\n' + raseDoc(r, rase).texte().replace(/\[(LOGO|QR[^\]]*)\]\n?/g, '') +
+    '\n\n--- Données pour l\'appli de gestion (ne pas modifier) ---\nDONNEES-CAISSE ' + JSON.stringify(d) + '\n';
+  return envoyerMail(m.dest || m.user, '[Caisse MB] Rase du ' + jour + ' - CA ' + fmt(r.ca) + ' DA - écart ' + fmt(rase.ecart) + ' DA', texte);
+}
 function raseDoc(r, rase) {
   const d = new Doc();
   enteteTicket(d);
@@ -561,6 +615,8 @@ const E = (msg, code = 400) => { throw new Err(code, msg); };
 
 function etatPublic(u) {
   const c = { ...db.config };
+  // le mot de passe du mail ne quitte jamais la caisse principale
+  if (c.mail) c.mail = { ...c.mail, pass: c.mail.pass ? '••••••••' : '' };
   return {
     user: { id: u.id, nom: u.nom, role: u.role },
     config: c,
@@ -963,7 +1019,25 @@ const routes = {
     save();
     saveNow();
     const res = await imprimer('ticket', raseDoc(r, rase));
-    return { rase, resume: r, erreurs: res.ok ? [] : [res.erreur] };
+    const erreurs = res.ok ? [] : [res.erreur];
+    // envoi automatique de la rase par mail (rangée ensuite dans l'appli de gestion)
+    if (db.config.mail && db.config.mail.actif) {
+      envoyerRase(j, r, rase).then(m => { j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur; save(); broadcast(); });
+    }
+    return { rase, resume: r, erreurs };
+  },
+  'POST /api/admin/mail-test': async (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const m = db.config.mail || {};
+    if (!m.user || !m.pass) E('Indiquez l\'adresse Gmail et le mot de passe d\'application, puis Enregistrer');
+    return envoyerMail(m.dest || m.user, '[Caisse MB] Test d\'envoi', 'La caisse La Maison Blanche sait envoyer des mails. Les rases arriveront ici chaque soir.\n');
+  },
+  'POST /api/rase/renvoyer-mail': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const j = db.jours.find(x => x.id === b.jour && x.rase); if (!j) E('Rase introuvable');
+    const m = await envoyerRase(j, resumeJour(j), j.rase);
+    j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur; save();
+    return m;
   },
   'POST /api/rapport-x': async (b, u) => {
     if (!peut(u, 'caissier')) E('Non autorisé', 403);
@@ -1065,6 +1139,11 @@ const routes = {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation', 'commentaires', 'commentairesCommande', 'qrLien', 'qrTexte', 'logoTicket'];
     for (const k of keep) if (b[k] !== undefined) db.config[k] = b[k];
+    if (b.mail) {
+      const ancien = db.config.mail || {};
+      db.config.mail = { actif: !!b.mail.actif, user: String(b.mail.user || '').trim(), dest: String(b.mail.dest || '').trim(),
+        pass: !b.mail.pass || /^•+$/.test(b.mail.pass) ? (ancien.pass || '') : String(b.mail.pass).replace(/\s+/g, '') };
+    }
     if (!db.config.imprimantes.ticket) db.config.imprimantes.ticket = IMPRIMANTES().ticket;
     if (!postesBons().length) db.config.imprimantes.cuisine = IMPRIMANTES().cuisine;
     for (const s of db.config.salles) { const vus = new Set(); s.tables = (s.tables || []).filter(t => t && t.n && !vus.has(String(t.n)) && vus.add(String(t.n))).map(t => ({ n: String(t.n).slice(0, 8), x: Math.max(0, Math.min(100, +t.x || 0)), y: Math.max(0, Math.min(100, +t.y || 0)) })); }
