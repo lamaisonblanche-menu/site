@@ -1051,6 +1051,15 @@ function etatPublic(u) {
   return {
     user: { id: u.id, nom: u.nom, role: u.role },
     config: c,
+    raseAutoEtat: (() => {
+      const j = jourCourant(false), cfg = db.config.raseAuto || {};
+      if (!cfg.actif || !j || j.clos || j.rase) return null;
+      const d = new Date(), [h, m] = String(cfg.heure || '02:00').split(':').map(Number);
+      const base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+      if (j.ouvert > base) return null;
+      const ts = base + raseAutoReport * 1800000;
+      return { ts, dansCinqMinutes: ts - now() <= 300000, report: raseAutoReport };
+    })(),
     categories: db.categories.slice().sort((a, b) => a.ordre - b.ordre),
     produits: db.produits,
     users: db.users.map(x => ({ id: x.id, nom: x.nom, role: x.role, actif: x.actif })),
@@ -1524,6 +1533,16 @@ const routes = {
     const s = db.sorties[i]; const j = db.jours.find(x => x.id === s.jour);
     if (j && j.clos) E('Journée déjà clôturée');
     db.sorties.splice(i, 1); journal(u, 'suppression sortie', fmt(s.montant) + ' ' + s.motif); save(); return {};
+  },
+  'POST /api/rase-auto/reporter': (b, u) => {
+    if (!peut(u, 'admin')) E('Seul le responsable peut reporter la rase', 403);
+    if (!db.config.raseAuto || !db.config.raseAuto.actif) E('Rase automatique désactivée');
+    const j = jourCourant(false);
+    if (!j || j.clos || j.rase || raseAutoBusy) E('Aucune rase à reporter');
+    raseAutoReport++;
+    journal(u, 'rase automatique reportée', 'Report manuel de 30 minutes');
+    save();
+    return { report: raseAutoReport };
   },
   'POST /api/rase': async (b, u) => {
     if (!peut(u, 'caissier')) E('Non autorisé', 403);
