@@ -1050,13 +1050,14 @@ const routes = {
   'POST /api/admin/test-impression': async (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const p = db.config.imprimantes[b.poste]; if (!p) E('Imprimante inconnue');
+    // « Tester le tiroir » : ouvre seulement le tiroir, sans rien imprimer
+    if (b.tiroir) return imprimer('ticket', new Doc().drawer());
     const d = new Doc();
     if (b.poste === 'ticket') enteteTicket(d);
     d.center(1).size(2).bold(1).t('TEST').size(0).bold(0).t(p.nom).t(dateH(now())).t('Accents : é è à ç ô œ ù').center(0).line();
     d.lr('Gauche', 'Droite');
     if (b.poste === 'ticket') piedTicket(d);
     d.cut();
-    if (b.poste === 'ticket' && b.tiroir) d.drawer();
     const r = await imprimer(b.poste, d);
     return r;
   },

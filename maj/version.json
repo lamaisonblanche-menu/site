@@ -1,11 +1,11 @@
 {
- "version": "3.2.1",
- "date": "2026-11-23T15:58:28.587Z",
- "notes": "Imprimante des tickets en USB (branchée sur le PC de caisse)",
+ "version": "3.2.2",
+ "date": "2026-11-23T16:02:41.890Z",
+ "notes": "Le test du tiroir ouvre le tiroir sans imprimer",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "3822728783049fc2f22a56d1ee74d62352c49fbf81c6b54b50830d6f61c3af22"
+   "sha256": "79b9fb49a71869140833837e3a27ae1722a41faf59746519fde5e1346f9dd5b8"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "cce8414d83c764f280d9b61db8ff69f5fb1074d0c9f38ca58e851f9d3c5c3180"
+   "sha256": "e93dbb06e89db38864bd2f53ed9fe3c1b716b671915fab6c895a44f30364ec17"
   }
  ]
 }
