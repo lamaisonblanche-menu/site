@@ -1,11 +1,11 @@
 {
- "version": "3.3.6",
- "date": "2026-11-23T17:11:28.401Z",
- "notes": "NY roll, Pavlova, Profiteroles et Mochis imprimés sur toutes les imprimantes",
+ "version": "3.3.7",
+ "date": "2026-11-23T17:12:20.862Z",
+ "notes": "Commande commune asiatique + gastro/brunch : chaque cuisine reçoit aussi la partie de l'autre, pour information",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "3676ec0fe266ce0c32d242c26b79e9388a55fc7d54be5f62c8a0b9b85a300d8c"
+   "sha256": "36c5d98fe7e3c215a87d4d7a0b6449ef076bb836971b9c6079093d8d400f0e98"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "e106e29314fbfb8e37486ee1a09a4ba2936e19b4bd4c9033257d304de9eac6d7"
+   "sha256": "9c76c599b811ce1013e90b4fa6390c3d9358d9e0a8629433d7012f7346d9a9cc"
   }
  ]
 }

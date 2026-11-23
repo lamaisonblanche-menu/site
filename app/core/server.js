@@ -445,7 +445,7 @@ function lignesBon(d, l) {
   if (l.emporter) d.bold(1).t('    *** A EMPORTER ***').bold(0);
   if (l.note) d.bold(1).t('    >> ' + l.note).bold(0);
 }
-function bon(poste, cmd, lignes, titre) {
+function bon(poste, cmd, lignes, titre, infos) {
   const d = new Doc();
   d.center(1).size(2).bold(1).t(((db.config.imprimantes[poste] || {}).nom || poste).toUpperCase()).size(0);
   if (titre) d.t(titre);
@@ -460,6 +460,11 @@ function bon(poste, cmd, lignes, titre) {
     const attente = s > (cmd.suite || 0) && s > 0;
     if (suites.length > 1 || attente) d.center(1).bold(1).t('--- ' + SUITES[s].toUpperCase() + (attente ? ' : ATTENDRE LA RÉCLAME' : '') + ' ---').bold(0).center(0);
     for (const l of lignes.filter(l => (l.suite || 0) === s)) lignesBon(d, l);
+  }
+  // commande commune asiatique + gastro/brunch : la partie de l'autre cuisine, pour information
+  for (const [autre, ls] of Object.entries(infos || {})) {
+    d.line('-').center(1).bold(1).t('POUR INFO - FAIT PAR ' + ((db.config.imprimantes[autre] || {}).nom || autre).toUpperCase()).bold(0).center(0);
+    for (const l of ls) { d.t(l.qte + '  ' + l.nom + (l.suite > (cmd.suite || 0) ? ' (' + SUITES[l.suite] + ', attendre)' : '')); for (const o of l.opts || []) d.t('    + ' + o.nom); }
   }
   d.line();
   d.cut();
@@ -799,10 +804,19 @@ const routes = {
     creerBons(c, nouvelles);
     save();
     const erreurs = [];
+    // commande commune : l'asiatique voit aussi la partie cuisine (gastro/brunch) et inversement
+    const CUISINES = ['cuisine', 'cuisine2', 'asiatique'];
+    const dePoste = k => nouvelles.filter(l => postesDe(l.pid).includes(k));
+    const commune = dePoste('asiatique').length && (dePoste('cuisine').length || dePoste('cuisine2').length);
     for (const poste of postesBons()) {
-      const ls = nouvelles.filter(l => postesDe(l.pid).includes(poste));
+      const ls = dePoste(poste);
       if (!ls.length) continue;
-      const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : ''));
+      let infos = null;
+      if (commune && CUISINES.includes(poste)) {
+        infos = {};
+        for (const k of CUISINES) if (k !== poste && !(poste !== 'asiatique' && k !== 'asiatique')) { const autres = dePoste(k).filter(l => !ls.includes(l)); if (autres.length) infos[k] = autres; }
+      }
+      const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : '', infos));
       if (!r.ok) erreurs.push(r.erreur);
     }
     journal(u, 'envoi', 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
