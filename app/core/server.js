@@ -833,7 +833,7 @@ setInterval(envoyerAttente, 5 * 60000);
 let raseAutoBusy = false, raseAutoReport = 0, raseAutoAverti = '';
 async function verifierRaseAuto() {
   const cfg = db.config.raseAuto || {};
-  if (raseAutoBusy || !cfg.actif || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(cfg.heure || '')) return;
+  if (raseAutoBusy || !cfg.actif || !/^([01]\d|2[0-3]):[0-5]\d$/.test(cfg.heure || '')) return;
   const j = jourCourant(false);
   if (!j || j.clos || j.rase) return;
   const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
@@ -1694,7 +1694,7 @@ const routes = {
   'POST /api/admin/config': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     if (b.raseAuto !== undefined) {
-      if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.raseAuto.heure || ''))) E('Heure de rase invalide');
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.raseAuto.heure || ''))) E('Heure de rase invalide');
       db.config.raseAuto = { actif: !!b.raseAuto.actif, heure: b.raseAuto.heure, extinction: !!b.raseAuto.extinction };
     }
     const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation', 'commentaires', 'commentairesCommande', 'qrLien', 'qrTexte', 'logoTicket'];
