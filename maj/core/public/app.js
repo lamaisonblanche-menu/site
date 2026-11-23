@@ -698,9 +698,9 @@ function numpad(id, onchange) {
 const npv = {};
 
 // code OU badge du responsable
-function askPin(titre, cb) {
+function askPin(titre, cb, qui) {
   let p = '';
-  const draw = () => { modal(mh(titre) + `<p class="muted">Badge ou code du responsable</p><div class="amount">${'•'.repeat(p.length) || '&nbsp;'}</div>
+  const draw = () => { modal(mh(titre) + `<p class="muted">${qui || 'Badge ou code du responsable'}</p><div class="amount">${'•'.repeat(p.length) || '&nbsp;'}</div>
     <div class="npad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].map(k => `<button onclick="A.pinK('${k}')">${k}</button>`).join('')}</div>`); window.__pinCb = done; };
   const done = v => { window.__pinCb = null; cb(v); };
   A.pinK = k => { if (k === 'C') p = ''; else if (k === 'OK') { done(p); return; } else if (p.length < 6) p += k; draw(); };
@@ -842,7 +842,7 @@ const A = window.A = {
       <div class="mf"><button class="btn" onclick="A.close()">Retour</button><button class="btn bad" ${motif ? '' : 'disabled'} onclick="A.ago()">Continuer</button></div>`);
     A.aq = d => { q = Math.max(1, Math.min(l.qte, q + d)); draw(); };
     A.am = m => { motif = m; draw(); };
-    A.ago = () => askPin('Autoriser l’annulation', p => act(async () => { const r = await api('/api/commande/annuler-ligne', { id: c.id, ligne: id, qte: q, motif, pin: p }); closeModal(); S.sel = null; showErrs(r); if (!r.erreurs.length) toast('Article annulé, bon d’annulation imprimé'); refresh(); }));
+    A.ago = () => (peut('caissier') ? (f => f('')) : f => askPin('Annulation par un caissier', f, 'Badge ou code d’un caissier'))(p => act(async () => { const r = await api('/api/commande/annuler-ligne', { id: c.id, ligne: id, qte: q, motif, pin: p }); closeModal(); S.sel = null; showErrs(r); if (!r.erreurs.length) toast('Article annulé, bon d’annulation imprimé'); refresh(); }));
     draw();
   },
   async addition() { const c = cmd(); if (S.draft.length) return toast('Envoyez d’abord la commande.', true); const r = await act(() => api('/api/commande/addition', { id: c.id })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Addition imprimée à la caisse ✓'); refresh(); } },

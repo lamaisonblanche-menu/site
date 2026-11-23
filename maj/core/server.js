@@ -158,6 +158,19 @@ if (db.version < 4) {
   for (const [k, v] of Object.entries(TICKET_DEFAUT())) if (db.config[k] === undefined) db.config[k] = v;
   db.version = 4;
 }
+// Équipe du restaurant, ajoutée une seule fois (version 3.2.3) : les personnes déjà présentes (même nom) ne sont pas touchées
+if (!db.equipeInitiale) {
+  const EQUIPE = [["Ihab", "serveur", "7430"], ["Moncef", "serveur", "4864"], ["Youcef", "serveur", "6058"], ["Mustapha", "serveur", "7080"], ["Zahir", "serveur", "4077"], ["Abdou", "serveur", "6194"], ["Wafi", "caissier", "3861"], ["Rayen", "caissier", "2130"], ["Walid", "cuisine", "8205"], ["Lotfi", "cuisine", "9428"], ["Lounis", "cuisine", "1372"], ["Salima", "cuisine", "4491"], ["Moh", "cuisine", "5360"], ["Youcef D.", "cuisine", "7998"]];
+  for (const [nom, role, pin] of EQUIPE) {
+    if (db.users.some(u => u.nom.toLowerCase() === nom.toLowerCase())) continue;
+    let code = pin; while (db.users.some(u => u.pin === code)) code = String(1000 + Math.floor(Math.random() * 9000));
+    db.users.push({ id: 'u-' + slug(nom), nom, role, pin: code, badge: '', actif: true });
+  }
+  // les comptes d'essai de départ ne servent plus
+  for (const u of db.users) if ((u.nom === 'Caisse 1' && u.pin === '1111') || (u.nom === 'Serveur 1' && u.pin === '2222')) u.actif = false;
+  db.equipeInitiale = true;
+  setTimeout(() => saveNow(), 0);
+}
 for (const s of db.config.salles) {
   if (s.tables.length && typeof s.tables[0] === 'string') s.tables = s.tables.map((n, i) => ({ n, x: 8 + (i % 10) * 9.5, y: 12 + Math.floor(i / 10) * 20 }));
   s.deco = s.deco || []; s.fond = s.fond || 'creme'; s.ratio = s.ratio || 1.6; s.taille = s.taille || 7;
@@ -724,8 +737,9 @@ const routes = {
     const l = c.lignes.find(x => x.id === b.ligne);
     if (!l || l.annule) E('Ligne introuvable');
     if (l.paye) E('Cet article est déjà payé');
-    const chef = pinAdmin(b.pin);
-    if (!chef) E('Code du responsable obligatoire pour annuler un article déjà envoyé', 403);
+    // seuls les caissiers (et le responsable) peuvent annuler un plat déjà envoyé
+    const chef = peut(u, 'caissier') ? u : parCode(b.pin);
+    if (!chef || !peut(chef, 'caissier')) E('Seul un caissier peut annuler un plat : passez le badge ou tapez le code d\'un caissier', 403);
     if (!b.motif) E('Motif obligatoire');
     const q = Math.max(1, Math.min(l.qte, parseInt(b.qte, 10) || l.qte));
     let cible = l;

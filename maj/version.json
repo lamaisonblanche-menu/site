@@ -1,11 +1,11 @@
 {
- "version": "3.2.2",
- "date": "2026-11-23T16:02:41.890Z",
- "notes": "Le test du tiroir ouvre le tiroir sans imprimer",
+ "version": "3.2.3",
+ "date": "2026-11-23T16:20:18.445Z",
+ "notes": "Toute l'équipe ajoutée ; seuls les caissiers peuvent annuler un plat",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "79b9fb49a71869140833837e3a27ae1722a41faf59746519fde5e1346f9dd5b8"
+   "sha256": "8bac95a38f37afadb73bad656f4abdeaea9a73b43bc160a8ba2282b5d61018cf"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "981b899797adcb9fa8f62159ed988668cdfdf6d1e529ada08ce6465cd5437785"
+   "sha256": "6af9d300db8e86449577acb10d0f626b0defcb63f5b913e56a0b41550b1f9af3"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "e93dbb06e89db38864bd2f53ed9fe3c1b716b671915fab6c895a44f30364ec17"
+   "sha256": "1db117c3476f5a50b3151f228e5cbf5b1363071cf37ec6480cdf54cf2c19651c"
   }
  ]
 }

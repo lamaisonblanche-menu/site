@@ -81,7 +81,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
    Toute nouvelle donnée passe par une migration dans server.js (voir les blocs `if (db.version < N)`),
    sans jamais supprimer ou renommer un champ existant.
 
-## 5. Ce que fait la caisse (version 3.2.1)
+## 5. Ce que fait la caisse (version 3.2.3)
 
 - **Plans de salle** repris de FrontCash : Gastro (1-12, 14-18), Brunch (20-38), Terrasse (100-129), modifiables (glisser-déposer).
 - **Onglet À emporter** : commandes E1, E2… par journée, nom/téléphone client, heure de retrait. Vente rapide au comptoir.
@@ -96,6 +96,8 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
   messages, annulations, addition, ticket avec logo + QR code, rapport X, rapport Z.
   Sans IP configurée, les impressions sont écrites dans `data/impressions-simulees/`.
 - **Écran cuisine** (rôle « cuisine ») : bons par poste, couleurs selon l'attente, bouton PRÊT → cloche chez le serveur, ruptures.
+- **Annulation d'un plat déjà envoyé : seuls les caissiers** (et le responsable). Un serveur doit faire passer le badge ou le code d'un caissier.
+- **Équipe** : serveurs, caissiers et comptes « cuisine » (bar et cuisine) ajoutés en 3.2.3 (une seule fois, drapeau `db.equipeInitiale`).
 - **Badges** (lecteur USB qui tape comme un clavier) pour se connecter, autoriser, pointer arrivée/départ.
 - **Gestion** : rapports, carte et prix, options, équipe/codes/badges, plans, imprimantes, pointage, réglages, journal.
 - **Rase** de fin de journée avec écart, sorties de caisse, exports CSV.
