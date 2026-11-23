@@ -1,11 +1,11 @@
 {
- "version": "3.5.2",
- "date": "2026-11-23T17:42:58.803Z",
- "notes": "Table réservée bloquée : seul un caissier peut l'ouvrir (badge ou code du caissier pour un serveur)",
+ "version": "3.5.3",
+ "date": "2026-11-23T19:29:22.364Z",
+ "notes": "3.5.3 : suppléments payants (Supplément frites 500 DA) affichés comme un commentaire sur le plat, avec le prix, sur les bons et le ticket",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "36e68867ce939b2464649670eb1b3f9759d1a99e7326dac3c79d0942e01f5d65"
+   "sha256": "50060b8e79abd0beaf59e6309e519a73cba73a94b97defd0f8b68e1c8f6447b2"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "61f6ac44a29461f9903bc79c1de767ef6f8864e5ef6840f638a67948022ba46f"
+   "sha256": "6e6670e3cb12c67ebe503c08512bd16bb5f939be0d7e10d7806803167dd17636"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "d564234041b91b7923f4a269cca729159e05dcba6b94bddde541dd6a776077fc"
+   "sha256": "a790373e8c828de7824f490e49d584082a882a60f9bfc27ac001d3f4d3b61f93"
   }
  ]
 }
