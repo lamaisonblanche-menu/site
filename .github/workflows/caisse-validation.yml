@@ -1,0 +1,16 @@
+name: Validation caisse sans publication
+on:
+  pull_request:
+    branches: [caisse]
+  workflow_dispatch:
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check app/core/server.js
+      - run: node --check app/core/public/app.js
+      - run: node --test app/tests/*.test.js
