@@ -1,11 +1,11 @@
 {
- "version": "3.3.8",
- "date": "2026-11-23T17:12:52.328Z",
- "notes": "Fondant chocolat glace et Nougat glacé imprimés en cuisine et au comptoir",
+ "version": "3.3.9",
+ "date": "2026-11-23T17:20:28.300Z",
+ "notes": "Eaux en petit et grand modèle (150 / 200 DA) ; Coca, Coca zéro, Selecto, Hamoud blanche à 250 DA",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "0b632c8737466af3d2be915bd6c436349c3e3da6d2b3187ab8513772767cb73e"
+   "sha256": "0d1896b5b6e221ef30d930c50a98815e1b6b3f0fd0297e807fa7a891810f405a"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "758d320a0aa098e6687029d88f0fd4f8c6c0fe7bff64b998473a6e73c58f1e34"
+   "sha256": "8dc70b5179ac248b11304e8415d71f0d3d52ccb2c8033c505f23704513f0a479"
   }
  ]
 }
