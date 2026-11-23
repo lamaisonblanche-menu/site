@@ -1,11 +1,11 @@
 {
- "version": "3.3.3",
- "date": "2026-11-23T16:53:22.760Z",
- "notes": "Codes imposés : Mustapha 2000, Zoheir (chef de rang, ajouté) 1993, Zahir 1996",
+ "version": "3.3.4",
+ "date": "2026-11-23T16:55:00.886Z",
+ "notes": "Code imposé : Lyes (maître d'hôtel) 1515",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "efd9bb328eb69f29de9dbb870073fe8f416e3ebca0d10025dd23b3ce2855e6a6"
+   "sha256": "2b2677e32d2d343ba86d20a6e43d42ac10a5da8b9be8e13ea4bd6a6aa83d3882"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "6444297ef025863d7a4873f20d1d77bccce6e9c484322ebfdde0c89e62809fbd"
+   "sha256": "351517e2fc2e03f23294c3bc403b1a782d67808ed762f10af2a5d33164d45719"
   }
  ]
 }
