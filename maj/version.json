@@ -1,7 +1,7 @@
 {
  "version": "3.5.6",
- "date": "2026-11-23T23:24:19.034Z",
- "notes": "3.5.6 : suppléments gruyère et parmesan, sociétés sur facture, rase automatique activée à 2h et extinction du PC chaque nuit, correction de l'écran des mises à jour.",
+ "date": "2026-11-23T23:24:35.521Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
