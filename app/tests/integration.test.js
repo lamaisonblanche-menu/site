@@ -65,6 +65,38 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     assert.equal(saved.tickets.length, 1);
     assert.equal(saved.tickets[0].net, (product.prix + 500) * 2);
     assert.ok(fs.readdirSync(path.join(dir, 'impressions-simulees')).length > 0, 'Bons simulés absents');
+    // Paiements partiels et mixtes, sans duplication des lignes.
+    const open2 = await api('/api/commande/ouvrir', { salle: 'gastro', table: '2', couverts: 1 });
+    assert.equal(open2.status, 200);
+    const id2 = open2.data.id;
+    const sent2 = await api('/api/commande/envoyer', { id: id2, lignes: [{ pid: product.id, qte: 2, opts: [{ g: 'supplements', i: 0 }] }] });
+    assert.equal(sent2.status, 200);
+    const state2 = await api('/api/etat');
+    const line2 = state2.data.commandes.find(c => c.id === id2).lignes[0];
+    const partial = await api('/api/commande/encaisser', { id: id2, lignes: [{ id: line2.id, qte: 1 }], mode: 'tpe', imprimer: false });
+    assert.equal(partial.status, 200, JSON.stringify(partial.data));
+    assert.equal(partial.data.partiel, true);
+    const unit = product.prix + 500;
+    const mixed = await api('/api/commande/encaisser', { id: id2, paiements: [{ mode: 'especes', montant: 100 }, { mode: 'tpe', montant: unit - 100 }], imprimer: false });
+    assert.equal(mixed.status, 200, JSON.stringify(mixed.data));
+    assert.equal(mixed.data.partiel, false);
+    assert.equal(mixed.data.ticket.net, unit);
+    const saved2 = JSON.parse(fs.readFileSync(path.join(dir, 'caisse.json'), 'utf8'));
+    assert.equal(saved2.tickets.length, 3);
+    assert.equal(saved2.tickets.reduce((a, t) => a + t.net, 0), unit * 4);
+    // Réservations invalides rejetées.
+    const invalidDate = await api('/api/reservation', { date: '2026-02-31', heure: '20:00', nom: 'Test', couverts: 2 });
+    assert.equal(invalidDate.status, 400);
+    const invalidHour = await api('/api/reservation', { date: '2026-12-01', heure: '29:00', nom: 'Test', couverts: 2 });
+    assert.equal(invalidHour.status, 400);
+    // Limitation des tentatives de connexion.
+    for (let i = 0; i < 5; i++) {
+      const failed = await api('/api/login', { pin: '0000' }, false);
+      assert.equal(failed.status, 401);
+    }
+    const blocked = await api('/api/login', { pin: '0000' }, false);
+    assert.equal(blocked.status, 429);
+
   } finally {
     server.kill('SIGTERM');
     await sleep(150);
