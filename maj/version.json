@@ -1,7 +1,7 @@
 {
  "version": "3.5.3",
- "date": "2026-11-23T18:47:10.146Z",
- "notes": "Fiabilise les encaissements, les réservations Gmail et les bons, et ajoute le supplément frites à 500 DA.",
+ "date": "2026-11-23T18:54:23.469Z",
+ "notes": "Fiabilise les encaissements, les réservations Gmail et les bons, et ajoute l’option frites à 500 DA dans la fiche du plat.",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "a948f54c17a028bbd385d86510ab53e0bfa4aa8993a04b9e218c44f3a577fa65"
+   "sha256": "9015fd03da50346595779e6cd3fe19bc58744464799124f99a7881c30b18f4f4"
   }
  ]
 }

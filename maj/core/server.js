@@ -304,23 +304,18 @@ if (!db.desserts353) {
   }
   db.desserts353 = true;
 }
-// Tarif confirmé par le patron : supplément frites à 500 DA.
-if (!db.supplementFrites353) {
-  let cat = db.categories.find(c => ['supplement', 'supplements'].includes(slug(c.nom)));
-  const p = db.produits.find(p => /^supplements?-frites$/.test(slug(p.nom)) ||
-    (cat && p.cat === cat.id && slug(p.nom) === 'frites'));
-  if (p) {
-    p.prix = 500;
-    p.actif = true;
-  } else {
-    if (!cat) {
-      cat = { id: 'supplements', nom: 'Suppléments', poste: 'cuisine', couleur: '#efe3cc', suite: 2, univers: 'La carte',
-        ordre: Math.max(0, ...db.categories.map(c => c.ordre)) + 1 };
-      db.categories.push(cat);
-    }
-    db.produits.push({ id: 'ps-supplement-frites', nom: 'Supplément frites', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+// Tarif confirmé par le patron : les frites se commandent comme option du plat.
+if (!db.optionFrites353) {
+  const categories = new Set(['brunch-oeufs', 'brunch-classiques', 'brunch-autres-envies', 'burgers', 'viandes', 'volailles', 'poissons', 'pates-fraiches']);
+  const id = 'supplement-frites';
+  if (!db.options.some(g => g.id === id)) {
+    db.options.push({ id, nom: 'Suppléments', obligatoire: false, multiple: false, choix: [{ nom: 'Supplément frites', prix: 500 }] });
   }
-  db.supplementFrites353 = true;
+  for (const p of db.produits) {
+    if (p.id === 'ps-supplement-frites') p.actif = false;
+    if (categories.has(p.cat) && !(p.options || []).includes(id)) p.options = [...(p.options || []), id];
+  }
+  db.optionFrites353 = true;
 }
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
@@ -600,7 +595,7 @@ function piedTicket(d) {
 }
 function lignesTicket(d, lignes, sansPayees) {
   const grp = {};
-  for (const l of lignes) { if (l.annule || (sansPayees && l.paye)) continue; const o = (l.opts || []).filter(x => x.prix).map(x => x.nom).join(', '); const k = l.nom + '|' + o + '|' + l.prix + '|' + (l.offert ? 1 : 0); (grp[k] = grp[k] || { ...l, o, qte: 0 }).qte += l.qte; }
+  for (const l of lignes) { if (l.annule || (sansPayees && l.paye)) continue; const o = (l.opts || []).filter(x => x.prix).map(x => x.nom + ' (+' + fmt(x.prix) + ' DA/unité)').join(', '); const k = l.nom + '|' + o + '|' + l.prix + '|' + (l.offert ? 1 : 0); (grp[k] = grp[k] || { ...l, o, qte: 0 }).qte += l.qte; }
   for (const l of Object.values(grp)) { d.lr(l.qte + ' x ' + l.nom, l.offert ? 'OFFERT' : fmt(l.qte * l.prix)); if (l.o) d.t('    + ' + l.o); }
 }
 // paiements d'un ticket (les anciens tickets n'ont qu'un mode)
