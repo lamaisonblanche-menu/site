@@ -1,11 +1,11 @@
 {
- "version": "3.2.4",
- "date": "2026-11-23T16:22:39.714Z",
- "notes": "Connexion automatique dès que le code est bon, sans appuyer sur Entrer",
+ "version": "3.2.5",
+ "date": "2026-11-23T16:24:01.448Z",
+ "notes": "Équipe : Rayan, Lyes (maître d'hôtel)",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "da37b62b234fc08c3abe13174a58e80da0d1c4cfc5dcf4378e9317e81d4f5c3d"
+   "sha256": "a37fa49d02e50f3371b05c5046958650772ecbedb21882a542229792b81578b2"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "6e7242f8e025136d8b88ac7b1fcfc97542799f57f915a4e6f8363e8a4d7e1514"
+   "sha256": "e0adb998379a3b47c2715adacd94c6e6f149ea6847d32dedd6892b5e5ea69197"
   }
  ]
 }

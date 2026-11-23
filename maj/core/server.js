@@ -171,6 +171,16 @@ if (!db.equipeInitiale) {
   db.equipeInitiale = true;
   setTimeout(() => saveNow(), 0);
 }
+// Équipe (version 3.2.5) : Rayan (orthographe corrigée), Lyes maître d'hôtel
+if (!db.equipe2) {
+  const ry = db.users.find(u => u.nom === 'Rayen'); if (ry) ry.nom = 'Rayan';
+  if (!db.users.some(u => u.nom.toLowerCase() === 'lyes')) {
+    let code = '9117'; while (db.users.some(u => u.pin === code)) code = String(1000 + Math.floor(Math.random() * 9000));
+    db.users.push({ id: 'u-lyes', nom: 'Lyes', role: 'serveur', pin: code, badge: '', actif: true });
+  }
+  db.equipe2 = true;
+  setTimeout(() => saveNow(), 0);
+}
 for (const s of db.config.salles) {
   if (s.tables.length && typeof s.tables[0] === 'string') s.tables = s.tables.map((n, i) => ({ n, x: 8 + (i % 10) * 9.5, y: 12 + Math.floor(i / 10) * 20 }));
   s.deco = s.deco || []; s.fond = s.fond || 'creme'; s.ratio = s.ratio || 1.6; s.taille = s.taille || 7;
