@@ -1,11 +1,11 @@
 {
- "version": "3.3.5",
- "date": "2026-11-23T17:07:39.405Z",
- "notes": "Crêpes, pancakes, desserts du brunch et fondant imprimés au comptoir ; pointage seulement sur la caisse principale",
+ "version": "3.3.6",
+ "date": "2026-11-23T17:11:28.401Z",
+ "notes": "NY roll, Pavlova, Profiteroles et Mochis imprimés sur toutes les imprimantes",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "649819783a78ba424b97fcf4d29fb809866b0b3659f901c0c0dac285ad9cca78"
+   "sha256": "3676ec0fe266ce0c32d242c26b79e9388a55fc7d54be5f62c8a0b9b85a300d8c"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "2c55467e6e508eed2b7b858d8d1021b506efd91be8e3b623b71dad01ba259e04"
+   "sha256": "e106e29314fbfb8e37486ee1a09a4ba2936e19b4bd4c9033257d304de9eac6d7"
   }
  ]
 }

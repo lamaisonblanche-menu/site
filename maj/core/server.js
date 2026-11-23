@@ -222,6 +222,14 @@ if (!db.postes5) {
   db.postes5 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Desserts imprimés partout (version 3.3.6) : NY roll, Pavlova, Profiteroles, Mochis glacés (déjà sur la carte, 2 000 DA)
+if (!db.partout6) {
+  const cat = db.categories.find(c => c.id === 'desserts-carte') || db.categories.find(c => c.id === 'desserts');
+  if (cat && !db.produits.some(p => /^mochi/i.test(p.nom))) db.produits.push({ id: 'ps-mochi', nom: 'Mochi', prix: 2000, cat: cat.id, actif: true, options: [], stock: null });
+  for (const p of db.produits) if (/^ny roll|^pavlova|^profiterole|^mochi/i.test(p.nom)) p.partout = true;
+  db.partout6 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -419,6 +427,16 @@ function posteDe(pid) {
   const k = c ? c.poste : 'cuisine';
   return db.config.imprimantes[k] && k !== 'ticket' ? k : postesBons()[0];
 }
+// Article « partout » (3.3.6) : le bon sort sur toutes les imprimantes de bons branchées (IP ou USB)
+function postesDe(pid) {
+  const p = db.produits.find(x => x.id === pid);
+  if (p && p.partout) {
+    const reels = postesBons().filter(k => { const i = db.config.imprimantes[k]; return i && (i.ip || (i.type === 'usb' && i.windows)); });
+    const l = reels.length ? reels : postesBons().filter(k => k !== 'cuisine2');
+    if (l.length) return l;
+  }
+  return [posteDe(pid)];
+}
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
 
 function lignesBon(d, l) {
@@ -450,7 +468,7 @@ function bon(poste, cmd, lignes, titre) {
 // Écran cuisine : un bon par poste et par suite
 function creerBons(c, lignes, type) {
   const parPoste = {};
-  for (const l of lignes) (parPoste[posteDe(l.pid)] = parPoste[posteDe(l.pid)] || []).push(l);
+  for (const l of lignes) for (const k of postesDe(l.pid)) (parPoste[k] = parPoste[k] || []).push(l);
   for (const [poste, ls] of Object.entries(parPoste)) {
     const suites = [...new Set(ls.map(l => l.suite || 0))];
     for (const s of suites) {
@@ -782,7 +800,7 @@ const routes = {
     save();
     const erreurs = [];
     for (const poste of postesBons()) {
-      const ls = nouvelles.filter(l => posteDe(l.pid) === poste);
+      const ls = nouvelles.filter(l => postesDe(l.pid).includes(poste));
       if (!ls.length) continue;
       const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : ''));
       if (!r.ok) erreurs.push(r.erreur);
@@ -801,7 +819,7 @@ const routes = {
     save();
     const erreurs = [];
     for (const poste of postesBons()) {
-      const lp = ls.filter(l => posteDe(l.pid) === poste);
+      const lp = ls.filter(l => postesDe(l.pid).includes(poste));
       if (!lp.length) continue;
       const d = new Doc();
       d.center(1).size(2).bold(1).t('RÉCLAME').t(SUITES[s].toUpperCase()).size(0).bold(0).center(0).line('=');
@@ -860,7 +878,7 @@ const routes = {
     const c = getCmd(b.id);
     const erreurs = [];
     for (const poste of postesBons()) {
-      const ls = c.lignes.filter(l => !l.annule && posteDe(l.pid) === poste);
+      const ls = c.lignes.filter(l => !l.annule && postesDe(l.pid).includes(poste));
       if (!ls.length) continue;
       const r = await imprimer(poste, bon(poste, c, ls, '** RÉIMPRESSION **'));
       if (!r.ok) erreurs.push(r.erreur);
@@ -881,16 +899,15 @@ const routes = {
     if (q < l.qte) { l.qte -= q; db.seq.ligne++; cible = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(cible); }
     cible.annule = { par: chef.nom, demandePar: u.nom, motif: b.motif, ts: now() };
     const pr = db.produits.find(p => p.id === l.pid); if (pr && pr.stock !== null && pr.stock !== undefined) pr.stock += q;
-    db.seq.bon++;
-    db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: posteDe(l.pid), ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] });
+    for (const k of postesDe(l.pid)) { db.seq.bon++; db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: k, ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] }); }
     journal(u, 'annulation article', 'Table ' + c.table + ' : ' + q + ' ' + l.nom + ' (' + b.motif + ') autorisé par ' + chef.nom);
     save();
-    const poste = posteDe(l.pid);
     const d = new Doc();
     d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t('Table ' + c.table + ' - ' + heure(now())).line();
     d.size(3).bold(1).t(q + '  ' + l.nom).size(0).bold(0).t('Motif : ' + b.motif).cut();
-    const r = await imprimer(poste, d);
-    return { commande: c, erreurs: r.ok ? [] : [r.erreur] };
+    const erreurs = [];
+    for (const k of postesDe(l.pid)) { const r = await imprimer(k, d); if (!r.ok) erreurs.push(r.erreur); }
+    return { commande: c, erreurs };
   },
   'POST /api/commande/offrir-ligne': (b, u) => {
     const c = getCmd(b.id);
@@ -1202,7 +1219,8 @@ const routes = {
     if (Array.isArray(b.options)) db.options = b.options.filter(g => g.nom && Array.isArray(g.choix)).map((g, i) => ({ id: g.id || ('o' + now() + i), nom: String(g.nom).slice(0, 30), obligatoire: !!g.obligatoire, multiple: !!g.multiple, choix: g.choix.filter(ch => ch.nom).map(ch => ({ nom: String(ch.nom).slice(0, 30), prix: Math.max(0, Math.round(+ch.prix || 0)) })) }));
     const gids = new Set(db.options.map(g => g.id));
     db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), univers: String(c.univers || 'La carte').slice(0, 20), ordre: i }));
-    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0) }));
+    const partoutAvant = new Set(db.produits.filter(p => p.partout).map(p => p.id));
+    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}) }));
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
     save(); return {};
