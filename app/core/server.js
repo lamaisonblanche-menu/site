@@ -355,11 +355,29 @@ function jourCourant(creer) {
 }
 
 // ---------------------------------------------------------------- Sessions
-const sessions = new Map(); // token -> {userId, ts}
+const sessions = new Map(); // token -> {userId, ts, created}
+const SESSION_IDLE_MS = 2 * 3600000, SESSION_MAX_MS = 12 * 3600000;
+const essaisAcces = new Map();
+function controleEssais(req) {
+  const ip = String(req?.socket?.remoteAddress || 'inconnue');
+  const t = now(), x = essaisAcces.get(ip);
+  if (x && x.bloqueJusqua > t) E('Trop de tentatives. Réessayez dans quelques minutes.', 429);
+  if (essaisAcces.size > 2000) for (const [k, v] of essaisAcces) if (t - v.debut > 3600000) essaisAcces.delete(k);
+  return ip;
+}
+function echecAcces(ip) {
+  const t = now(), ancien = essaisAcces.get(ip);
+  const x = ancien && t - ancien.debut < 5 * 60000 ? ancien : { debut: t, n: 0, bloqueJusqua: 0 };
+  x.n++;
+  if (x.n >= 5) x.bloqueJusqua = t + 5 * 60000;
+  essaisAcces.set(ip, x);
+}
+function succesAcces(ip) { essaisAcces.delete(ip); }
 function userDe(req) {
   const t = req.headers['x-token'];
   const s = t && sessions.get(t);
   if (!s) return null;
+  if (now() - s.ts > SESSION_IDLE_MS || now() - (s.created || s.ts) > SESSION_MAX_MS) { sessions.delete(t); return null; }
   const u = db.users.find(x => x.id === s.userId && x.actif);
   if (!u) return null;
   s.ts = now();
@@ -986,11 +1004,13 @@ function bonsKds(poste) {
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
 const routes = {
-  'POST /api/login': (b) => {
+  'POST /api/login': (b, _u, req) => {
+    const ip = controleEssais(req);
     const u = parCode(b.badge || b.pin);
-    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    if (!u) { echecAcces(ip); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
+    succesAcces(ip);
     const token = crypto.randomBytes(18).toString('hex');
-    sessions.set(token, { userId: u.id, ts: now() });
+    sessions.set(token, { userId: u.id, ts: now(), created: now() });
     journal(u, 'connexion', '');
     return { token, user: { id: u.id, nom: u.nom, role: u.role } };
   },
@@ -1461,13 +1481,15 @@ const routes = {
     return { erreurs: res.ok ? [] : [res.erreur] };
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
-  'POST /api/code-valide': (b) => { const u = parCode(b.pin); return { ok: !!u && String(b.pin).length >= 4 }; },
+  'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
   'POST /api/pointage': (b, _u, req) => {
     // le pointage se fait seulement sur le PC de la caisse principale (pas sur les écrans de salle)
     const ip = String((req && req.socket && req.socket.remoteAddress) || '');
     if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Le pointage se fait uniquement sur la caisse principale', 403);
+    const cle = controleEssais(req);
     const u = parCode(b.badge || b.pin);
-    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    if (!u) { echecAcces(cle); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
+    succesAcces(cle);
     const ouvert = db.pointages.find(p => p.userId === u.id && !p.out && now() - p.in < 20 * 3600e3);
     let type, duree = 0;
     if (ouvert) {
@@ -1594,7 +1616,14 @@ function lireCorps(req) {
     req.on('end', () => { try { res(s ? JSON.parse(s) : {}); } catch (e) { rej(new Err(400, 'JSON invalide')); } });
   });
 }
-function csv(rows) { return '﻿' + rows.map(r => r.map(v => { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';')).join('\r\n'); }
+function csv(rows) {
+  // Empêche qu'un champ libre soit interprété comme formule par un tableur.
+  return '\uFEFF' + rows.map(r => r.map(v => {
+    v = v == null ? '' : String(v);
+    if (/^[\\t\\r\\n ]*[=+@-]/.test(v)) v = "'" + v;
+    return /[;"\\r\\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(';')).join('\\r\\n');
+}
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
