@@ -131,7 +131,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.
 
-## 8. Passation (23/11/2026, version 3.5.0 publiée)
+## 8. Passation (23/11/2026, version 3.5.2 publiée)
 
 État : caisse lancée au restaurant le 23/11/2026. Versions du jour : 3.3.2 → 3.5.0 (voir `git log`).
 Toutes les modifications de la carte ou des codes passent par une **migration avec drapeau** dans server.js
@@ -148,3 +148,17 @@ Toutes les modifications de la carte ou des codes passent par une **migration av
 
 Tester avant chaque publication (obligatoire) : `node --check`, une commande complète au navigateur en 1024×768
 (ouvrir une table, plats, Envoyer, encaisser en espèces) et lire `impressions-simulees/`.
+
+### Pour ChatGPT / Codex (comment publier)
+- Travailler depuis **Codex** (chatgpt.com/codex), environnement relié au dépôt `lamaisonblanche-menu/site`, **branche de base `caisse`**.
+- Dans la même pull request : le changement dans `app/core/`, `app/core/VERSION` augmenté, ET le dossier `maj/` régénéré par
+  `cd app && node outils/publier.js "notes"`. Sans `maj/`, rien n'arrive au restaurant.
+- La pull request doit viser **base: caisse** (jamais `main`). Le patron la fusionne (« Merge pull request ») : c'est ce qui publie.
+- Si Claude et Codex travaillent le même jour : toujours repartir de la dernière version de `caisse` et prendre un numéro de version
+  plus grand que celui de `maj/version.json`.
+
+Changements du 23/11 au soir (3.4.0 → 3.5.2) :
+- 3.4.0 : mise à jour installée même avec des tables ouvertes (après 3 min sans activité) ; « Installer maintenant » toujours possible.
+- 3.5.0 : réservations (onglet Résa, téléphone + site via Gmail IMAP, mail au patron).
+- 3.5.1 : table réservée bloquée de 30 min avant à 1 h après l'heure.
+- 3.5.2 : une table bloquée ne s'ouvre que par un caissier (badge/code d'un caissier pour un serveur).
