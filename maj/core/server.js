@@ -269,6 +269,9 @@ if (!db.boissons10) {
   db.boissons10 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Réservations (version 3.5.0)
+db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
+db.seq.resa = db.seq.resa || 0;
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -746,6 +749,197 @@ setInterval(() => { for (const r of clients) { try { r.write(': ping\n\n'); } ca
 class Err extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const E = (msg, code = 400) => { throw new Err(code, msg); };
 
+// ------------------------------------------------------------ Réservations (téléphone + site)
+const JOURS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+function jourTxt(date) { const d = new Date(date + 'T12:00'); return JOURS_FR[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS_FR[d.getMonth()]; }
+function resaPublic(r) { return { id: r.id, date: r.date, heure: r.heure, nom: r.nom, tel: r.tel, couverts: r.couverts, salle: r.salle, table: r.table, note: r.note, statut: r.statut, source: r.source, par: r.par, ts: r.ts }; }
+function resaTexte(r) {
+  return [
+    'Client : ' + r.nom + (r.tel ? ' - ' + r.tel : ''),
+    'Quand : ' + jourTxt(r.date) + ' à ' + r.heure.replace(':', ' h '),
+    'Personnes : ' + r.couverts,
+    'Salle : ' + (r.salle ? salleNom(r.salle) : 'pas choisie') + (r.table ? ' - table ' + r.table : ''),
+    r.note ? 'Remarque : ' + r.note : '',
+    'Prise par : ' + (r.par || '-') + (r.source === 'site' ? ' (site internet)' : ' (téléphone)'),
+  ].filter(Boolean).join('\n');
+}
+// mails de notification : gardés en attente tant qu'il n'y a pas d'internet
+function notifier(sujet, texte) {
+  const m = db.config.mail || {};
+  if (!m.actif || !m.user || !m.pass) return;
+  db.mailsAttente.push({ dest: m.dest || m.user, sujet, texte, ts: now() });
+  save(); envoyerAttente();
+}
+let envoiEnCours = false;
+async function envoyerAttente() {
+  if (envoiEnCours) return;
+  envoiEnCours = true;
+  try {
+    db.mailsAttente = db.mailsAttente.filter(x => now() - x.ts < 2 * 864e5);
+    while (db.mailsAttente.length) {
+      const x = db.mailsAttente[0];
+      const r = await envoyerMail(x.dest, x.sujet, x.texte);
+      if (!r.ok) break;
+      db.mailsAttente.shift(); save();
+    }
+  } catch (e) {} finally { envoiEnCours = false; }
+}
+setInterval(envoyerAttente, 5 * 60000);
+function verifierResa(b) {
+  const r = {
+    date: String(b.date || ''), heure: String(b.heure || ''), nom: String(b.nom || '').trim().slice(0, 50), tel: String(b.tel || '').trim().slice(0, 30),
+    couverts: parseInt(b.couverts, 10) || 0, salle: String(b.salle || ''), table: String(b.table || '').trim(), note: String(b.note || '').trim().slice(0, 200),
+  };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) E('Choisissez la date');
+  if (!/^\d{2}:\d{2}$/.test(r.heure)) E('Choisissez l\'heure');
+  if (!r.nom) E('Nom du client obligatoire');
+  if (!(r.couverts >= 1 && r.couverts <= 200)) E('Nombre de personnes ?');
+  if (r.salle && !db.config.salles.some(x => x.id === r.salle)) r.salle = '';
+  if (!r.salle) r.table = '';
+  return r;
+}
+const minutes = h => +h.slice(0, 2) * 60 + +h.slice(3, 5);
+function conflitTable(r, id) {
+  if (!r.table) return null;
+  return db.reservations.find(x => x.id !== id && x.date === r.date && x.salle === r.salle && x.table === r.table && ['a_confirmer', 'prevue'].includes(x.statut) && Math.abs(minutes(x.heure) - minutes(r.heure)) < 120);
+}
+// ---- lecture des réservations du site (mails Web3Forms) dans Gmail, par IMAP
+function imapLire(m, depuis) {
+  return new Promise((resolve, reject) => {
+    const hote = process.env.CAISSE_IMAP_HOST || 'imap.gmail.com';
+    const sock = tls.connect(+process.env.CAISSE_IMAP_PORT || 993, hote, { servername: hote });
+    let buf = Buffer.alloc(0), n = 0, attente = null, fini = false;
+    const fin = (err, val) => { if (fini) return; fini = true; try { sock.end(); sock.destroy(); } catch (e) {} err ? reject(err) : resolve(val); };
+    sock.setTimeout(30000, () => fin(new Error('pas de réponse de Gmail (internet ?)')));
+    sock.on('error', e => fin(new Error(e.code === 'ENOTFOUND' || e.code === 'EAI_AGAIN' ? 'pas d\'internet' : e.message)));
+    const cmd = c => new Promise(res => { n++; const tag = 'A' + n; attente = { tag, res }; sock.write(tag + ' ' + c + '\r\n'); });
+    sock.on('data', d => {
+      buf = Buffer.concat([buf, d]);
+      if (!attente) { if (buf.indexOf('\r\n') >= 0) { const l = buf.toString('latin1'); buf = Buffer.alloc(0); if (!/^\* OK/.test(l)) fin(new Error('Gmail : ' + l.slice(0, 80))); else suite(); } return; }
+      const t = buf.toString('latin1'), i = t.search(new RegExp('(^|\\r\\n)' + attente.tag + ' (OK|NO|BAD)'));
+      if (i < 0) return;
+      const j = t.indexOf('\r\n', i + 2);
+      if (j < 0) return;
+      const rep = buf.slice(0, j + 2); buf = buf.slice(j + 2);
+      const a = attente; attente = null; a.res(rep);
+    });
+    const ok = (rep, quoi) => { const l = rep.toString('latin1').trim().split('\r\n').pop(); if (!/ OK/.test(l)) throw new Error(quoi + ' : ' + l.slice(0, 120)); };
+    const dImap = d => d.getDate() + '-' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + '-' + d.getFullYear();
+    let lance = false;
+    const suite = async () => {
+      if (lance) return; lance = true;
+      try {
+        const q = x => '"' + String(x).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+        let r = await cmd('LOGIN ' + q(m.user) + ' ' + q(m.pass));
+        const l = r.toString('latin1'); if (!/ OK/.test(l.trim().split('\r\n').pop())) throw new Error(/AUTHENTICATIONFAILED|Invalid credentials/i.test(l) ? 'Gmail refuse le mot de passe d\'application' : 'connexion Gmail refusée');
+        ok(await cmd('SELECT INBOX'), 'boîte de réception');
+        r = await cmd('UID SEARCH SINCE ' + dImap(depuis) + ' FROM "web3forms"'); ok(r, 'recherche');
+        const uids = ((r.toString('latin1').match(/\* SEARCH([^\r\n]*)/) || [])[1] || '').trim().split(/\s+/).filter(Boolean).slice(-60);
+        const mails = [];
+        for (const uid of uids) {
+          const f = await cmd('UID FETCH ' + uid + ' (BODY.PEEK[])');
+          const mm = f.toString('latin1').match(/\{(\d+)\}\r\n/);
+          if (!mm) continue;
+          const debut = f.toString('latin1').indexOf(mm[0]) + mm[0].length;
+          mails.push(f.slice(debut, debut + +mm[1]));
+        }
+        try { await cmd('LOGOUT'); } catch (e) {}
+        fin(null, mails);
+      } catch (e) { fin(e); }
+    };
+  });
+}
+// décodage minimal d'un mail (MIME) : en-têtes, sujet, texte lisible
+function decodeMots(s) {
+  return s.replace(/\?=\s+=\?/g, '?==?').replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (x, cs, enc, t) => {
+    const b = /b/i.test(enc) ? Buffer.from(t, 'base64') : Buffer.from(t.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (y, h) => String.fromCharCode(parseInt(h, 16))), 'latin1');
+    return /utf-?8/i.test(cs) ? b.toString('utf8') : b.toString('latin1');
+  });
+}
+function mimeParties(raw) {
+  const t = raw.toString('latin1'), k = t.search(/\r?\n\r?\n/);
+  const head = (k < 0 ? t : t.slice(0, k)).replace(/\r?\n[ \t]+/g, ' ');
+  const body = k < 0 ? '' : t.slice(k).replace(/^\r?\n\r?\n/, '');
+  const h = {}; for (const l of head.split(/\r?\n/)) { const i = l.indexOf(':'); if (i > 0) h[l.slice(0, i).toLowerCase().trim()] = l.slice(i + 1).trim(); }
+  const ct = h['content-type'] || 'text/plain';
+  const bd = (ct.match(/boundary="?([^";]+)"?/i) || [])[1];
+  if (/^multipart\//i.test(ct) && bd) {
+    const morceaux = body.split('--' + bd).slice(1).filter(x => !/^--/.test(x));
+    return { h, parties: morceaux.flatMap(x => mimeParties(Buffer.from(x.replace(/^\r?\n/, ''), 'latin1')).parties) };
+  }
+  const te = (h['content-transfer-encoding'] || '').toLowerCase();
+  let b = te === 'base64' ? Buffer.from(body.replace(/\s+/g, ''), 'base64') : te === 'quoted-printable' ? Buffer.from(body.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (x, y) => String.fromCharCode(parseInt(y, 16))), 'latin1') : Buffer.from(body, 'latin1');
+  const cs = (ct.match(/charset="?([^";]+)"?/i) || [])[1] || 'utf-8';
+  return { h, parties: [{ type: ct.split(';')[0].toLowerCase(), texte: /utf-?8/i.test(cs) ? b.toString('utf8') : b.toString('latin1') }] };
+}
+function texteDeHtml(html) {
+  return html.replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|p|tr|td|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (x, n) => String.fromCharCode(+n));
+}
+function resaDepuisMail(raw) {
+  const { h, parties } = mimeParties(raw);
+  const sujet = decodeMots(h.subject || '');
+  if (!/^\s*R[ée]servation/i.test(sujet)) return null;
+  const plain = parties.find(p => p.type === 'text/plain'), html = parties.find(p => p.type === 'text/html');
+  const texte = plain && /Personnes|Nom/.test(plain.texte) ? plain.texte : html ? texteDeHtml(html.texte) : (plain ? plain.texte : '');
+  const lignes = texte.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const champ = nom => {
+    const re = new RegExp('^' + nom + '\\s*:\\s*(.*)$', 'i');
+    for (let i = 0; i < lignes.length; i++) {
+      const m = lignes[i].match(re); if (m && m[1]) return m[1].trim();
+      if (new RegExp('^' + nom + '$', 'i').test(lignes[i]) && lignes[i + 1]) return lignes[i + 1];
+    }
+    return '';
+  };
+  const propre = v => (v === '-' ? '' : v);
+  // date : « lundi 23 novembre » (année devinée), heure « 14 h 00 »
+  const dt = (champ('Date') || sujet).toLowerCase().match(/(\d{1,2})\s+(janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)(?:\s+(\d{4}))?/);
+  const hr = (champ('Heure') || sujet).match(/(\d{1,2})\s*h\s*(\d{2})?/i);
+  if (!dt || !hr) return null;
+  const mi = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'].indexOf(dt[2].normalize('NFD').replace(/[̀-ͯ]/g, ''));
+  let an = dt[3] ? +dt[3] : new Date().getFullYear();
+  let date = an + '-' + String(mi + 1).padStart(2, '0') + '-' + String(+dt[1]).padStart(2, '0');
+  if (!dt[3] && date < dateLocale(now() - 60 * 864e5)) date = (an + 1) + date.slice(4);
+  const heure = String(+hr[1]).padStart(2, '0') + ':' + (hr[2] || '00');
+  const esp = champ('Espace').toLowerCase();
+  const salle = (db.config.salles.find(x => esp && (esp.includes(x.nom.toLowerCase()) || x.nom.toLowerCase().includes(esp.replace(/^salle\s+|^espace\s+/, '')))) || {}).id || '';
+  const pers = parseInt(champ('Personnes') || (sujet.match(/(\d+)\s*pers/) || [])[1], 10) || 1;
+  const nom = propre(champ('Nom')) || (sujet.split(',').pop() || '').trim() || 'Client du site';
+  const notes = [propre(champ('Occasion')) && 'Occasion : ' + propre(champ('Occasion')), propre(champ('Remarque')), propre(champ('E-mail')) && 'Mail : ' + propre(champ('E-mail'))].filter(Boolean).join(' · ');
+  return { id: (h['message-id'] || sujet + date + heure).replace(/[<>]/g, ''), date, heure, nom: nom.slice(0, 50), tel: propre(champ('T[ée]l[ée]phone') || champ('WhatsApp')).slice(0, 30), couverts: pers, salle, table: '', note: notes.slice(0, 200) };
+}
+let siteEtat = { dernier: 0, erreur: null, ajoutees: 0 };
+let lectureSite = false;
+async function lireSite() {
+  const m = db.config.mail || {};
+  if (!m.actif || !m.user || !m.pass || lectureSite) return siteEtat;
+  lectureSite = true;
+  try {
+    const mails = await imapLire(m, new Date(now() - 4 * 864e5));
+    let ajout = 0;
+    for (const raw of mails) {
+      let r; try { r = resaDepuisMail(raw); } catch (e) { r = null; }
+      if (!r || db.siteVus.includes(r.id)) continue;
+      db.siteVus.push(r.id); if (db.siteVus.length > 600) db.siteVus = db.siteVus.slice(-400);
+      if (r.date < dateLocale(now())) continue;
+      db.seq.resa++;
+      db.reservations.push({ ...r, ext: r.id, id: 'R' + db.seq.resa, statut: 'a_confirmer', source: 'site', par: 'Site', ts: now() });
+      ajout++;
+    }
+    siteEtat = { dernier: now(), erreur: null, ajoutees: siteEtat.ajoutees + ajout };
+    if (ajout) save();
+  } catch (e) { siteEtat = { ...siteEtat, dernier: now(), erreur: e.message }; }
+  lectureSite = false;
+  return siteEtat;
+}
+setTimeout(lireSite, 20000); setInterval(lireSite, 5 * 60000);
+// une table réservée devient « arrivée » quand on l'ouvre autour de l'heure prévue
+function arriveeAuto(c) {
+  const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
+  const r = db.reservations.find(x => x.date === auj && x.salle === c.salle && x.table === c.table && ['prevue', 'a_confirmer'].includes(x.statut) && Math.abs(minutes(x.heure) - mn) <= 90);
+  if (r) { r.statut = 'arrivee'; r.arrivee = now(); }
+}
 function etatPublic(u) {
   const c = { ...db.config };
   // le mot de passe du mail ne quitte jamais la caisse principale
@@ -759,6 +953,7 @@ function etatPublic(u) {
     commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte'),
     jour: jourCourant(false) || null,
     options: db.options, top: topVentes(), version: VERSION,
+    reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
     prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
 }
@@ -787,6 +982,47 @@ const routes = {
     return { token, user: { id: u.id, nom: u.nom, role: u.role } };
   },
   'GET /api/etat': (b, u) => etatPublic(u),
+  'GET /api/reservations': (b, u, req, q) => {
+    if (u.role === 'cuisine') E('Non autorisé', 403);
+    const du = /^\d{4}-\d{2}-\d{2}$/.test(q.du || '') ? q.du : dateLocale(now()), au = /^\d{4}-\d{2}-\d{2}$/.test(q.au || '') ? q.au : du;
+    return { reservations: db.reservations.filter(r => r.date >= du && r.date <= au).sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure)).map(resaPublic), site: siteEtat, mail: !!(db.config.mail && db.config.mail.actif && db.config.mail.pass) };
+  },
+  'POST /api/reservation': (b, u) => {
+    if (!peut(u, 'caissier')) E('Seuls les caissiers peuvent prendre une réservation', 403);
+    const r = verifierResa(b);
+    const ex = b.id ? db.reservations.find(x => x.id === b.id) : null;
+    if (b.id && !ex) E('Réservation introuvable');
+    const c = conflitTable(r, ex && ex.id);
+    if (c && !b.forcer) E('La table ' + r.table + ' est déjà réservée à ' + c.heure + ' (' + c.nom + ')', 409);
+    if (ex) {
+      Object.assign(ex, r, { modifiePar: u.nom, modifie: now() });
+      const confirme = ex.statut === 'a_confirmer' && b.confirmer;
+      if (confirme) ex.statut = 'prevue';
+      journal(u, confirme ? 'réservation du site confirmée' : 'réservation modifiée', ex.nom + ' ' + ex.date + ' ' + ex.heure);
+      save(); notifier('[Caisse MB] ' + (confirme ? 'Réservation du site confirmée' : 'Réservation modifiée') + ' : ' + ex.nom + ', ' + ex.couverts + ' pers., ' + jourTxt(ex.date) + ' à ' + ex.heure, resaTexte(ex) + '\n' + (confirme ? 'Confirmée' : 'Modifiée') + ' par : ' + u.nom);
+      return resaPublic(ex);
+    }
+    db.seq.resa++;
+    const n = { id: 'R' + db.seq.resa, ...r, statut: 'prevue', source: 'telephone', par: u.nom, ts: now() };
+    db.reservations.push(n);
+    journal(u, 'réservation', n.nom + ' ' + n.date + ' ' + n.heure + ' ' + n.couverts + ' pers.');
+    save(); notifier('[Caisse MB] Nouvelle réservation : ' + n.nom + ', ' + n.couverts + ' pers., ' + jourTxt(n.date) + ' à ' + n.heure, resaTexte(n));
+    return resaPublic(n);
+  },
+  'POST /api/reservation/statut': (b, u) => {
+    const r = db.reservations.find(x => x.id === b.id);
+    if (!r) E('Réservation introuvable');
+    if (!['prevue', 'arrivee', 'annulee', 'absent'].includes(b.statut)) E('Statut inconnu');
+    if (!peut(u, 'caissier') && b.statut !== 'arrivee') E('Seuls les caissiers peuvent faire ça', 403);
+    const avant = r.statut;
+    r.statut = b.statut; if (b.statut === 'arrivee') r.arrivee = now();
+    journal(u, 'réservation ' + b.statut, r.nom + ' ' + r.date + ' ' + r.heure);
+    save();
+    if (b.statut === 'annulee' && avant !== 'annulee') notifier('[Caisse MB] Réservation annulée : ' + r.nom + ', ' + jourTxt(r.date) + ' à ' + r.heure, resaTexte(r) + '\nAnnulée par : ' + u.nom);
+    if (b.statut === 'prevue' && avant === 'a_confirmer') notifier('[Caisse MB] Réservation du site confirmée : ' + r.nom + ', ' + r.couverts + ' pers., ' + jourTxt(r.date) + ' à ' + r.heure, resaTexte(r) + '\nConfirmée par : ' + u.nom);
+    return resaPublic(r);
+  },
+  'POST /api/reservations/site': async (b, u) => { if (!peut(u, 'caissier')) E('Non autorisé', 403); return await lireSite(); },
   'POST /api/logout': (b, u, req) => { sessions.delete(req.headers['x-token']); return {}; },
 
   'POST /api/commande/ouvrir': (b, u) => {
@@ -803,6 +1039,7 @@ const routes = {
     const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };
     if (salle === 'emporter') { c.client = { nom: String(b.client && b.client.nom || '').slice(0, 40), tel: String(b.client && b.client.tel || '').slice(0, 20) }; c.retrait = +b.retrait || null; }
     db.commandes[c.id] = c;
+    if (salle !== 'emporter' && salle !== 'comptoir') arriveeAuto(c);
     journal(u, 'ouverture table', salleNom(salle) + ' ' + table);
     save();
     return c;

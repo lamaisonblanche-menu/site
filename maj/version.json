@@ -1,11 +1,11 @@
 {
- "version": "3.4.0",
- "date": "2026-11-23T17:23:43.319Z",
- "notes": "Les mises à jour s'installent même avec des tables ouvertes (elles sont gardées), après 3 min sans activité ; bouton « Installer maintenant » toujours possible",
+ "version": "3.5.0",
+ "date": "2026-11-23T17:38:17.017Z",
+ "notes": "Réservations : prises au téléphone par le caissier, réservations du site lues dans Gmail (à confirmer), tables réservées sur le plan, mail au patron à chaque réservation",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "f5e3e93e58ffc2a20a3ca53e8025bc50d7c1dccbef4b34e2388aa9bbf8678466"
+   "sha256": "76120c1f2c4311c2154c22a6b58e00e411e0ebe76afae0daf608d9196c61f114"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "cfc7a322a832f6401045d4c701fc01dea4e20c083a7dca6a7e60b15a2f3fa4bc"
+   "sha256": "a43e0fefbfc75bdb4bd71fdeda7c95b9309e0b51f24f13fa19eeb70bb66c4504"
   },
   {
    "chemin": "public/index.html",
@@ -33,7 +33,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "006657adcb9d1de242d1211be36c3fbf0241ff4a2d74602705b8aab870e79d58"
+   "sha256": "2816b0eddbb222d7b6a337d2a02dcfd267f02d90dc8a6d6666e71984280ce936"
   },
   {
    "chemin": "seed-menu.json",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "62fbf30958f8b6becebedf0a75fe147d95a6da3858ba4a292e3d1a0df8531d28"
+   "sha256": "960c7bb0300f7528ce36492482f9f73c7097d88dc3070b71d413ba154e95aed0"
   }
  ]
 }

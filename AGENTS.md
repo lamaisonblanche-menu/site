@@ -122,6 +122,11 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - 3.3.7 : commande commune (asiatique + cuisine/cuisine2 dans le même envoi) → chaque bon de cuisine ajoute en bas « POUR INFO - FAIT PAR … » avec la partie de l'autre cuisine (`bon(…, infos)`), à l'envoi seulement (pas sur l'écran cuisine).
 - 3.3.8 (`db.postes8`) : champ produit `postes: ['cuisine','comptoir']` → bon sur ces imprimantes précises. Fondant chocolat glace et Nougat glacé : cuisine + comptoir.
 - 3.3.9 (`db.boissons9`) : Eau minérale / pétillante PM 150 et GM 200 ; « Soda » désactivé, remplacé par Coca, Coca zéro, Selecto, Hamoud blanche (250) ; Sprite et Schweppes 250 en 3.3.10 (`db.boissons10`). Prix confirmés par le patron : Piña colada 700, Matcha latte 900.
+- **Réservations (3.5.0)** : `db.reservations` [{id R…, date, heure HH:MM, nom, tel, couverts, salle, table, note, statut a_confirmer|prevue|arrivee|annulee|absent, source telephone|site, par}].
+  Vue `viewResa` (onglet « Résa » du rail), création/modif réservée aux caissiers (`POST /api/reservation`, conflit de table ±2 h → 409 sauf `forcer`).
+  Le plan affiche les tables réservées du jour ; ouvrir la table ±90 min autour de l'heure la passe en « arrivée » (`arriveeAuto`).
+  Notification : mail au patron (`notifier`, file `db.mailsAttente` renvoyée toutes les 5 min si pas d'internet).
+  Site : la caisse lit Gmail en IMAP (`imapLire`, mails de web3forms des 4 derniers jours, toutes les 5 min, même mot de passe d'application) et crée des réservations « à confirmer » (`resaDepuisMail`, déjà lues dans `db.siteVus`).
 - **Pointage** : seulement sur la caisse principale (requête venant de 127.0.0.1) ; le bouton est caché sur les écrans de salle et l'API refuse.
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.

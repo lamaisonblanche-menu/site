@@ -47,6 +47,7 @@ async function refresh() {
   try { S.etat = await api('/api/etat'); } catch (e) { return; }
   if (S.view === 'caisse') await loadCaisse();
   if (S.view === 'kds') await loadKds();
+  if (S.view === 'resa') await loadResa();
   alertesPrets();
   verifierVersion(S.etat.version);
   render();
@@ -187,6 +188,7 @@ const ICO = {
   caisse: '<svg viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="10" rx="2"/><path d="M7 10V5h10v5M7 15h4"/></svg>',
   kds: '<svg viewBox="0 0 24 24"><path d="M4 18h16M6 18c0-4 2.7-7 6-7s6 3 6 7M12 11V8M10 6h4"/></svg>',
   admin: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  resa: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h3"/></svg>',
   out: '<svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
 };
 function rail() {
@@ -195,6 +197,7 @@ function rail() {
   const ini = u.nom.split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase();
   return `<nav class="rail"><img src="logo.png" alt="La Maison Blanche">
     ${u.role !== 'cuisine' ? it('tables', 'Salle', v === 'tables' || v === 'commande', "A.go('tables')") : ''}
+    ${u.role !== 'cuisine' ? it('resa', 'Résa' + ((S.etat.reservations || []).length ? ` <i class="rbadge${(S.etat.reservations || []).some(r => r.statut === 'a_confirmer') ? ' warn' : ''}">${S.etat.reservations.length}</i>` : ''), v === 'resa', "A.go('resa')") : ''}
     ${peut('caissier') ? it('caisse', 'Caisse', v === 'caisse', "A.go('caisse')") : ''}
     ${u.role === 'cuisine' || peut('caissier') ? it('kds', 'Cuisine', v === 'kds', "A.go('kds')") : ''}
     ${peut('admin') ? it('admin', 'Gestion', v === 'admin', "A.go('admin')") : ''}
@@ -222,6 +225,11 @@ function planHtml(salle, edit) {
       inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}</span>`;
       if (S.etat.prets.some(p => p.cmdId === c.id)) { cls += ' ring'; inner += '<span class="pb">🔔</span>'; }
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
+    }
+    if (!c && !edit) {
+      const mn = new Date().getHours() * 60 + new Date().getMinutes();
+      const rs = (S.etat.reservations || []).filter(r => r.salle === salle.id && r.table === t.n && minR(r.heure) >= mn - 60).sort((a, b) => a.heure.localeCompare(b.heure))[0];
+      if (rs) { cls += ' resv' + (minR(rs.heure) - mn <= 60 ? ' bientot' : ''); inner += `<span class="pr">${rs.heure.replace(':', 'h')}</span><span class="pd">${esc(rs.nom.split(' ')[0].slice(0, 9))} · ${rs.couverts}p</span>`; }
     }
     if (edit && adm.selT === i) cls += ' sel';
     const act = edit ? `data-t="${i}"` : (c ? `onclick="A.voir('${c.id}')"` : `onclick="A.ouvrir('${jsq(t.n)}')"`);
@@ -259,7 +267,7 @@ function viewTables() {
   const enCours = S.etat.commandes.reduce((a, c) => a + totalCmd(c), 0);
   const mes = S.etat.commandes.filter(c => c.serveurId === S.etat.user.id).length;
   return topbar() + `<div class="tbar"><div class="tabs">${tabs}</div>
-    ${S.salle === 'emporter' ? '' : `<div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span>🔔 Prêt</span><span>⏸ Suite à réclamer</span></div>`}
+    ${S.salle === 'emporter' ? '' : `<div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span><i class="l-resv"></i>Réservée</span><span>🔔 Prêt</span><span>⏸ Suite à réclamer</span></div>`}
     <div class="sum"><div><b>${occ}</b><small>tables ici</small></div><div><b>${S.etat.commandes.length}</b><small>en cours</small></div>${mes ? `<div><b>${mes}</b><small>à moi</small></div>` : ''}${peut('caissier') ? `<div><b class="num">${fmt(enCours)}</b><small>DA à encaisser</small></div>` : ''}</div></div>${body}`;
 }
 
@@ -370,6 +378,43 @@ document.addEventListener('pointerup', e => {
 });
 document.addEventListener('contextmenu', e => { if (e.target.closest('.pt')) e.preventDefault(); });
 
+// ------------------------------------------------------------ Réservations
+const minR = h => +h.slice(0, 2) * 60 + +h.slice(3, 5);
+const plusJours = (date, n) => { const d = new Date(date + 'T12:00'); d.setDate(d.getDate() + n); return ymd(d); };
+const jourLong = date => { const auj = ymd(new Date()); const t = new Date(date + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); return date === auj ? 'Aujourd’hui · ' + t : date === plusJours(auj, 1) ? 'Demain · ' + t : t.charAt(0).toUpperCase() + t.slice(1); };
+const STATUT_R = { a_confirmer: ['À confirmer', 'warn'], prevue: ['Prévue', 'ok'], arrivee: ['Arrivée', 'navy'], annulee: ['Annulée', 'bad'], absent: ['Pas venu', 'bad'] };
+async function loadResa() {
+  S.resaDate = S.resaDate || ymd(new Date());
+  const r = await api('/api/reservations?du=' + S.resaDate + '&au=' + S.resaDate).catch(() => null);
+  const a = await api('/api/reservations?du=' + ymd(new Date()) + '&au=' + plusJours(ymd(new Date()), 60)).catch(() => null);
+  if (r) { S.resa = { ...r, date: S.resaDate }; S.resaConfirmer = a ? a.reservations.filter(x => x.statut === 'a_confirmer') : []; }
+}
+function viewResa() {
+  const R = S.resa;
+  if (!R) return '<div class="main">Chargement…</div>';
+  const cais = peut('caissier'), auj = ymd(new Date());
+  const actives = R.reservations.filter(r => r.statut !== 'annulee' && r.statut !== 'absent');
+  const pers = actives.reduce((a, r) => a + r.couverts, 0);
+  const salleN = id => (S.etat.config.salles.find(x => x.id === id) || {}).nom || '';
+  const ligne = r => { const [st, cl] = STATUT_R[r.statut] || ['', '']; return `<div class="rv ${r.statut}">
+    <div class="rv-h">${r.heure.replace(':', 'h')}</div>
+    <div class="rv-i"><b>${esc(r.nom)}</b> <span class="rv-p">${r.couverts} pers.</span>${r.source === 'site' ? ' <span class="pill">🌐 site</span>' : ''} <span class="pill ${cl}">${st}</span>
+      <div class="muted">${r.tel ? '📞 ' + esc(r.tel) + ' · ' : ''}${r.salle ? esc(salleN(r.salle)) + (r.table ? ' · table ' + esc(r.table) : '') : 'salle à choisir'}${r.date !== S.resaDate ? ' · ' + esc(jourLong(r.date)) : ''}</div>
+      ${r.note ? `<div class="rv-n">💬 ${esc(r.note)}</div>` : ''}<div class="rv-par">Prise par ${esc(r.par || '')}</div></div>
+    <div class="rv-a">${r.statut === 'a_confirmer' && cais ? `<button class="btn ok" onclick="A.resaForm('${r.id}',1)">Confirmer</button>` : ''}
+      ${r.statut === 'prevue' ? `<button class="btn dark" onclick="A.resaSt('${r.id}','arrivee')">Arrivé</button>` : ''}
+      ${cais && ['prevue', 'a_confirmer'].includes(r.statut) ? `<button class="btn" onclick="A.resaForm('${r.id}')">Modifier</button><button class="btn" onclick="A.resaSt('${r.id}','annulee')">Annuler</button>${r.statut === 'prevue' && r.date <= auj ? `<button class="btn ghost" onclick="A.resaSt('${r.id}','absent')">Pas venu</button>` : ''}` : ''}
+      ${cais && ['annulee', 'absent', 'arrivee'].includes(r.statut) ? `<button class="btn ghost" onclick="A.resaSt('${r.id}','prevue')">Remettre</button>` : ''}</div></div>`; };
+  const conf = (S.resaConfirmer || []).filter(r => r.date !== S.resaDate);
+  return topbar() + `<div class="tbar"><div class="tabs"><button class="tab" onclick="A.resaJour(-1)">‹</button>
+      <button class="tab ${S.resaDate === auj ? 'on' : ''}" onclick="A.resaJour(0)">Aujourd’hui</button><button class="tab ${S.resaDate === plusJours(auj, 1) ? 'on' : ''}" onclick="A.resaJour(1,1)">Demain</button>
+      <button class="tab" onclick="A.resaJour(1)">›</button><input type="date" class="rdate" value="${S.resaDate}" onchange="A.resaDate(this.value)"></div>
+      ${cais ? '<button class="btn dark big" onclick="A.resaForm()">+ Nouvelle réservation</button>' : ''}</div>
+    <div class="main"><h2 class="rv-t">${esc(jourLong(S.resaDate))} <span class="muted">· ${actives.length} réservation${actives.length > 1 ? 's' : ''} · ${pers} pers.</span></h2>
+      ${conf.length ? `<div class="rv-conf"><h3>🌐 Demandes du site à confirmer (autres jours)</h3>${conf.map(ligne).join('')}</div>` : ''}
+      ${R.reservations.map(ligne).join('') || '<p class="muted">Aucune réservation ce jour-là.</p>'}
+      <p class="muted rv-site">${R.mail ? `Réservations du site : ${R.site.erreur ? '⚠ ' + esc(R.site.erreur) : R.site.dernier ? 'lues à ' + hm(R.site.dernier) : 'pas encore lues'} ${cais ? '<button class="btn sm" onclick="A.resaSite()">Lire maintenant</button>' : ''}` : 'Mail non réglé (Gestion → Réglages) : pas de notification et pas de lecture des réservations du site.'}</p></div>`;
+}
 // ---- petit clavier à l'écran (écrans tactiles sans clavier)
 function clavier(id) {
   const rangs = ['1234567890', 'azertyuiop', 'qsdfghjklm', 'wxcvbn\'-,.', 'éèàçù'];
@@ -756,6 +801,7 @@ const A = window.A = {
     S.view = v;
     if (v === 'caisse') await loadCaisse();
     if (v === 'kds') await loadKds();
+    if (v === 'resa') await loadResa();
     if (v === 'admin') { adm = {}; A.atab(S.adminTab); return; }
     render();
   },
@@ -1286,6 +1332,49 @@ Object.assign(A, {
     draw();
   },
   nouvelEmporter() { A.infosEmporter(null); },
+  // ---- réservations
+  async resaJour(n, abs) { const auj = ymd(new Date()); S.resaDate = n === 0 ? auj : abs ? plusJours(auj, n) : plusJours(S.resaDate || auj, n); await loadResa(); render(); },
+  async resaDate(v) { if (v) { S.resaDate = v; await loadResa(); render(); } },
+  resaSt(id, st) {
+    if (st === 'annulee' && !confirm('Annuler cette réservation ?')) return;
+    act(async () => { await api('/api/reservation/statut', { id, statut: st }); toast(st === 'arrivee' ? 'Client arrivé ✓' : 'Enregistré ✓'); await refresh(); });
+  },
+  resaSite() { act(async () => { toast('Lecture des mails du site…'); const r = await api('/api/reservations/site', {}); toast(r.erreur ? r.erreur : 'Réservations du site à jour ✓', !!r.erreur, 5000); await refresh(); }); },
+  resaForm(id, confirmer) {
+    const ex = id ? [...(S.resa ? S.resa.reservations : []), ...(S.resaConfirmer || [])].find(r => r.id === id) : null;
+    const auj = ymd(new Date());
+    const st = ex ? { ...ex } : { date: S.resaDate && S.resaDate >= auj ? S.resaDate : auj, heure: '', nom: '', tel: '', couverts: 2, salle: '', table: '', note: '' };
+    st.champ = st.champ || 'rs-nom'; st.kb = !ex;
+    const heures = []; for (let h = 9; h <= 22; h++) for (const m of [0, 30]) heures.push(String(h).padStart(2, '0') + ':' + (m ? '30' : '00'));
+    const draw = () => {
+      const salle = S.etat.config.salles.find(x => x.id === st.salle);
+      const prises = new Map((st._liste || (S.resa && S.resa.date === st.date ? S.resa.reservations : [])).filter(r => r.id !== st.id && r.salle === st.salle && ['prevue', 'a_confirmer'].includes(r.statut) && st.heure && Math.abs(minR(r.heure) - minR(st.heure)) < 120).map(r => [r.table, r]));
+      modal(mh(ex ? (confirmer ? 'Confirmer la réservation du site' : 'Modifier la réservation') : 'Nouvelle réservation') + `
+      ${confirmer ? '<p class="pill warn" style="display:block;padding:8px 12px;border-radius:10px">Vérifiez avec le client (WhatsApp ou téléphone), choisissez la table, puis confirmez.</p>' : ''}
+      <div class="row"><div class="field grow"><label>Nom du client</label><input id="rs-nom" value="${esc(st.nom)}" onfocus="A.rsf('rs-nom')" oninput="A.rss('nom',this.value)"></div>
+        <div class="field grow"><label>Téléphone</label><input id="rs-tel" inputmode="tel" value="${esc(st.tel)}" onfocus="A.rsf('rs-tel')" oninput="A.rss('tel',this.value)"></div></div>
+      <div class="field"><label>Remarque (anniversaire, chaise bébé…)</label><input id="rs-note" value="${esc(st.note)}" onfocus="A.rsf('rs-note')" oninput="A.rss('note',this.value)"></div>
+      ${st.kb ? clavier(st.champ) + '<div style="text-align:right;margin-top:6px"><button class="btn sm" onclick="A.rskb(0)">Fermer le clavier ⌄</button></div>' : ''}
+      <div class="rs-g"><label>Jour</label><div class="chips">${[0, 1, 2].map(n => { const d = plusJours(auj, n); return `<button class="chip big ${st.date === d ? 'on' : ''}" onclick="A.rsv('date','${d}')">${n === 0 ? 'Aujourd’hui' : n === 1 ? 'Demain' : new Date(d + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'long' })}</button>`; }).join('')}
+        <input type="date" class="rdate" value="${st.date}" min="${auj}" onchange="A.rsv('date',this.value)"></div></div>
+      <div class="rs-g"><label>Heure</label><div class="chips rs-h">${heures.map(h => `<button class="chip ${st.heure === h ? 'on' : ''}" onclick="A.rsv('heure','${h}')">${h.replace(':', 'h')}</button>`).join('')}</div></div>
+      <div class="rs-g"><label>Personnes</label><div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(n => `<button class="chip big ${+st.couverts === n ? 'on' : ''}" onclick="A.rsv('couverts',${n})">${n}</button>`).join('')}
+        <button class="chip big" onclick="A.rsv('couverts',${Math.max(1, (+st.couverts || 0) + 1)})">+1</button>${+st.couverts > 12 || ![1, 2, 3, 4, 5, 6, 7, 8, 10, 12].includes(+st.couverts) ? `<b style="align-self:center;font-size:20px">${st.couverts}</b>` : ''}</div></div>
+      <div class="rs-g"><label>Salle</label><div class="chips"><button class="chip big ${!st.salle ? 'on' : ''}" onclick="A.rsv('salle','')">Pas encore</button>${S.etat.config.salles.map(x => `<button class="chip big ${st.salle === x.id ? 'on' : ''}" onclick="A.rsv('salle','${x.id}')">${esc(x.nom)}</button>`).join('')}</div></div>
+      ${salle ? `<div class="rs-g"><label>Table ${st.heure ? '' : '(choisissez d’abord l’heure pour voir les tables prises)'}</label><div class="rs-t"><button class="${!st.table ? 'on' : ''}" onclick="A.rsv('table','')">—</button>${salle.tables.map(t => { const p = prises.get(t.n); return `<button class="${st.table === t.n ? 'on' : ''} ${p ? 'prise' : ''}" ${p ? `title="${esc(p.nom)} ${p.heure}"` : ''} onclick="A.rsv('table','${jsq(t.n)}')">${esc(t.n)}${p ? `<small>${p.heure.replace(':', 'h')}</small>` : ''}</button>`; }).join('')}</div></div>` : ''}
+      <div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark big" onclick="A.rsok()">${confirmer ? 'Confirmer la réservation' : ex ? 'Enregistrer' : 'Enregistrer la réservation'}</button></div>`, true);
+    };
+    A.rsf = c => { if (st.champ !== c || !st.kb) { st.champ = c; st.kb = true; draw(); const i = document.getElementById(c); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } };
+    A.rskb = on => { st.kb = !!on; draw(); };
+    A.rss = (k, v) => { st[k] = v; };
+    A.rsv = async (k, v) => { st[k] = v; st.kb = false; if (k === 'salle') st.table = ''; if (k === 'date') { const r = await api('/api/reservations?du=' + v + '&au=' + v).catch(() => null); st._liste = r ? r.reservations : []; } draw(); };
+    A.rsok = (forcer) => act(async () => {
+      try { await api('/api/reservation', { ...st, _liste: undefined, id: ex ? ex.id : undefined, confirmer: !!confirmer, forcer: !!forcer }); }
+      catch (e) { if (e.status === 409 && confirm(e.message + '. Réserver quand même ?')) return A.rsok(true); throw e; }
+      closeModal(); toast(confirmer ? 'Réservation confirmée ✓' : 'Réservation enregistrée ✓'); S.resaDate = st.date; if (S.view !== 'resa') S.view = 'resa'; await refresh();
+    });
+    draw();
+  },
   // ---- encaissement rapide en espèces (le cas habituel)
   async payer() {
     let c = cmd();
@@ -1345,6 +1434,7 @@ function render() {
   else if (S.view === 'commande') h = viewCommande();
   else if (S.view === 'caisse') h = viewCaisse();
   else if (S.view === 'admin' && peut('admin')) h = viewAdmin();
+  else if (S.view === 'resa' && S.etat.user.role !== 'cuisine') h = viewResa();
   else if (S.view === 'kds' || S.etat.user.role === 'cuisine') { S.view = 'kds'; h = viewKds(); }
   else { S.view = 'tables'; h = viewTables(); }
   const sels = ['.main', '.fc-art', '.fc-lines', '.fc-grp', '.ed-side', '.kds'];

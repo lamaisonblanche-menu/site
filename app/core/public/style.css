@@ -613,3 +613,31 @@ h1,h2,h3{font-family:var(--f-b);font-weight:650}
 .kds{grid-auto-rows:max-content}
 td.r,th.r{white-space:nowrap}
 .card .v{font-family:var(--f-n);font-weight:700}
+
+/* v6 : réservations */
+.ri .rbadge{font-style:normal;display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:#e0c48f;color:#111;font-size:11px;font-weight:700;margin-left:2px}
+.ri .rbadge.warn{background:#f59e0b;color:#fff}
+.pill.navy{background:var(--navy);color:#fff}
+.rdate{height:44px;border-radius:10px;border:1px solid #d9d4c7;padding:0 10px;font-size:16px;background:#fff;margin-left:6px}
+.rv-t{margin:0 0 12px;font-size:22px}.rv-t .muted{font-size:16px;font-weight:400}
+.rv{display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid #e6e2d8;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.rv.a_confirmer{border-color:#f59e0b;background:#fffaf0}
+.rv.annulee,.rv.absent{opacity:.55}.rv.arrivee{opacity:.75}
+.rv-h{font-size:26px;font-weight:800;min-width:78px;font-variant-numeric:tabular-nums}
+.rv-i{flex:1;min-width:0}.rv-i b{font-size:19px}.rv-p{font-weight:700;margin-left:4px}
+.rv-n{margin-top:4px;color:#8a5a00}.rv-par{font-size:12px;color:#999;margin-top:3px}
+.rv-a{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46%}
+.rv-a .btn{min-height:46px}
+.rv-conf{border:2px dashed #f59e0b;border-radius:14px;padding:10px;margin-bottom:16px}.rv-conf h3{margin:2px 4px 10px;font-size:16px}
+.rv-site{margin-top:18px}
+.rs-g{margin-top:10px}.rs-g>label{display:block;font-size:13px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.rs-h .chip{min-width:64px}
+.rs-t{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px}
+.rs-t button{height:52px;border-radius:10px;background:#f1efe9;font-size:18px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.rs-t button small{font-size:11px;font-weight:500;margin-top:3px}
+.rs-t button.on{background:var(--ink);color:#fff}
+.rs-t button.prise{background:#fde2e2;color:#a11}
+.ptab.resv{background:#efe7ff;border-color:#8b6ad8}
+.ptab.resv.bientot{background:#dccbff;box-shadow:0 0 0 3px #8b6ad8}
+.ptab .pr{font-weight:800;color:#5b3bb0}
+.legend i.l-resv{background:#efe7ff;border:2px solid #8b6ad8}
