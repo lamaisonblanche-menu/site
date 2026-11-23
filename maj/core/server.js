@@ -182,6 +182,27 @@ if (!db.equipe2) {
   db.equipe2 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
+if (!db.carte2) {
+  const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
+  const n = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const [id, nom, poste, couleur, suite, univers, apres, decal] of A.cats) {
+    if (db.categories.some(c => c.id === id)) continue;
+    const ref = db.categories.find(c => c.id === apres);
+    db.categories.push({ id, nom, poste: db.config.imprimantes[poste] ? poste : 'cuisine', couleur, suite, univers, ordre: (ref ? ref.ordre : db.categories.length) + decal });
+  }
+  db.categories.sort((a, b) => a.ordre - b.ordre).forEach((c, i) => (c.ordre = i));
+  for (const [cat, items] of A.prods) {
+    if (!db.categories.some(c => c.id === cat)) continue;
+    for (const [nom, prix] of items) {
+      if (db.produits.some(p => n(p.nom) === n(nom))) continue;
+      db.seq.produit = (db.seq.produit || 0) + 1;
+      db.produits.push({ id: 'ps' + Date.now().toString(36) + db.seq.produit, nom, prix, cat, actif: true, options: [], stock: null });
+    }
+  }
+  db.carte2 = true;
+  setTimeout(() => saveNow(), 0);
+}
 for (const s of db.config.salles) {
   if (s.tables.length && typeof s.tables[0] === 'string') s.tables = s.tables.map((n, i) => ({ n, x: 8 + (i % 10) * 9.5, y: 12 + Math.floor(i / 10) * 20 }));
   s.deco = s.deco || []; s.fond = s.fond || 'creme'; s.ratio = s.ratio || 1.6; s.taille = s.taille || 7;

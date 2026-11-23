@@ -115,7 +115,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 
 ## 7. Ce qui reste à faire / à savoir
 
-- La carte a été reprise du site. Il manque des groupes de FrontCash (Gibier, Plats traditionnels, Formules, Suppléments).
+- La carte a été reprise du site (sushis, rolls et lattes ajoutés en 3.3.1). Il manque des groupes de FrontCash (Plats traditionnels, Formules, Suppléments).
 - Aucun groupe n'est encore envoyé sur l'imprimante « Cuisine 2 » : c'est au patron de dire lesquels.
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.

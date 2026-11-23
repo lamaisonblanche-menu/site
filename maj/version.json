@@ -1,11 +1,11 @@
 {
- "version": "3.3.0",
- "date": "2026-11-23T16:34:50.327Z",
- "notes": "Nouvelle apparence : barre latérale, plan de salle plus lisible, encaissement plein écran",
+ "version": "3.3.1",
+ "date": "2026-11-23T16:42:16.974Z",
+ "notes": "Sushis, rolls, lattes et desserts de la carte ajoutés",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "5eee6c0c5c6901f5e523f0a434bca4106e1ff7136deb451f982b0bb1a7b13716"
+   "sha256": "ef2a79c2f7dc37800a73fd9930b307824ce20af920cbc7159323456418e77e6b"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1f4c4513ebca3649b1d469da454e0f71b6b49bccc3162ba30073e066c8be2113"
+   "sha256": "f1bc4a0507ff16e8f05135a7b0696f8177c812d05f6cebc9422ec351db5c09d6"
   }
  ]
 }
