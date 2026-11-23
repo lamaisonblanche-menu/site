@@ -1,11 +1,11 @@
 {
- "version": "3.5.1",
- "date": "2026-11-23T17:40:20.699Z",
- "notes": "Table réservée bloquée seulement 30 min avant l'heure (jusqu'à 1 h après), avertissement à l'ouverture",
+ "version": "3.5.2",
+ "date": "2026-11-23T17:42:58.803Z",
+ "notes": "Table réservée bloquée : seul un caissier peut l'ouvrir (badge ou code du caissier pour un serveur)",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "eb41f86c3d67299b46490cde10158a521148fdc03641aa14a93fa2797becd78c"
+   "sha256": "36e68867ce939b2464649670eb1b3f9759d1a99e7326dac3c79d0942e01f5d65"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "2c5f83540036578cd291b740b2cdb70c5f85ebe6383b3185f23fee9e39671ddd"
+   "sha256": "61f6ac44a29461f9903bc79c1de767ef6f8864e5ef6840f638a67948022ba46f"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "a9a26d13fddab71322f2259359121369b4319d0a49ba1c270c32ffd5a55fab31"
+   "sha256": "d564234041b91b7923f4a269cca729159e05dcba6b94bddde541dd6a776077fc"
   }
  ]
 }

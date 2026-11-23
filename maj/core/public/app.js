@@ -813,12 +813,15 @@ const A = window.A = {
   ouvrir(t) {
     const rs = resaBloquante(S.salle, t);
     let n = rs ? rs.couverts : 2;
-    const draw = () => modal(mh('Table ' + esc(t)) + `${rs ? `<p class="pill warn" style="display:block;padding:10px 12px;border-radius:10px;font-size:15px">🔒 Table réservée à <b>${rs.heure.replace(':', 'h')}</b> pour <b>${esc(rs.nom)}</b> (${rs.couverts} pers.). Ouvrez-la seulement si ce sont ces clients.</p>` : ''}<p class="muted">Nombre de couverts</p><div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div>
+    const draw = () => modal(mh('Table ' + esc(t)) + `${rs ? `<p class="pill warn" style="display:block;padding:10px 12px;border-radius:10px;font-size:15px">🔒 Table réservée à <b>${rs.heure.replace(':', 'h')}</b> pour <b>${esc(rs.nom)}</b> (${rs.couverts} pers.). ${peut('caissier') ? 'Ouvrez-la seulement si ce sont ces clients.' : 'Seul un caissier peut l’ouvrir : il faudra son badge ou son code.'}</p>` : ''}<p class="muted">Nombre de couverts</p><div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div>
       <div class="chips" style="justify-content:center">${[1, 2, 3, 4, 5, 6, 8, 10].map(k => `<button class="chip ${k === n ? 'on' : ''}" onclick="A.cvs(${k})">${k}</button>`).join('')}</div>
       <div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark" onclick="A.ok()">Ouvrir la table</button></div>`);
     A.cv = d => { n = Math.max(1, Math.min(99, n + d)); draw(); };
     A.cvs = k => { n = k; draw(); };
-    A.ok = () => act(async () => { const c = await api('/api/commande/ouvrir', { salle: S.salle, table: t, couverts: n }); closeModal(); if (!S.etat.commandes.find(x => x.id === c.id)) S.etat.commandes.push(c); A.voir(c.id); });
+    A.ok = (pinC) => {
+      if (rs && !peut('caissier') && pinC === undefined) return askPin('Table réservée : accord du caissier', v => A.ok(v), 'Badge ou code d’un caissier');
+      return act(async () => { let c; try { c = await api('/api/commande/ouvrir', { salle: S.salle, table: t, couverts: n, pin: pinC }); } catch (e) { if (pinC !== undefined) closeModal(); throw e; } closeModal(); if (!S.etat.commandes.find(x => x.id === c.id)) S.etat.commandes.push(c); A.voir(c.id); });
+    };
     draw();
   },
   comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },

@@ -1034,6 +1034,16 @@ const routes = {
     if (!table) E('Table manquante');
     const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
     if (ex) return ex;
+    // table réservée (bloquée 30 min avant) : seul un caissier peut l'ouvrir
+    if (salle !== 'emporter' && salle !== 'comptoir' && !peut(u, 'caissier')) {
+      const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
+      const rs = db.reservations.find(x => x.date === auj && x.salle === salle && x.table === table && x.statut === 'prevue' && mn >= minutes(x.heure) - 30 && mn <= minutes(x.heure) + 60);
+      if (rs) {
+        const chef = parCode(b.pin);
+        if (!chef || !peut(chef, 'caissier')) E('Table réservée à ' + rs.heure + ' pour ' + rs.nom + ' : seul un caissier peut l\'ouvrir', 403);
+        journal(u, 'table réservée ouverte', salleNom(salle) + ' ' + table + ' (' + rs.nom + ') autorisé par ' + chef.nom);
+      }
+    }
     const j = jourCourant(true);
     db.seq.cmd++;
     const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };

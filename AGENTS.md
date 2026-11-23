@@ -124,7 +124,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - 3.3.9 (`db.boissons9`) : Eau minérale / pétillante PM 150 et GM 200 ; « Soda » désactivé, remplacé par Coca, Coca zéro, Selecto, Hamoud blanche (250) ; Sprite et Schweppes 250 en 3.3.10 (`db.boissons10`). Prix confirmés par le patron : Piña colada 700, Matcha latte 900.
 - **Réservations (3.5.0)** : `db.reservations` [{id R…, date, heure HH:MM, nom, tel, couverts, salle, table, note, statut a_confirmer|prevue|arrivee|annulee|absent, source telephone|site, par}].
   Vue `viewResa` (onglet « Résa » du rail), création/modif réservée aux caissiers (`POST /api/reservation`, conflit de table ±2 h → 409 sauf `forcer`).
-  Une table réservée est bloquée (violette, avertissement à l’ouverture) de 30 min avant l’heure à 1 h après (`resaBloquante`) ; l’ouvrir entre -30 min et +90 min la passe en « arrivée » (`arriveeAuto`).
+  Une table réservée est bloquée (violette, avertissement à l’ouverture) de 30 min avant l’heure à 1 h après (`resaBloquante`) ; l’ouvrir entre -30 min et +90 min la passe en « arrivée » (`arriveeAuto`). Une table bloquée ne peut être ouverte que par un caissier (un serveur doit donner le badge ou code d’un caissier, `pin` dans `POST /api/commande/ouvrir`, 3.5.2).
   Notification : mail au patron (`notifier`, file `db.mailsAttente` renvoyée toutes les 5 min si pas d'internet).
   Site : la caisse lit Gmail en IMAP (`imapLire`, mails de web3forms des 4 derniers jours, toutes les 5 min, même mot de passe d'application) et crée des réservations « à confirmer » (`resaDepuisMail`, déjà lues dans `db.siteVus`).
 - **Pointage** : seulement sur la caisse principale (requête venant de 127.0.0.1) ; le bouton est caché sur les écrans de salle et l'API refuse.
