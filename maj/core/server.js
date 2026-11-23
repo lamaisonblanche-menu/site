@@ -230,6 +230,12 @@ if (!db.partout6) {
   db.partout6 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Plusieurs imprimantes (version 3.3.8) : Fondant chocolat glace et Nougat glacé sortent en cuisine ET au comptoir
+if (!db.postes8) {
+  for (const p of db.produits) if (/^fondant chocolat|^nougat glac/i.test(p.nom)) p.postes = ['cuisine', 'comptoir'];
+  db.postes8 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -435,6 +441,8 @@ function postesDe(pid) {
     const l = reels.length ? reels : postesBons().filter(k => k !== 'cuisine2');
     if (l.length) return l;
   }
+  // article envoyé sur plusieurs imprimantes choisies (3.3.8), ex. Fondant : cuisine + comptoir
+  if (p && Array.isArray(p.postes)) { const l = p.postes.filter(k => db.config.imprimantes[k] && k !== 'ticket'); if (l.length) return l; }
   return [posteDe(pid)];
 }
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
@@ -1234,7 +1242,8 @@ const routes = {
     const gids = new Set(db.options.map(g => g.id));
     db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), univers: String(c.univers || 'La carte').slice(0, 20), ordre: i }));
     const partoutAvant = new Set(db.produits.filter(p => p.partout).map(p => p.id));
-    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}) }));
+    const postesAvant = Object.fromEntries(db.produits.filter(p => Array.isArray(p.postes)).map(p => [p.id, p.postes]));
+    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}), ...((Array.isArray(p.postes) ? p.postes : postesAvant[p.id]) ? { postes: Array.isArray(p.postes) ? p.postes : postesAvant[p.id] } : {}) }));
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
     save(); return {};

@@ -1,11 +1,11 @@
 {
- "version": "3.3.7",
- "date": "2026-11-23T17:12:20.862Z",
- "notes": "Commande commune asiatique + gastro/brunch : chaque cuisine reçoit aussi la partie de l'autre, pour information",
+ "version": "3.3.8",
+ "date": "2026-11-23T17:12:52.328Z",
+ "notes": "Fondant chocolat glace et Nougat glacé imprimés en cuisine et au comptoir",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "36c5d98fe7e3c215a87d4d7a0b6449ef076bb836971b9c6079093d8d400f0e98"
+   "sha256": "0b632c8737466af3d2be915bd6c436349c3e3da6d2b3187ab8513772767cb73e"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "9c76c599b811ce1013e90b4fa6390c3d9358d9e0a8629433d7012f7346d9a9cc"
+   "sha256": "758d320a0aa098e6687029d88f0fd4f8c6c0fe7bff64b998473a6e73c58f1e34"
   }
  ]
 }
