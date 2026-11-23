@@ -40,4 +40,4 @@ jobs:
       - run: node --check app/main.js
       - run: node --check app/maj.js
       - run: node --check app/core/server.js
-      - run: node --test app/tests/*.test.js
+      - run: node --test app/tests/caisse.test.js app/tests/integration.test.js app/tests/windows-updater.test.js
