@@ -1,11 +1,11 @@
 {
- "version": "3.5.6",
- "date": "2026-11-23T23:24:35.521Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.5.7",
+ "date": "2026-11-23T23:34:38.266Z",
+ "notes": "3.5.7 : pointage réparé, tables vides qui bloquaient la rase, mail de la rase automatique corrigé, connexions gardées après une mise à jour, récap par société, Wafi code 1009.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "1e95443457b8ea47a23241b12e7e6a593869a619b770e6b4fbff836851f2a3cf"
+   "sha256": "19e240e64b5ee96839b52c754c0564f1d894fe2fc7e80e792fc7ec315bf452a3"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "851e876dc4bb8ae3ab7d0c70746942fa5bb1bc1b2759c5041fbbde6c627c3104"
+   "sha256": "43721c58e89166c157335ca4233dc1aabe3c46e1b4a17d31c9ed97454ca8eaf1"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "702dae7027decfa518506653d400ff7ba7ad58c327eab30d5624cfa189d2f36d"
+   "sha256": "938d6e9cd6d9967e9bf8ebaa6bae475ecd19c5ebe6d90aff52ce85486b1eb2ba"
   }
  ]
 }

@@ -170,3 +170,13 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - `extinctionDeNuit()` : si la rase a déjà été faite à la main, le PC s'éteint quand même une fois par nuit (fenêtre d'1 h après l'heure,
   pas de table ouverte, aucune activité depuis 5 min ; drapeau `db.extinctionNuit` = date). Windows + CAISSE_APP seulement.
 - Gestion → Réglages : infos de mise à jour rechargées à l'affichage (après « Enregistrer », l'écran affichait à tort « hors de l'application »).
+
+### 3.5.7 (24/11/2026, Claude) — analyse complète et corrections
+- BUG GRAVE corrigé : `POST /api/pointage/autoriser` (3.5.5) avait une regex `127\\.` (double barre) → refusait tout, le pointage était impossible.
+- Tables « ouvertes » (rase, rase auto, écran Caisse) = seulement celles avec des articles à payer ; les tables vides sont fermées à la rase (`fermerTablesVides`). Avant, une table ouverte puis laissée vide bloquait la rase et repoussait la rase automatique toutes les 30 min.
+- Rase automatique : mail au même format que la rase normale (`mailRase` : sujet « Rase du … », sans « \n » littéraux ni [LOGO]), drapeau `raseAuto` dans `mailsAttente`, `db.extinctionNuit` posé (pas de 2e extinction). Rapport Z/Rapports : écart « à vérifier » / « à compter » au lieu de 0.
+- Supplément (`supplement-fixe`) : plus de doublon « >> olives » sur les bons ; rangé dans un groupe « Suppléments » (`db.supp4`) au lieu de « Brunch œufs ».
+- Connexions gardées sur disque (`data/sessions.json`) : une mise à jour ne déconnecte plus les écrans.
+- Déconnexion automatique des écrans de salle : le réglage « Déconnexion automatique (secondes) » est de nouveau respecté (3.5.5 l'avait figé à 30 s).
+- Rapports : tableau « Sur facture, par société » (`rapport().parSociete`). Ticket payé sur facture : « Bon pour facture », signature et cachet.
+- Wafi : caissier, code 1009 (`db.equipe5`). Sauvegarde du jour nommée en date locale.

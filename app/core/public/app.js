@@ -184,7 +184,8 @@ function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
 setInterval(() => {
   if (!S.etat) return;
-  const sec = CAISSE_PRINCIPALE || S.etat.user.role === 'cuisine' ? 0 : 30;
+  const reg = +S.etat.config.deconnexionServeurSec;
+  const sec = CAISSE_PRINCIPALE || S.etat.user.role === 'cuisine' ? 0 : (Number.isFinite(reg) ? reg : 60);
   if (sec > 0 && Date.now() - lastTouch > sec * 1000) {
     if (S.draft.length) return; // jamais pendant une commande en cours de saisie
     logout();
@@ -573,9 +574,11 @@ function admRapports() {
   <div class="panel"><h3>Plats vendus <a class="btn sm" href="${exp('plats')}">Exporter</a></h3>
     <table class="l"><tr><th>#</th><th>Plat</th><th>Groupe</th><th class="r">Quantité</th><th class="r">Montant</th></tr>
     ${R.plats.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.nom)}</td><td class="muted">${esc(p.cat)}</td><td class="r num">${p.qte}</td><td class="r num">${da(p.montant)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Rien sur la période.</td></tr>'}</table></div>
+  ${(R.parSociete || []).length ? `<div class="panel"><h3>Sur facture, par société <span class="muted" style="font-size:14px">à facturer, puis réglé par chèque</span></h3>
+    <table class="l"><tr><th>Société</th><th>Tickets</th><th class="r">Montant</th></tr>${R.parSociete.map(x => `<tr><td><b>${esc(x.nom)}</b></td><td class="muted" style="font-size:13px">${x.tickets.map(t => 'n° ' + t.num + ' (' + t.date.slice(8, 10) + '/' + t.date.slice(5, 7) + ')').join(', ')}</td><td class="r num">${da(x.montant)}</td></tr>`).join('')}</table></div>` : ''}
   <div class="panel"><h3>Rases <a class="btn sm" href="${exp('rases')}">Exporter</a></h3>
     <table class="l"><tr><th>Journée</th><th>Date</th><th>Caissier</th><th class="r">CA</th><th class="r">Sorties</th><th class="r">Attendu</th><th class="r">Compté</th><th class="r">Écart</th></tr>
-    ${R.rases.map(r => `<tr><td>${r.n}</td><td>${r.date}</td><td>${esc(r.par)}</td><td class="r num">${fmt(r.ca)}</td><td class="r num">${fmt(r.sorties)}</td><td class="r num">${fmt(r.attendu)}</td><td class="r num">${fmt(r.compte)}</td><td class="r num"><span class="pill ${r.ecart ? 'bad' : 'ok'}">${r.ecart > 0 ? '+' : ''}${fmt(r.ecart)}</span>${r.completePar ? '<div class="muted" style="font-size:12px">' + esc(r.completePar) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Aucune rase sur la période.</td></tr>'}</table></div>
+    ${R.rases.map(r => `<tr><td>${r.n}</td><td>${r.date}</td><td>${esc(r.par)}</td><td class="r num">${fmt(r.ca)}</td><td class="r num">${fmt(r.sorties)}</td><td class="r num">${fmt(r.attendu)}</td><td class="r num">${r.compte === null ? '<span class="pill warn">à compter</span>' : fmt(r.compte)}</td><td class="r num">${r.ecart === null ? '<span class="pill warn">auto</span>' : `<span class="pill ${r.ecart ? 'bad' : 'ok'}">${r.ecart > 0 ? '+' : ''}${fmt(r.ecart)}</span>`}${r.completePar ? '<div class="muted" style="font-size:12px">' + esc(r.completePar) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Aucune rase sur la période.</td></tr>'}</table></div>
   <div class="row"><a class="btn" href="${exp('tickets')}">Exporter les tickets</a><a class="btn" href="${exp('sorties')}">Exporter les sorties</a></div>`;
   return h;
 }

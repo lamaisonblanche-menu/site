@@ -292,6 +292,30 @@ if (!db.supp1) {
   for (const p of db.produits) if (cuisines.has(p.cat)) { p.options = p.options || []; if (!p.options.includes('supplements')) p.options.push('supplements'); }
   db.supp1 = true;
 }
+// Groupe « Suppléments » (version 3.5.7) : l'article Supplément n'est plus compté dans « Brunch œufs »
+if (!db.supp4) {
+  const sp = db.produits.find(p => p.id === 'supplement-fixe');
+  if (sp) {
+    let cat = db.categories.find(c => c.id === 'supplements');
+    if (!cat) {
+      const ref = db.categories.find(c => c.id === sp.cat) || {};
+      cat = { id: 'supplements', nom: 'Suppléments', poste: ref.poste || 'cuisine', couleur: '#f3e6c4', suite: ref.suite || 2, univers: 'La carte', ordre: db.categories.length };
+      db.categories.push(cat);
+    }
+    sp.cat = cat.id;
+  }
+  db.supp4 = true;
+  setTimeout(() => saveNow(), 0);
+}
+// Code imposé (version 3.5.7) : Wafi, caissier, 1009
+if (!db.equipe5) {
+  let u = db.users.find(x => x.nom.toLowerCase() === 'wafi');
+  if (!u) { u = { id: 'u-wafi', nom: 'Wafi', role: 'caissier', pin: '', badge: '', actif: true }; db.users.push(u); }
+  for (const o of db.users) if (o !== u && o.pin === '1009') { let c; do c = String(1000 + Math.floor(Math.random() * 9000)); while (db.users.some(x => x.pin === c) || ['2000', '1993', '1996', '1515', '1009'].includes(c)); o.pin = c; }
+  u.pin = '1009'; u.role = 'caissier'; u.actif = true;
+  db.equipe5 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Version 3.5.6 (demandes du gérant) :
 // - suppléments Gruyère et Parmesan (500 DA) dans le groupe d'options « Supplément »
 // - sociétés payées sur facture (mêmes noms que l'appli de gestion)
@@ -354,7 +378,7 @@ function saveNow() {
   const fd = fs.openSync(tmp, 'w');
   try { fs.writeFileSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   fs.renameSync(tmp, DB_FILE);
-  const b = path.join(BACKUPS, 'caisse-' + new Date().toISOString().slice(0, 10) + '.json');
+  const b = path.join(BACKUPS, 'caisse-' + dateLocale(Date.now()) + '.json');
   if (!fs.existsSync(b)) {
     fs.copyFileSync(DB_FILE, b);
     const all = fs.readdirSync(BACKUPS).filter(f => f.endsWith('.json')).sort();
@@ -383,6 +407,11 @@ function jourCourant(creer) {
 // ---------------------------------------------------------------- Sessions
 const sessions = new Map(); // token -> {userId, ts, created}
 const SESSION_IDLE_MS = 2 * 3600000, SESSION_MAX_MS = 12 * 3600000;
+// Les connexions sont gardées sur disque : une mise à jour (redémarrage du serveur) ne déconnecte plus les écrans (3.5.7)
+const SESSIONS_FILE = path.join(DATA, 'sessions.json');
+try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')))) if (Date.now() - v.ts < SESSION_IDLE_MS && Date.now() - (v.created || v.ts) < SESSION_MAX_MS) sessions.set(k, v); } catch (e) {}
+function sauverSessions() { try { fs.writeFileSync(SESSIONS_FILE + '.tmp', JSON.stringify(Object.fromEntries(sessions))); fs.renameSync(SESSIONS_FILE + '.tmp', SESSIONS_FILE); } catch (e) {} }
+setInterval(sauverSessions, 30000);
 const essaisAcces = new Map();
 function controleEssais(req) {
   const ip = String(req?.socket?.remoteAddress || 'inconnue');
@@ -622,6 +651,7 @@ function ticketDoc(tk, duplicata) {
   if (tk.mode === 'offert') d.t('Offert - ' + (tk.motif || ''));
   else for (const p of paiementsDe(tk)) d.lr(MODES[p.mode] + (p.mode === 'societe' ? ' ' + p.societe : '') + (p.reference ? ' n° ' + p.reference : ''), fmt(p.montant) + ' DA');
   if (tk.recu && tk.rendu > 0) { d.lr('Espèces reçues', fmt(tk.recu) + ' DA'); d.lr('Rendu', fmt(tk.rendu) + ' DA'); }
+  if (paiementsDe(tk).some(p => p.mode === 'societe')) d.line().t('Bon pour facture').t('Nom et signature du client :').feed(3).t('Cachet de la société :').feed(3);
   piedTicket(d);
   d.cut();
   return d;
@@ -645,6 +675,13 @@ function additionDoc(cmd) {
 }
 function totalCmd(cmd) { return cmd.lignes.reduce((s, l) => s + (l.annule || l.offert || l.paye ? 0 : l.qte * l.prix), 0); }
 
+// tables ouvertes sans rien à payer : fermées à la rase (version 3.5.7)
+function fermerTablesVides(qui) {
+  let n = 0;
+  for (const c of Object.values(db.commandes)) if (c.statut === 'ouverte' && !c.lignes.some(l => !l.annule && !l.paye)) { c.statut = 'annulee'; c.ferme = now(); n++; }
+  if (n) journal(qui, 'tables vides fermées', n + ' table(s)');
+  return n;
+}
 // ---------------------------------------------------------------- Calculs journée
 function resumeJour(j) {
   if (!j) return null;
@@ -658,7 +695,8 @@ function resumeJour(j) {
   for (const t of tks) { if (t.mode === 'offert') continue; parServeur[t.serveur] = (parServeur[t.serveur] || 0) + t.net; parCaissier[t.caissier] = (parCaissier[t.caissier] || 0) + t.net; }
   const annulations = [];
   for (const c of Object.values(db.commandes)) if (c.jour === j.id) for (const l of c.lignes) if (l.annule && l.envoye) annulations.push({ table: c.table, nom: l.nom, qte: l.qte, montant: l.qte * l.prix, motif: l.annule.motif, par: l.annule.par });
-  const ouvertes = Object.values(db.commandes).filter(c => c.statut === 'ouverte');
+  // table « ouverte » = il reste des articles à payer (une table ouverte puis laissée vide ne bloque plus la rase)
+  const ouvertes = Object.values(db.commandes).filter(c => c.statut === 'ouverte' && c.lignes.some(l => !l.annule && !l.paye));
   return {
     jour: j, nbTickets: tks.length, ca: especes + cheque + tpe + societe, especes, cheque, tpe, societe, offert,
     remises: sum(tks, t => t.remise || 0), patron: sum(tks.filter(t => t.patron), t => t.net),
@@ -673,12 +711,12 @@ function resumeJour(j) {
 }
 function rapport(du, au) {
   const tks = db.tickets.filter(t => !t.annule && t.date >= du && t.date <= au);
-  const plats = {}, cats = {}, jours = {}, serveurs = {}, heures = {};
+  const plats = {}, cats = {}, jours = {}, serveurs = {}, heures = {}, parSociete = {};
   let ca = 0, especes = 0, cheque = 0, tpe = 0, societe = 0, offert = 0, remises = 0, couverts = 0;
   for (const t of tks) {
     if (t.mode !== 'offert') { ca += t.net; jours[t.date] = (jours[t.date] || 0) + t.net; serveurs[t.serveur] = (serveurs[t.serveur] || 0) + t.net; const h = new Date(t.ts).getHours(); heures[h] = (heures[h] || 0) + t.net; }
     if (t.mode === 'offert') offert += t.total;
-    for (const p of paiementsDe(t)) { if (p.mode === 'especes') especes += p.montant; else if (p.mode === 'cheque') cheque += p.montant; else if (p.mode === 'tpe') tpe += p.montant; else if (p.mode === 'societe') societe += p.montant; }
+    for (const p of paiementsDe(t)) { if (p.mode === 'especes') especes += p.montant; else if (p.mode === 'cheque') cheque += p.montant; else if (p.mode === 'tpe') tpe += p.montant; else if (p.mode === 'societe') { societe += p.montant; const k = p.societe || 'Société ?'; const x = parSociete[k] = parSociete[k] || { nom: k, montant: 0, tickets: [] }; x.montant += p.montant; x.tickets.push({ num: t.num, date: t.date, montant: p.montant }); } }
     remises += t.remise || 0; couverts += t.couverts || 0;
     for (const l of t.lignes) {
       if (l.annule) continue;
@@ -699,6 +737,7 @@ function rapport(du, au) {
   const tempsPrep = Object.fromEntries(Object.entries(prep).map(([k, v]) => [k, Math.round(v.reduce((a, x) => a + x, 0) / v.length)]));
   return {
     precedent, precedentDu: pdu, precedentAu: pau, tempsPrep,
+    parSociete: Object.values(parSociete).sort((a, b) => b.montant - a.montant),
     du, au, nbTickets: tks.length, ca, especes, cheque, tpe, societe, offert, remises, couverts,
     ticketMoyen: tks.length ? Math.round(ca / tks.length) : 0,
     plats: Object.values(plats).sort((a, b) => b.qte - a.qte),
@@ -753,12 +792,17 @@ function raseAppli(j, r, rase) {
   };
 }
 function envoyerRase(j, r, rase) {
+  const x = mailRase(j, r, rase);
+  return envoyerMail(x.dest, x.sujet, x.texte);
+}
+function mailRase(j, r, rase) {
   const m = db.config.mail || {};
   const d = raseAppli(j, r, rase);
   const jour = new Date(j.date + 'T12:00').toLocaleDateString('fr-FR');
   const texte = 'Rase de la journée n° ' + j.n + ' du ' + jour + '\n\n' + raseDoc(r, rase).texte().replace(/\[(LOGO|QR[^\]]*)\]\n?/g, '') +
     '\n\n--- Données pour l\'appli de gestion (ne pas modifier) ---\nDONNEES-CAISSE ' + JSON.stringify(d) + '\n';
-  return envoyerMail(m.dest || m.user, '[Caisse MB] Rase du ' + jour + ' - CA ' + fmt(r.ca) + ' DA - écart ' + fmt(rase.ecart) + ' DA', texte);
+  const auto = rase.compte === null || rase.automatique;
+  return { dest: m.dest || m.user, sujet: '[Caisse MB] Rase du ' + jour + ' - CA ' + fmt(r.ca) + ' DA - ' + (auto ? 'rase automatique, espèces à compter' : 'écart ' + fmt(rase.ecart) + ' DA'), texte };
 }
 function raseDoc(r, rase) {
   const d = new Doc();
@@ -783,7 +827,8 @@ function raseDoc(r, rase) {
   if (rase) {
     d.lr('Espèces attendues (rase)', fmt(rase.attendu));
     d.lr('Espèces comptées', rase.compte === null ? 'Non comptées (auto)' : fmt(rase.compte));
-    d.bold(1).lr('ÉCART', (rase.ecart > 0 ? '+' : '') + fmt(rase.ecart) + ' DA').bold(0);
+    if (rase.ecart === null || rase.ecart === undefined) d.bold(1).lr('ÉCART', 'à vérifier').bold(0);
+    else d.bold(1).lr('ÉCART', (rase.ecart > 0 ? '+' : '') + fmt(rase.ecart) + ' DA').bold(0);
     if (rase.completePar) d.t('Écart complété par : ' + rase.completePar);
     if (rase.commentaire) d.t('Note : ' + rase.commentaire);
   } else { d.bold(1).lr('Espèces dans le tiroir', fmt(r.attenduTiroir) + ' DA').bold(0); d.lr('Tables encore ouvertes', r.tablesOuvertes + ' - ' + fmt(r.montantOuvert) + ' DA'); }
@@ -876,13 +921,13 @@ async function verifierRaseAuto() {
       ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe,
       societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
     j.rase = z; j.clos = now();
+    fermerTablesVides(null);
     journal(null, 'rase automatique', 'Journée ' + j.n + ' clôturée sans comptage physique');
     const mail = db.config.mail || {};
     if (mail.actif && mail.user && mail.pass) {
-      const jour = new Date(j.date + 'T12:00').toLocaleDateString('fr-FR');
-      const texte = 'Rase automatique du ' + jour + '\\n\\n' + raseDoc(r, z).texte() +
-        '\\nDONNEES-CAISSE ' + JSON.stringify(raseAppli(j, r, z));
-      db.mailsAttente.push({ dest: mail.dest || mail.user, sujet: '[Caisse MB] Rase automatique du ' + jour, texte, ts: now(), important: true });
+      // même format que la rase faite à la main (sujet « Rase du … », ligne DONNEES-CAISSE) pour l'appli de gestion
+      const x = mailRase(j, r, z);
+      db.mailsAttente.push({ ...x, ts: now(), important: true, raseAuto: j.id });
     }
     saveNow();
     const copie = path.join(BACKUPS, 'rase-auto-' + j.id + '.json');
@@ -892,11 +937,13 @@ async function verifierRaseAuto() {
     if (!impression || !impression.ok) journal(null, 'impression rase auto', String(impression && impression.erreur || 'non confirmée'));
     // Retenter le SMTP pendant dix minutes maximum ; le message reste durablement en file.
     const finMail = now() + 10 * 60000;
-    while (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')) && now() < finMail) {
+    while (db.mailsAttente.some(x => x.raseAuto === j.id) && now() < finMail) {
       await Promise.race([envoyerAttente(), new Promise(resolve => setTimeout(resolve, 15000))]);
-      if (db.mailsAttente.some(x => x.important && x.sujet.includes('Rase automatique du')))
+      if (db.mailsAttente.some(x => x.raseAuto === j.id))
         await new Promise(resolve => setTimeout(resolve, 15000));
     }
+    if (!db.mailsAttente.some(x => x.raseAuto === j.id)) j.mailEnvoye = now(); else j.mailErreur = 'Pas encore envoyée (internet ?) : elle partira toute seule';
+    db.extinctionNuit = dateLocale(now());
     journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
     saveNow();
     if (cfg.extinction && process.platform === 'win32' && process.env.CAISSE_TEST_SHUTDOWN !== '1')
@@ -1138,6 +1185,7 @@ const routes = {
     succesAcces(ip);
     const token = crypto.randomBytes(18).toString('hex');
     sessions.set(token, { userId: u.id, ts: now(), created: now() });
+    sauverSessions();
     journal(u, 'connexion', '');
     return { token, user: { id: u.id, nom: u.nom, role: u.role } };
   },
@@ -1249,7 +1297,7 @@ const routes = {
       }
       const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
       db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: p.id === 'supplement-fixe' ? '' : String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
     }
     if (!nouvelles.length) E('Rien à envoyer');
     for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
@@ -1600,6 +1648,7 @@ const routes = {
     const attendu = r.aRemettre;
     const rase = { ts: now(), par: u.nom, compte, attendu, ecart: compte - attendu, completePar: String(b.completePar || ''), commentaire: String(b.commentaire || ''), ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe, societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
     j.rase = rase; j.clos = now();
+    fermerTablesVides(u);
     journal(u, 'rase', 'Journée ' + j.n + ' CA ' + fmt(r.ca) + ' compté ' + fmt(compte) + ' écart ' + fmt(rase.ecart));
     save();
     saveNow();
@@ -1635,7 +1684,7 @@ const routes = {
   'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
   'POST /api/pointage/autoriser': (b, _u, req) => {
     const ip = String(req.socket.remoteAddress || '');
-    if (!/^(::1|127\\.|::ffff:127\\.)/.test(ip)) E('Autorisation uniquement sur la caisse principale', 403);
+    if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Autorisation uniquement sur la caisse principale', 403);
     const cle = controleEssais(req);
     const caissier = parCode(b.badge || b.pin);
     if (!caissier || !peut(caissier, 'caissier')) {
@@ -1693,12 +1742,12 @@ const routes = {
   'GET /api/version': () => ({ version: VERSION }),
   // « calme » = aucune table ouverte et personne n'a touché la caisse depuis 3 minutes (pour installer une mise à jour)
   // 3.4.0 : les tables ouvertes n'empêchent plus la mise à jour (elles sont gardées) ; il suffit que personne n'ait touché la caisse depuis 3 min
-  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000; if (calme) saveNow(); return { calme }; },
+  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000; if (calme) { saveNow(); sauverSessions(); } return { calme }; },
   'GET /api/maj': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return { version: VERSION, app: !!process.send, etat: majEtat }; },
   'POST /api/maj/verifier': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); if (process.send) process.send({ type: 'verifier' }); return {}; },
   'POST /api/maj/installer': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
-    journal(u, 'mise à jour', 'installation demandée'); saveNow();
+    journal(u, 'mise à jour', 'installation demandée'); saveNow(); sauverSessions();
     if (process.send) process.send({ type: 'installer' }); return {};
   },
   'POST /api/rase/reimprimer': async (b, u) => {
