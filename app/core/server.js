@@ -1620,9 +1620,9 @@ function csv(rows) {
   // Empêche qu'un champ libre soit interprété comme formule par un tableur.
   return '\uFEFF' + rows.map(r => r.map(v => {
     v = v == null ? '' : String(v);
-    if (/^[\\t\\r\\n ]*[=+@-]/.test(v)) v = "'" + v;
-    return /[;"\\r\\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-  }).join(';')).join('\\r\\n');
+    if (/^[\t\r\n ]*[=+@-]/.test(v)) v = "'" + v;
+    return /[;"\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(';')).join('\r\n');
 }
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
