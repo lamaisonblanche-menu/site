@@ -34,13 +34,20 @@ async function api(path, body) {
   if (!r.ok) { const e = new Error(j.erreur || 'Erreur'); e.status = r.status; throw e; }
   return j;
 }
-function showErrs(res) { if (res && res.erreurs && res.erreurs.length) toast('⚠ ' + res.erreurs.join(' · ') + ' — rien n’a été imprimé.', true, 7000); }
+function showErrs(res) { if (res && res.erreurs && res.erreurs.length) toast('⚠ ' + res.erreurs.join(' · '), true, 7000); }
 let tt;
 function toast(msg, bad, ms) {
   const t = $('#toast'); t.textContent = msg; t.className = bad ? 'bad' : ''; t.hidden = false;
   clearTimeout(tt); tt = setTimeout(() => (t.hidden = true), ms || (bad ? 5000 : 2200));
 }
 async function act(fn) { try { return await fn(); } catch (e) { if (e.message) toast(e.message, true); return null; } }
+async function envoyerBrouillon(c) {
+  if (S.envoiEnCours) return null;
+  S.envoiEnCours = true;
+  const lignes = S.draft.slice();
+  try { return await act(() => api('/api/commande/envoyer', { id: c.id, lignes })); }
+  finally { S.envoiEnCours = false; }
+}
 
 async function refresh() {
   if (!S.token) return;
@@ -381,8 +388,8 @@ document.addEventListener('contextmenu', e => { if (e.target.closest('.pt')) e.p
 const minR = h => +h.slice(0, 2) * 60 + +h.slice(3, 5);
 // une table réservée est bloquée de 30 min avant l'heure prévue jusqu'à 1 h après (si les clients ne sont pas arrivés)
 function resaBloquante(salleId, table) {
-  const mn = new Date().getHours() * 60 + new Date().getMinutes();
-  return (S.etat.reservations || []).filter(r => r.salle === salleId && r.table === table && r.statut === 'prevue' && mn >= minR(r.heure) - 30 && mn <= minR(r.heure) + 60).sort((a, b) => a.heure.localeCompare(b.heure))[0];
+  const minute = Math.floor(Date.now() / 60000) * 60000;
+  return (S.etat.reservations || []).filter(r => r.salle === salleId && r.table === table && r.statut === 'prevue' && minute >= r.tsPrevue - 30 * 60000 && minute <= r.tsPrevue + 60 * 60000).sort((a, b) => a.tsPrevue - b.tsPrevue)[0];
 }
 const plusJours = (date, n) => { const d = new Date(date + 'T12:00'); d.setDate(d.getDate() + n); return ymd(d); };
 const jourLong = date => { const auj = ymd(new Date()); const t = new Date(date + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); return date === auj ? 'Aujourd’hui · ' + t : date === plusJours(auj, 1) ? 'Demain · ' + t : t.charAt(0).toUpperCase() + t.slice(1); };
@@ -908,7 +915,7 @@ const A = window.A = {
   rr() { render(); },
   async envoyer() {
     const c = cmd(); if (!c || !S.draft.length) return;
-    const r = await act(() => api('/api/commande/envoyer', { id: c.id, lignes: S.draft.slice() }));
+    const r = await envoyerBrouillon(c);
     if (!r) return;
     S.draft = []; S.sel = null; S.qty = ''; showErrs(r);
     if (!r.erreurs.length) toast('Commande envoyée ✓');
@@ -932,7 +939,7 @@ const A = window.A = {
       <div class="mf"><button class="btn" onclick="A.close()">Retour</button><button class="btn bad" ${motif ? '' : 'disabled'} onclick="A.ago()">Continuer</button></div>`);
     A.aq = d => { q = Math.max(1, Math.min(l.qte, q + d)); draw(); };
     A.am = m => { motif = m; draw(); };
-    A.ago = () => (peut('caissier') ? (f => f('')) : f => askPin('Annulation par un caissier', f, 'Badge ou code d’un caissier'))(p => act(async () => { const r = await api('/api/commande/annuler-ligne', { id: c.id, ligne: id, qte: q, motif, pin: p }); closeModal(); S.sel = null; showErrs(r); if (!r.erreurs.length) toast('Article annulé, bon d’annulation imprimé'); refresh(); }));
+    A.ago = () => (peut('caissier') ? (f => f('')) : f => askPin('Annulation par un caissier', f, 'Badge ou code d’un caissier'))(p => act(async () => { const r = await api('/api/commande/annuler-ligne', { id: c.id, ligne: id, qte: q, attendu: l.qte, motif, pin: p }); closeModal(); S.sel = null; showErrs(r); if (!r.erreurs.length) toast('Article annulé, bon d’annulation imprimé'); refresh(); }));
     draw();
   },
   async addition() { const c = cmd(); if (S.draft.length) return toast('Envoyez d’abord la commande.', true); const r = await act(() => api('/api/commande/addition', { id: c.id })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Addition imprimée à la caisse ✓'); refresh(); } },
@@ -950,7 +957,13 @@ const A = window.A = {
       <p class="muted">Les tables en noir sont occupées : si vous en choisissez une, les deux tables sont regroupées.</p>
       <div class="chips">${s.tables.map(t => { const occ = S.etat.commandes.find(k => k.salle === salle && k.table === t.n && k.id !== c.id); return `<button class="chip ${occ ? 'on' : ''}" onclick="A.tt('${jsq(t.n)}')">${esc(t.n)}</button>`; }).join('')}</div>`, true); };
     A.ts = id => { salle = id; draw(); };
-    A.tt = t => act(async () => { const r = await api('/api/commande/modifier', { id: c.id, salle, table: t }); closeModal(); S.cmdId = r.id; S.salle = salle; toast('Table transférée ✓'); refresh(); });
+    A.tt = t => {
+      const rs = resaBloquante(salle, t);
+      const transferer = pin => act(async () => { const r = await api('/api/commande/modifier', { id: c.id, salle, table: t, pin }); closeModal(); S.cmdId = r.id; S.salle = salle; toast('Table transférée ✓'); refresh(); });
+      if (rs && !peut('caissier') && (salle !== c.salle || t !== c.table)) return askPin('Table réservée : accord du caissier', transferer, 'Badge ou code d’un caissier');
+      if (rs && peut('caissier') && (salle !== c.salle || t !== c.table) && !confirm('Table réservée pour ' + rs.nom + ' à ' + rs.heure + '. Transférer quand même ?')) return;
+      return transferer();
+    };
     draw();
   },
   couverts() { const c = cmd(); let n = c.couverts; const draw = () => modal(mh('Couverts') + `<div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div><div class="mf"><button class="btn dark" onclick="A.ok()">OK</button></div>`); A.cv = d => { n = Math.max(1, n + d); draw(); }; A.ok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, couverts: n }); closeModal(); refresh(); }); draw(); },
@@ -980,7 +993,9 @@ const A = window.A = {
   encaisser(mode, partie, avecRemise) {
     const c = cmd();
     if (S.draft.length) return toast('Envoyez d’abord la commande (bouton Commande).', true);
-    const lignes = partie || c.lignes.filter(l => !l.annule && !l.paye);
+    const restantes = c.lignes.filter(l => !l.annule && !l.paye);
+    const attendu = restantes.map(l => [l.id, l.qte, l.offert]);
+    const lignes = partie || restantes;
     const total = lignes.reduce((s, l) => s + (l.offert ? 0 : l.qte * l.prix), 0);
     const st = { mode: mode || 'especes', saisie: '', pays: [], societe: '', reference: '', remise: null, pin: '', imprimer: true, motif: '' };
     const net = () => st.mode === 'offert' ? 0 : total - (st.remise ? (st.remise.type === 'pct' ? Math.round(total * st.remise.valeur / 100) : Math.min(total, st.remise.valeur)) : 0);
@@ -1037,14 +1052,17 @@ const A = window.A = {
       A.rok = () => askPin('Autoriser la remise', p => { st.pin = p; st.remise = { type, valeur: +val }; draw(); });
       npv.rem = ''; dr();
     };
+    let encaissementEnCours = false;
     A.ego = async () => {
       const go = async () => {
+        if (encaissementEnCours) return;
+        encaissementEnCours = true;
         const paiements = st.mode === 'offert' ? [{ mode: 'offert', montant: 0 }] : projete();
-        const r = await act(() => api('/api/commande/encaisser', { id: c.id, paiements, remise: st.remise, pin: st.pin, imprimer: st.imprimer, motif: st.motif, lignes: partie ? partie.map(l => ({ id: l.id, qte: l.qte })) : null }));
-        if (!r) return;
-        closeModal(); showErrs(r);
+        const r = await act(() => api('/api/commande/encaisser', { id: c.id, paiements, attendu, remise: st.remise, pin: st.pin, imprimer: st.imprimer, motif: st.motif, lignes: partie ? partie.map(l => ({ id: l.id, qte: l.qte })) : null }));
+        if (!r) { encaissementEnCours = false; return; }
+        closeModal();
         const t = r.ticket;
-        if (!r.erreurs.length) toast((t.rendu ? 'Encaissé ✓ — rendre ' + da(t.rendu) : 'Encaissé ✓') + (r.partiel ? ' · il reste des articles sur la table' : ''), false, 5000);
+        toast((t.rendu ? 'Encaissé ✓ — rendre ' + da(t.rendu) : 'Encaissé ✓') + (r.partiel ? ' · il reste des articles sur la table' : '') + (r.erreurs.length ? ' · ' + r.erreurs.join(' · ') : ''), !!r.erreurs.length, 7000);
         S.sel = null; S.qty = '';
         if (!r.partiel) { S.draft = []; S.cmdId = null; S.view = c.salle === 'comptoir' ? 'caisse' : 'tables'; }
         if (S.view === 'caisse') await loadCaisse();
@@ -1345,7 +1363,10 @@ Object.assign(A, {
   async resaDate(v) { if (v) { S.resaDate = v; await loadResa(); render(); } },
   resaSt(id, st) {
     if (st === 'annulee' && !confirm('Annuler cette réservation ?')) return;
-    act(async () => { await api('/api/reservation/statut', { id, statut: st }); toast(st === 'arrivee' ? 'Client arrivé ✓' : 'Enregistré ✓'); await refresh(); });
+    const enregistrer = pin => act(async () => { await api('/api/reservation/statut', { id, statut: st, pin }); closeModal(); toast(st === 'arrivee' ? 'Client arrivé ✓' : 'Enregistré ✓'); await refresh(); });
+    const r = S.resa && S.resa.reservations.find(x => x.id === id);
+    if (st === 'arrivee' && !peut('caissier') && r && r.table && resaBloquante(r.salle, r.table)) return askPin('Table réservée : accord du caissier', enregistrer, 'Badge ou code d’un caissier');
+    return enregistrer();
   },
   resaSite() { act(async () => { toast('Lecture des mails du site…'); const r = await api('/api/reservations/site', {}); toast(r.erreur ? r.erreur : 'Réservations du site à jour ✓', !!r.erreur, 5000); await refresh(); }); },
   resaForm(id, confirmer) {
@@ -1358,7 +1379,7 @@ Object.assign(A, {
       const salle = S.etat.config.salles.find(x => x.id === st.salle);
       const prises = new Map((st._liste || (S.resa && S.resa.date === st.date ? S.resa.reservations : [])).filter(r => r.id !== st.id && r.salle === st.salle && ['prevue', 'a_confirmer'].includes(r.statut) && st.heure && Math.abs(minR(r.heure) - minR(st.heure)) < 120).map(r => [r.table, r]));
       modal(mh(ex ? (confirmer ? 'Confirmer la réservation du site' : 'Modifier la réservation') : 'Nouvelle réservation') + `
-      ${confirmer ? '<p class="pill warn" style="display:block;padding:8px 12px;border-radius:10px">Vérifiez avec le client (WhatsApp ou téléphone), choisissez la table, puis confirmez.</p>' : ''}
+      ${confirmer ? '<p class="pill warn" style="display:block;padding:8px 12px;border-radius:10px">Vérifiez que la demande du site a bien été reçue sur WhatsApp, puis choisissez la table et confirmez.</p>' : ''}
       <div class="row"><div class="field grow"><label>Nom du client</label><input id="rs-nom" value="${esc(st.nom)}" onfocus="A.rsf('rs-nom')" oninput="A.rss('nom',this.value)"></div>
         <div class="field grow"><label>Téléphone</label><input id="rs-tel" inputmode="tel" value="${esc(st.tel)}" onfocus="A.rsf('rs-tel')" oninput="A.rss('tel',this.value)"></div></div>
       <div class="field"><label>Remarque (anniversaire, chaise bébé…)</label><input id="rs-note" value="${esc(st.note)}" onfocus="A.rsf('rs-note')" oninput="A.rss('note',this.value)"></div>
@@ -1387,7 +1408,7 @@ Object.assign(A, {
   async payer() {
     let c = cmd();
     if (S.draft.length) {
-      const r = await act(() => api('/api/commande/envoyer', { id: c.id, lignes: S.draft.slice() }));
+      const r = await envoyerBrouillon(c);
       if (!r) return; S.draft = []; showErrs(r); await refresh(); c = cmd(); if (!c) return;
     }
     const n = totalCmd(c);
@@ -1418,12 +1439,18 @@ Object.assign(A, {
       npv.cash = recu;
     };
     A.cb = b => { recu = String(b); draw(); };
+    const attendu = c.lignes.filter(l => !l.annule && !l.paye).map(l => [l.id, l.qte, l.offert]);
+    let paiementEnCours = false;
     A.cgo = montant => act(async () => {
-      const r = await api('/api/commande/encaisser', { id: c.id, paiements: [{ mode: 'especes', montant }], imprimer: ticket() });
+      if (paiementEnCours) return;
+      paiementEnCours = true;
+      let r;
+      try { r = await api('/api/commande/encaisser', { id: c.id, paiements: [{ mode: 'especes', montant }], attendu, imprimer: ticket() }); }
+      catch (e) { paiementEnCours = false; throw e; }
       closeModal(); showErrs(r);
       const t = r.ticket;
       if (t.rendu > 0) modal(`<div class="rendu-big"><div>Rendre au client</div><b class="num">${da(t.rendu)}</b><button class="btn dark big" onclick="A.close()">OK</button></div>`);
-      else toast('Encaissé ✓ ' + da(t.net), false, 3000);
+      else if (!r.erreurs.length) toast('Encaissé ✓ ' + da(t.net), false, 3000);
       if (t.rendu > 0) setTimeout(() => { if ($('.rendu-big')) closeModal(); }, 8000);
       S.draft = []; S.cmdId = null; S.view = c.salle === 'comptoir' || c.salle === 'emporter' ? (peut('caissier') && c.salle === 'comptoir' ? 'caisse' : 'tables') : 'tables';
       if (S.view === 'caisse') await loadCaisse();
