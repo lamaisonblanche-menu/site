@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../core/server.js'), 'utf8');
 test('CSV : les champs dangereux et les séparateurs sont échappés', () => {
-  const a = source.indexOf('function csv(rows)'), b = source.indexOf('\n\nconst MIME', a);
+  const a = source.indexOf('function csv(rows)'), b = source.indexOf('const MIME', a);
   assert.ok(a >= 0 && b > a);
   const csv = vm.runInNewContext(source.slice(a, b) + '\ncsv');
   const out = csv([['=1+1', '+2', '-3', '@A', 'a;b', 'a"b'], ['ok', 'ligne\nsuivante']]);
