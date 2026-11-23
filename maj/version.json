@@ -1,11 +1,11 @@
 {
- "version": "3.3.1",
- "date": "2026-11-23T16:42:16.974Z",
- "notes": "Sushis, rolls, lattes et desserts de la carte ajoutés",
+ "version": "3.3.2",
+ "date": "2026-11-23T16:48:54.268Z",
+ "notes": "Vérification avant lancement : affichage 1024×768 ajusté (prise de commande, encaissement, écran cuisine), Rigatoni au saumon, Cromesquis d'escargots ajouté",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "ef2a79c2f7dc37800a73fd9930b307824ce20af920cbc7159323456418e77e6b"
+   "sha256": "abba5fcd6d1275d62d78e09d88276dcf264d2137f85323ab50eadddcc31aeea9"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -33,7 +33,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "9b1ad7bf345bddd8873b5109fea97e5722b9767e9b00ccc3233b01b73cc00806"
+   "sha256": "006657adcb9d1de242d1211be36c3fbf0241ff4a2d74602705b8aab870e79d58"
   },
   {
    "chemin": "seed-menu.json",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "f1bc4a0507ff16e8f05135a7b0696f8177c812d05f6cebc9422ec351db5c09d6"
+   "sha256": "d73a8306a393726fec6f37fe6bc4b38ea98016128661c0efdce69c0eb8c66e45"
   }
  ]
 }
