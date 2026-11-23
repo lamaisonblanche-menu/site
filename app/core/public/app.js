@@ -227,9 +227,8 @@ function planHtml(salle, edit) {
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
     }
     if (!c && !edit) {
-      const mn = new Date().getHours() * 60 + new Date().getMinutes();
-      const rs = (S.etat.reservations || []).filter(r => r.salle === salle.id && r.table === t.n && minR(r.heure) >= mn - 60).sort((a, b) => a.heure.localeCompare(b.heure))[0];
-      if (rs) { cls += ' resv' + (minR(rs.heure) - mn <= 60 ? ' bientot' : ''); inner += `<span class="pr">${rs.heure.replace(':', 'h')}</span><span class="pd">${esc(rs.nom.split(' ')[0].slice(0, 9))} · ${rs.couverts}p</span>`; }
+      const rs = resaBloquante(salle.id, t.n);
+      if (rs) { cls += ' resv bientot'; inner += `<span class="pr">${rs.heure.replace(':', 'h')}</span><span class="pd">${esc(rs.nom.split(' ')[0].slice(0, 9))} · ${rs.couverts}p</span>`; }
     }
     if (edit && adm.selT === i) cls += ' sel';
     const act = edit ? `data-t="${i}"` : (c ? `onclick="A.voir('${c.id}')"` : `onclick="A.ouvrir('${jsq(t.n)}')"`);
@@ -380,6 +379,11 @@ document.addEventListener('contextmenu', e => { if (e.target.closest('.pt')) e.p
 
 // ------------------------------------------------------------ Réservations
 const minR = h => +h.slice(0, 2) * 60 + +h.slice(3, 5);
+// une table réservée est bloquée de 30 min avant l'heure prévue jusqu'à 1 h après (si les clients ne sont pas arrivés)
+function resaBloquante(salleId, table) {
+  const mn = new Date().getHours() * 60 + new Date().getMinutes();
+  return (S.etat.reservations || []).filter(r => r.salle === salleId && r.table === table && r.statut === 'prevue' && mn >= minR(r.heure) - 30 && mn <= minR(r.heure) + 60).sort((a, b) => a.heure.localeCompare(b.heure))[0];
+}
 const plusJours = (date, n) => { const d = new Date(date + 'T12:00'); d.setDate(d.getDate() + n); return ymd(d); };
 const jourLong = date => { const auj = ymd(new Date()); const t = new Date(date + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); return date === auj ? 'Aujourd’hui · ' + t : date === plusJours(auj, 1) ? 'Demain · ' + t : t.charAt(0).toUpperCase() + t.slice(1); };
 const STATUT_R = { a_confirmer: ['À confirmer', 'warn'], prevue: ['Prévue', 'ok'], arrivee: ['Arrivée', 'navy'], annulee: ['Annulée', 'bad'], absent: ['Pas venu', 'bad'] };
@@ -807,8 +811,9 @@ const A = window.A = {
   },
   salle(id) { S.salle = id; localStorage.setItem('mb_salle', id); render(); },
   ouvrir(t) {
-    let n = 2;
-    const draw = () => modal(mh('Table ' + esc(t)) + `<p class="muted">Nombre de couverts</p><div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div>
+    const rs = resaBloquante(S.salle, t);
+    let n = rs ? rs.couverts : 2;
+    const draw = () => modal(mh('Table ' + esc(t)) + `${rs ? `<p class="pill warn" style="display:block;padding:10px 12px;border-radius:10px;font-size:15px">🔒 Table réservée à <b>${rs.heure.replace(':', 'h')}</b> pour <b>${esc(rs.nom)}</b> (${rs.couverts} pers.). Ouvrez-la seulement si ce sont ces clients.</p>` : ''}<p class="muted">Nombre de couverts</p><div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div>
       <div class="chips" style="justify-content:center">${[1, 2, 3, 4, 5, 6, 8, 10].map(k => `<button class="chip ${k === n ? 'on' : ''}" onclick="A.cvs(${k})">${k}</button>`).join('')}</div>
       <div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark" onclick="A.ok()">Ouvrir la table</button></div>`);
     A.cv = d => { n = Math.max(1, Math.min(99, n + d)); draw(); };

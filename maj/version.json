@@ -1,11 +1,11 @@
 {
- "version": "3.5.0",
- "date": "2026-11-23T17:38:17.017Z",
- "notes": "Réservations : prises au téléphone par le caissier, réservations du site lues dans Gmail (à confirmer), tables réservées sur le plan, mail au patron à chaque réservation",
+ "version": "3.5.1",
+ "date": "2026-11-23T17:40:20.699Z",
+ "notes": "Table réservée bloquée seulement 30 min avant l'heure (jusqu'à 1 h après), avertissement à l'ouverture",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "76120c1f2c4311c2154c22a6b58e00e411e0ebe76afae0daf608d9196c61f114"
+   "sha256": "eb41f86c3d67299b46490cde10158a521148fdc03641aa14a93fa2797becd78c"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "a43e0fefbfc75bdb4bd71fdeda7c95b9309e0b51f24f13fa19eeb70bb66c4504"
+   "sha256": "2c5f83540036578cd291b740b2cdb70c5f85ebe6383b3185f23fee9e39671ddd"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "960c7bb0300f7528ce36492482f9f73c7097d88dc3070b71d413ba154e95aed0"
+   "sha256": "a9a26d13fddab71322f2259359121369b4319d0a49ba1c270c32ffd5a55fab31"
   }
  ]
 }

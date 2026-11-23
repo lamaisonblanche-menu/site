@@ -937,7 +937,7 @@ setTimeout(lireSite, 20000); setInterval(lireSite, 5 * 60000);
 // une table réservée devient « arrivée » quand on l'ouvre autour de l'heure prévue
 function arriveeAuto(c) {
   const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
-  const r = db.reservations.find(x => x.date === auj && x.salle === c.salle && x.table === c.table && ['prevue', 'a_confirmer'].includes(x.statut) && Math.abs(minutes(x.heure) - mn) <= 90);
+  const r = db.reservations.find(x => x.date === auj && x.salle === c.salle && x.table === c.table && x.statut === 'prevue' && mn >= minutes(x.heure) - 30 && mn <= minutes(x.heure) + 90);
   if (r) { r.statut = 'arrivee'; r.arrivee = now(); }
 }
 function etatPublic(u) {
