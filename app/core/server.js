@@ -1007,6 +1007,7 @@ function bonsKds(poste) {
 }
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
+const autorisationsPointage = new Map();
 const routes = {
   'POST /api/login': (b, _u, req) => {
     const ip = controleEssais(req);
@@ -1498,10 +1499,28 @@ const routes = {
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
   'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
+  'POST /api/pointage/autoriser': (b, _u, req) => {
+    const ip = String(req.socket.remoteAddress || '');
+    if (!/^(::1|127\\.|::ffff:127\\.)/.test(ip)) E('Autorisation uniquement sur la caisse principale', 403);
+    const cle = controleEssais(req);
+    const caissier = parCode(b.badge || b.pin);
+    if (!caissier || !peut(caissier, 'caissier')) {
+      echecAcces(cle); E('Code ou badge du caissier incorrect', 401);
+    }
+    succesAcces(cle);
+    for (const [k, v] of autorisationsPointage) if (v.expire < now()) autorisationsPointage.delete(k);
+    const autorisation = crypto.randomBytes(24).toString('hex');
+    autorisationsPointage.set(autorisation, { ip, caissier: caissier.nom, expire: now() + 60000 });
+    return { autorisation, expireDans: 60 };
+  },
   'POST /api/pointage': (b, _u, req) => {
     // le pointage se fait seulement sur le PC de la caisse principale (pas sur les écrans de salle)
     const ip = String((req && req.socket && req.socket.remoteAddress) || '');
     if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Le pointage se fait uniquement sur la caisse principale', 403);
+    const jeton = String(b.autorisation || '');
+    const accord = autorisationsPointage.get(jeton);
+    autorisationsPointage.delete(jeton); // usage unique, y compris si le code employé est incorrect
+    if (!accord || accord.expire < now() || accord.ip !== ip) E('Autorisation du caissier requise ou expirée', 403);
     const cle = controleEssais(req);
     const u = parCode(b.badge || b.pin);
     if (!u) { echecAcces(cle); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
@@ -1516,9 +1535,9 @@ const routes = {
       db.pointages.push({ id: 'P' + db.seq.pointage, userId: u.id, nom: u.nom, in: now(), out: null });
       type = 'arrivee';
     }
-    journal(u, 'pointage', type === 'arrivee' ? 'arrivée' : 'départ');
+    journal(u, 'pointage', (type === 'arrivee' ? 'arrivée' : 'départ') + ' · autorisé par ' + accord.caissier);
     save();
-    return { nom: u.nom, type, heure: heure(now()), duree };
+    return { nom: u.nom, type, heure: heure(now()), duree, autorisePar: accord.caissier };
   },
   'GET /api/admin/pointages': (b, u, req, q) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
@@ -1685,7 +1704,7 @@ const server = http.createServer(async (req, res) => {
       const fn = routes[key];
       if (!fn) E('Inconnu', 404);
       const body = req.method === 'POST' ? await lireCorps(req) : {};
-      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
+      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/pointage/autoriser' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
       if (req.method === 'POST') derniereActivite = now();
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);
