@@ -121,11 +121,11 @@ function viewLogin() {
   const P = S.pointage;
   return `<div class="login ${P ? 'pointage' : ''}"><div class="login-in">
     <img src="logo.png" alt="La Maison Blanche">
-    <div class="sub">${P ? 'Pointage · arrivée / départ' : 'Caisse'}</div>
+    <div class="sub">${P ? (S.pointageAutorisation ? 'Pointage · code employé' : 'Pointage · code caissier') : 'Caisse'}</div>
     ${S.pointeMsg ? `<div class="pmsg ${S.pointeMsg.type}">${S.pointeMsg.html}</div>` : ''}
     <div class="dots" id="dots">${[0, 1, 2, 3, 4, 5].slice(0, Math.max(4, pin.length)).map(i => `<i class="${i < pin.length ? 'f' : ''}"></i>`).join('')}</div>
     <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button onclick="A.pinTouch('${n}')">${n}</button>`).join('')}
-      <button class="k" onclick="A.pin('C')">Effacer</button><button onclick="A.pinTouch('0')">0</button><button class="k" onclick="A.pin('OK')">${P ? 'Pointer' : 'Entrer'}</button></div>
+      <button class="k" onclick="A.pin('C')">Effacer</button><button onclick="A.pinTouch('0')">0</button><button class="k" onclick="A.pin('OK')">${P ? (S.pointageAutorisation ? 'Pointer' : 'Autoriser') : 'Entrer'}</button></div>
     <div class="err" id="lerr"></div>
     <div class="hl"><b>Passez votre badge</b> sur le lecteur ou tapez votre code</div>
     ${CAISSE_PRINCIPALE ? `<button class="btn ${P ? 'dark' : ''} ptg" onclick="A.modePointage(${P ? 0 : 1})">${P ? '← Retour à la caisse' : '⏱ Pointer mon arrivée / mon départ'}</button>` : ''}
@@ -134,13 +134,25 @@ function viewLogin() {
 async function pointer(cred) {
   pin = '';
   try {
-    const r = await api('/api/pointage', cred);
+    if (!S.pointageAutorisation) {
+      const a = await api('/api/pointage/autoriser', cred);
+      S.pointageAutorisation = a.autorisation;
+      clearTimeout(S._autorisationTimer);
+      S._autorisationTimer = setTimeout(() => { S.pointageAutorisation = null; if (S.pointage) render(); }, 60000);
+      S.pointeMsg = null;
+      render();
+      return;
+    }
+    const autorisation = S.pointageAutorisation;
+    S.pointageAutorisation = null;
+    clearTimeout(S._autorisationTimer);
+    const r = await api('/api/pointage', { ...cred, autorisation });
     const h = r.duree ? ' · ' + Math.floor(r.duree / 60) + ' h ' + String(r.duree % 60).padStart(2, '0') + ' travaillées' : '';
     S.pointeMsg = { type: r.type, html: (r.type === 'arrivee' ? 'Bonjour <b>' + esc(r.nom) + '</b> · arrivée à ' + r.heure : 'Au revoir <b>' + esc(r.nom) + '</b> · départ à ' + r.heure + h) };
     bip(1);
   } catch (e) { S.pointeMsg = { type: 'bad', html: esc(e.message || 'Erreur') }; }
   render();
-  clearTimeout(S._pt); S._pt = setTimeout(() => { S.pointeMsg = null; S.pointage = false; if (S.view === 'login') render(); }, 5000);
+  clearTimeout(S._pt); S._pt = setTimeout(() => { S.pointeMsg = null; S.pointage = false; S.pointageAutorisation = null; if (S.view === 'login') render(); }, 5000);
 }
 async function login(cred) {
   if (!cred) { cred = { pin }; }
@@ -154,7 +166,7 @@ async function login(cred) {
     if (S.view === 'login' || S.view === 'admin' && !peut('admin') || S.view === 'caisse' && !peut('caissier')) S.view = 'tables';
     if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId)) S.view = 'tables';
     if (r.user.role === 'cuisine') { S.view = 'kds'; await loadKds(); } else if (S.view === 'kds' && !peut('caissier')) S.view = 'tables';
-    S.pointage = false; S.pointeMsg = null;
+    S.pointage = false; S.pointageAutorisation = null; S.pointeMsg = null;
     toast('Bonjour ' + r.user.nom);
     render(); touch();
   } catch (e) {
@@ -172,8 +184,8 @@ function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
 setInterval(() => {
   if (!S.etat) return;
-  const sec = +S.etat.config.deconnexionServeurSec || 0;
-  if (S.etat.user.role === 'serveur' && sec > 0 && Date.now() - lastTouch > sec * 1000) {
+  const sec = CAISSE_PRINCIPALE || S.etat.user.role === 'cuisine' ? 0 : 30;
+  if (sec > 0 && Date.now() - lastTouch > sec * 1000) {
     if (S.draft.length) return; // jamais pendant une commande en cours de saisie
     logout();
   }
@@ -600,7 +612,7 @@ function admPointage() {
   let h = `<div class="row" style="margin-bottom:14px">${per.map(([k, n]) => `<button class="chip ${S.periode === k ? 'on' : ''}" onclick="S.periode='${k}';A.atab('pointage')">${n}</button>`).join('')}
     <input type="date" value="${du}" onchange="A.perso('du',this.value,'pointage')" class="dt"> → <input type="date" value="${au}" onchange="A.perso('au',this.value,'pointage')" class="dt">
     <span class="grow"></span><button class="btn" onclick="A.ptAdd()">+ Ajouter</button><a class="btn" href="/export/pointages.csv?t=${S.token}&du=${du}&au=${au}">Exporter</a></div>
-    <p class="muted">Chacun pointe en passant son badge après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion de la caisse principale (pas sur les écrans de salle). Vous pouvez corriger les heures ici.</p>`;
+    <p class="muted">Le caissier autorise avec son code ou badge, puis l’employé pointe après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion de la caisse principale (pas sur les écrans de salle). Vous pouvez corriger les heures ici.</p>`;
   if (!adm.pointages) return h + '<p>Chargement…</p>';
   const parNom = {};
   for (const p of adm.pointages) (parNom[p.nom] = parNom[p.nom] || []).push(p);
@@ -796,7 +808,7 @@ const A = window.A = {
     }
   },
   pinTouch(k) { A.pin(k); },
-  modePointage(on) { S.pointage = !!on; S.pointeMsg = null; pin = ''; render(); },
+  modePointage(on) { S.pointage = !!on; S.pointageAutorisation = null; clearTimeout(S._autorisationTimer); S.pointeMsg = null; pin = ''; render(); },
   logout() { if (S.draft.length && !confirm('Des articles ne sont pas envoyés. Sortir quand même ?')) return; logout(); },
   close: closeModal,
   async go(v) {
