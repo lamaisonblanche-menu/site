@@ -1,0 +1,33 @@
+name: Publier la mise à jour de caisse
+on:
+  push:
+    branches: [caisse]
+    paths:
+      - 'app/core/**'
+      - 'app/outils/publier.js'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publication:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: caisse
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check app/core/server.js && node --check app/core/public/app.js
+      - name: Générer le manifeste et les empreintes du paquet
+        run: cd app && node outils/publier.js "Rase automatique, supplément 500 DA, pointage et verrouillage"
+      - name: Vérifier le paquet généré
+        run: |
+          node -e "const fs=require('fs'),c=require('crypto'),m=require('./maj/version.json');for(const f of m.fichiers){const b=fs.readFileSync('maj/core/'+f.chemin);if(c.createHash('sha256').update(b).digest('hex')!==f.sha256)process.exit(1)}if(!m.fichiers.length)process.exit(1)"
+      - name: Publier uniquement le canal de mise à jour
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add maj/
+          git diff --cached --quiet || (git commit -m "Publier mise à jour automatique de caisse" && git push origin HEAD:caisse)
