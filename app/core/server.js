@@ -78,7 +78,7 @@ function dbInitiale() {
       fondCaisse: 15000, tablePatron: '18',
       imprimantes: IMPRIMANTES(),
       largeur: 48, pageCode: 16, sansAccents: false, tiroirAuto: true,
-      deconnexionServeurSec: 60,
+      deconnexionServeurSec: 60, raseAuto: { actif: false, heure: '02:00', extinction: true },
       salles: sallesInitiales(),
       societes: [],
       motifsSortie: ['Influenceuse', 'Dépense du restaurant', 'Achat marché', 'Avance sur salaire', 'Autre'],
@@ -271,6 +271,7 @@ if (!db.boissons10) {
 }
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
+db.config.raseAuto = db.config.raseAuto || { actif: false, heure: '02:00', extinction: true };
 db.seq.resa = db.seq.resa || 0;
 // Article autonome de supplément : migration idempotente, sans modifier les anciennes ventes.
 if (!db.supplementArticle) {
@@ -767,7 +768,7 @@ function raseDoc(r, rase) {
   d.lr('Fond de caisse', fmt(r.fondCaisse));
   if (rase) {
     d.lr('Espèces attendues (rase)', fmt(rase.attendu));
-    d.lr('Espèces comptées', fmt(rase.compte));
+    d.lr('Espèces comptées', rase.compte === null ? 'Non comptées (auto)' : fmt(rase.compte));
     d.bold(1).lr('ÉCART', (rase.ecart > 0 ? '+' : '') + fmt(rase.ecart) + ' DA').bold(0);
     if (rase.completePar) d.t('Écart complété par : ' + rase.completePar);
     if (rase.commentaire) d.t('Note : ' + rase.commentaire);
@@ -818,7 +819,7 @@ async function envoyerAttente() {
   if (envoiEnCours) return;
   envoiEnCours = true;
   try {
-    db.mailsAttente = db.mailsAttente.filter(x => now() - x.ts < 2 * 864e5);
+    db.mailsAttente = db.mailsAttente.filter(x => x.important || now() - x.ts < 2 * 864e5);
     while (db.mailsAttente.length) {
       const x = db.mailsAttente[0];
       const r = await envoyerMail(x.dest, x.sujet, x.texte);
@@ -1471,6 +1472,7 @@ const routes = {
     if (!j) E('Aucune journée ouverte');
     const r = resumeJour(j);
     if (r.tablesOuvertes && !b.forcer) E('Il reste ' + r.tablesOuvertes + ' table(s) ouverte(s) (' + fmt(r.montantOuvert) + ' DA). Encaissez-les avant la rase.');
+    if (j.clos || j.rase) E('Journée déjà clôturée');
     const compte = Math.round(+b.compte);
     if (!(compte >= 0)) E('Indiquez le montant compté');
     const attendu = r.aRemettre;
@@ -1632,6 +1634,10 @@ const routes = {
   },
   'POST /api/admin/config': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (b.raseAuto !== undefined) {
+      if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(b.raseAuto.heure || ''))) E('Heure de rase invalide');
+      db.config.raseAuto = { actif: !!b.raseAuto.actif, heure: b.raseAuto.heure, extinction: !!b.raseAuto.extinction };
+    }
     const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation', 'commentaires', 'commentairesCommande', 'qrLien', 'qrTexte', 'logoTicket'];
     for (const k of keep) if (b[k] !== undefined) db.config[k] = b[k];
     if (b.mail) {
