@@ -736,6 +736,12 @@ function admReglages() {
     <div class="field"><label>Lien du QR code imprimé en bas du ticket et de l’addition (vide = pas de QR code)</label><input value="${esc(c.qrLien || '')}" onchange="adm.cfg.qrLien=this.value.trim()"></div>
     <div class="field"><label>Texte sous le QR code</label><input value="${esc(c.qrTexte || '')}" onchange="adm.cfg.qrTexte=this.value"></div>
     <button class="btn" onclick="A.testPrint('ticket')">Imprimer un ticket d’essai</button></div>
+  <div class="panel"><h3>Clôture Z et extinction nocturnes</h3>
+    <p class="muted">La clôture automatique est désactivée par défaut. Les tables ouvertes repoussent la clôture de 30 minutes. Le montant des espèces ne sera pas inventé. Le PC principal Windows peut s'éteindre après sauvegarde.</p>
+    <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).actif ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),actif:this.checked}"> Activer la rase automatique</label>
+    <div class="field"><label>Heure de la clôture</label><input type="time" value="${esc((c.raseAuto || {}).heure || '02:00')}" onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),heure:this.value}"></div>
+    <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).extinction !== false ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),extinction:this.checked}"> Éteindre le PC Windows principal après sauvegarde</label>
+    <button class="btn dark" onclick="A.saveCfg()">Enregistrer</button></div>
   <div class="panel"><h3>Envoi automatique de la rase</h3>
     <p class="muted">Après chaque rase, la caisse envoie le rapport par mail. Il est ensuite rangé automatiquement dans l’appli de gestion. Il faut un « mot de passe d’application » Gmail (16 lettres), pas le mot de passe habituel.</p>
     <label class="chk"><input type="checkbox" ${(c.mail || {}).actif ? 'checked' : ''} onchange="A.mset('actif',this.checked)"> Envoyer la rase automatiquement chaque soir</label>
