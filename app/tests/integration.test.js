@@ -99,7 +99,7 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
 
   } finally {
     server.kill('SIGTERM');
-    await sleep(150);
-    fs.rmSync(dir, { recursive: true, force: true });
+    for (let i = 0; i < 40 && server.exitCode === null; i++) await sleep(100);
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
