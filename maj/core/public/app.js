@@ -121,11 +121,11 @@ function viewLogin() {
   const P = S.pointage;
   return `<div class="login ${P ? 'pointage' : ''}"><div class="login-in">
     <img src="logo.png" alt="La Maison Blanche">
-    <div class="sub">${P ? 'Pointage · arrivée / départ' : 'Caisse'}</div>
+    <div class="sub">${P ? (S.pointageAutorisation ? 'Pointage · code employé' : 'Pointage · code caissier') : 'Caisse'}</div>
     ${S.pointeMsg ? `<div class="pmsg ${S.pointeMsg.type}">${S.pointeMsg.html}</div>` : ''}
     <div class="dots" id="dots">${[0, 1, 2, 3, 4, 5].slice(0, Math.max(4, pin.length)).map(i => `<i class="${i < pin.length ? 'f' : ''}"></i>`).join('')}</div>
     <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button onclick="A.pinTouch('${n}')">${n}</button>`).join('')}
-      <button class="k" onclick="A.pin('C')">Effacer</button><button onclick="A.pinTouch('0')">0</button><button class="k" onclick="A.pin('OK')">${P ? 'Pointer' : 'Entrer'}</button></div>
+      <button class="k" onclick="A.pin('C')">Effacer</button><button onclick="A.pinTouch('0')">0</button><button class="k" onclick="A.pin('OK')">${P ? (S.pointageAutorisation ? 'Pointer' : 'Autoriser') : 'Entrer'}</button></div>
     <div class="err" id="lerr"></div>
     <div class="hl"><b>Passez votre badge</b> sur le lecteur ou tapez votre code</div>
     ${CAISSE_PRINCIPALE ? `<button class="btn ${P ? 'dark' : ''} ptg" onclick="A.modePointage(${P ? 0 : 1})">${P ? '← Retour à la caisse' : '⏱ Pointer mon arrivée / mon départ'}</button>` : ''}
@@ -134,13 +134,25 @@ function viewLogin() {
 async function pointer(cred) {
   pin = '';
   try {
-    const r = await api('/api/pointage', cred);
+    if (!S.pointageAutorisation) {
+      const a = await api('/api/pointage/autoriser', cred);
+      S.pointageAutorisation = a.autorisation;
+      clearTimeout(S._autorisationTimer);
+      S._autorisationTimer = setTimeout(() => { S.pointageAutorisation = null; if (S.pointage) render(); }, 60000);
+      S.pointeMsg = null;
+      render();
+      return;
+    }
+    const autorisation = S.pointageAutorisation;
+    S.pointageAutorisation = null;
+    clearTimeout(S._autorisationTimer);
+    const r = await api('/api/pointage', { ...cred, autorisation });
     const h = r.duree ? ' · ' + Math.floor(r.duree / 60) + ' h ' + String(r.duree % 60).padStart(2, '0') + ' travaillées' : '';
     S.pointeMsg = { type: r.type, html: (r.type === 'arrivee' ? 'Bonjour <b>' + esc(r.nom) + '</b> · arrivée à ' + r.heure : 'Au revoir <b>' + esc(r.nom) + '</b> · départ à ' + r.heure + h) };
     bip(1);
   } catch (e) { S.pointeMsg = { type: 'bad', html: esc(e.message || 'Erreur') }; }
   render();
-  clearTimeout(S._pt); S._pt = setTimeout(() => { S.pointeMsg = null; S.pointage = false; if (S.view === 'login') render(); }, 5000);
+  clearTimeout(S._pt); S._pt = setTimeout(() => { S.pointeMsg = null; S.pointage = false; S.pointageAutorisation = null; if (S.view === 'login') render(); }, 5000);
 }
 async function login(cred) {
   if (!cred) { cred = { pin }; }
@@ -154,7 +166,7 @@ async function login(cred) {
     if (S.view === 'login' || S.view === 'admin' && !peut('admin') || S.view === 'caisse' && !peut('caissier')) S.view = 'tables';
     if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId)) S.view = 'tables';
     if (r.user.role === 'cuisine') { S.view = 'kds'; await loadKds(); } else if (S.view === 'kds' && !peut('caissier')) S.view = 'tables';
-    S.pointage = false; S.pointeMsg = null;
+    S.pointage = false; S.pointageAutorisation = null; S.pointeMsg = null;
     toast('Bonjour ' + r.user.nom);
     render(); touch();
   } catch (e) {
@@ -172,8 +184,8 @@ function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
 setInterval(() => {
   if (!S.etat) return;
-  const sec = +S.etat.config.deconnexionServeurSec || 0;
-  if (S.etat.user.role === 'serveur' && sec > 0 && Date.now() - lastTouch > sec * 1000) {
+  const sec = CAISSE_PRINCIPALE || S.etat.user.role === 'cuisine' ? 0 : 30;
+  if (sec > 0 && Date.now() - lastTouch > sec * 1000) {
     if (S.draft.length) return; // jamais pendant une commande en cours de saisie
     logout();
   }
@@ -600,7 +612,7 @@ function admPointage() {
   let h = `<div class="row" style="margin-bottom:14px">${per.map(([k, n]) => `<button class="chip ${S.periode === k ? 'on' : ''}" onclick="S.periode='${k}';A.atab('pointage')">${n}</button>`).join('')}
     <input type="date" value="${du}" onchange="A.perso('du',this.value,'pointage')" class="dt"> → <input type="date" value="${au}" onchange="A.perso('au',this.value,'pointage')" class="dt">
     <span class="grow"></span><button class="btn" onclick="A.ptAdd()">+ Ajouter</button><a class="btn" href="/export/pointages.csv?t=${S.token}&du=${du}&au=${au}">Exporter</a></div>
-    <p class="muted">Chacun pointe en passant son badge après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion de la caisse principale (pas sur les écrans de salle). Vous pouvez corriger les heures ici.</p>`;
+    <p class="muted">Le caissier autorise avec son code ou badge, puis l’employé pointe après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion de la caisse principale (pas sur les écrans de salle). Vous pouvez corriger les heures ici.</p>`;
   if (!adm.pointages) return h + '<p>Chargement…</p>';
   const parNom = {};
   for (const p of adm.pointages) (parNom[p.nom] = parNom[p.nom] || []).push(p);
@@ -724,6 +736,12 @@ function admReglages() {
     <div class="field"><label>Lien du QR code imprimé en bas du ticket et de l’addition (vide = pas de QR code)</label><input value="${esc(c.qrLien || '')}" onchange="adm.cfg.qrLien=this.value.trim()"></div>
     <div class="field"><label>Texte sous le QR code</label><input value="${esc(c.qrTexte || '')}" onchange="adm.cfg.qrTexte=this.value"></div>
     <button class="btn" onclick="A.testPrint('ticket')">Imprimer un ticket d’essai</button></div>
+  <div class="panel"><h3>Clôture Z et extinction nocturnes</h3>
+    <p class="muted">La clôture automatique est désactivée par défaut. Les tables ouvertes repoussent la clôture de 30 minutes. Le montant des espèces ne sera pas inventé. Le PC principal Windows peut s'éteindre après sauvegarde.</p>
+    <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).actif ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),actif:this.checked}"> Activer la rase automatique</label>
+    <div class="field"><label>Heure de la clôture</label><input type="time" value="${esc((c.raseAuto || {}).heure || '02:00')}" onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),heure:this.value}"></div>
+    <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).extinction !== false ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),extinction:this.checked}"> Éteindre le PC Windows principal après sauvegarde</label>
+    <button class="btn dark" onclick="A.saveCfg()">Enregistrer</button></div>
   <div class="panel"><h3>Envoi automatique de la rase</h3>
     <p class="muted">Après chaque rase, la caisse envoie le rapport par mail. Il est ensuite rangé automatiquement dans l’appli de gestion. Il faut un « mot de passe d’application » Gmail (16 lettres), pas le mot de passe habituel.</p>
     <label class="chk"><input type="checkbox" ${(c.mail || {}).actif ? 'checked' : ''} onchange="A.mset('actif',this.checked)"> Envoyer la rase automatiquement chaque soir</label>
@@ -796,7 +814,8 @@ const A = window.A = {
     }
   },
   pinTouch(k) { A.pin(k); },
-  modePointage(on) { S.pointage = !!on; S.pointeMsg = null; pin = ''; render(); },
+  reporterRase() { act(async () => { await api('/api/rase-auto/reporter', {}); toast('Rase reportée de 30 minutes'); await refresh(); }); },
+  modePointage(on) { S.pointage = !!on; S.pointageAutorisation = null; clearTimeout(S._autorisationTimer); S.pointeMsg = null; pin = ''; render(); },
   logout() { if (S.draft.length && !confirm('Des articles ne sont pas envoyés. Sortir quand même ?')) return; logout(); },
   close: closeModal,
   async go(v) {
@@ -844,7 +863,7 @@ const A = window.A = {
   },
   choixOptions(p, n, groupes) {
     const sel = {};
-    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length);
+    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length) && (p.id !== 'supplement-fixe' || !!libre.trim());
     const draw = () => modal(mh(esc(p.nom) + (n > 1 ? ' × ' + n : '')) + groupes.map(g => `<p class="muted" style="margin:10px 0 0">${esc(g.nom)}${g.obligatoire ? ' <b style="color:var(--bad)">*</b>' : ''}${g.multiple ? ' (plusieurs possibles)' : ''}</p>
       <div class="chips">${g.choix.map((ch, i) => `<button class="chip big ${(sel[g.id] || []).includes(i) ? 'on' : ''}" onclick="A.och('${g.id}',${i})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div>`).join('') +
       `<div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark big" ${ok() ? '' : 'disabled'} onclick="A.ook()">Ajouter</button></div>`);
@@ -1215,7 +1234,7 @@ Object.assign(A, {
     if (p.stock === 0) return toast(p.nom + ' est épuisé', true);
     const deja = S.draft.filter(d => d.pid === pid).reduce((s, d) => s + d.qte, 0);
     if (p.stock > 0 && deja + 1 > p.stock) return toast('Il ne reste que ' + p.stock + ' « ' + p.nom + ' »', true);
-    if (long || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
+    if (long || pid === 'supplement-fixe' || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
     const j = S.draft.findIndex(d => d.pid === pid && !d.note && !(d.opts || []).length && d.suite == null && !d.emporter);
     if (j >= 0) S.draft[j].qte++; else S.draft.push({ pid, qte: 1, note: '', opts: [], suite: null, emporter: false });
     S.flash = j >= 0 ? j : S.draft.length - 1; clearTimeout(S._fl); S._fl = setTimeout(() => { S.flash = null; }, 400);
@@ -1239,7 +1258,7 @@ Object.assign(A, {
       <div class="fe-row"><span>Quantité</span><div class="qty sm"><button onclick="A.fq(-1)">−</button><span>${d.qte}</span><button onclick="A.fq(1)">+</button></div></div>
       ${groupes.map(g => `<div class="fe-g ${g.obligatoire && !(sel[g.id] || []).length ? 'req' : ''}"><div class="fe-l">${esc(g.nom)}${g.obligatoire ? ' <b>*</b>' : ''}${g.multiple ? ' <span class="muted">(plusieurs possibles)</span>' : ''}</div>
         <div class="chips">${g.choix.map((ch, k) => `<button class="chip big ${(sel[g.id] || []).includes(k) ? 'on' : ''}" onclick="A.fo('${g.id}',${k})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div></div>`).join('')}
-      <div class="fe-g"><div class="fe-l">Commentaire pour la cuisine</div>
+      <div class="fe-g"><div class="fe-l">${p.id === 'supplement-fixe' ? 'Quel supplément ? (obligatoire)' : 'Commentaire pour la cuisine'}</div>
         <div class="chips">${coms.map(x => `<button class="chip ${chips.includes(x) ? 'on' : ''}" onclick="A.fc('${jsq(x)}')">${esc(x)}</button>`).join('')}</div>
         <div class="row"><input id="fe-libre" class="fe-in grow" value="${esc(libre)}" placeholder="Autre commentaire…" oninput="A.fl(this.value)"><button class="btn sm ${S.kbOn ? 'dark' : ''}" onclick="S.kbOn=!S.kbOn;A.fdraw()">⌨</button></div>
         ${S.kbOn ? clavier('fe-libre') : ''}</div>
@@ -1258,12 +1277,13 @@ Object.assign(A, {
       draw();
     };
     A.fc = x => { const j = chips.indexOf(x); if (j >= 0) chips.splice(j, 1); else chips.push(x); draw(); };
-    A.fl = v => { libre = v; };
+    A.fl = v => { libre = v; const b = document.querySelector('.mf .btn.dark.big'); if (b && p.id === 'supplement-fixe') b.disabled = !ok(); };
     A.fe = () => { d.emporter = !d.emporter; draw(); };
     A.fs = s => { d.suite = s === (catDe(p).suite || 0) ? null : s; draw(); };
     A.fdel = () => { S.draft.splice(i, 1); closeModal(); render(); };
     A.fdup = () => { A.fok(true); };
     A.fok = dup => {
+      if (!ok()) return toast('Indiquez quel supplément avant de continuer.', true);
       d.opts = []; for (const g of groupes) for (const k of sel[g.id] || []) d.opts.push({ g: g.id, i: k });
       d.note = [...chips, libre.trim()].filter(Boolean).join(', ');
       if (nouveau) S.draft.push(d); else { S.draft[i] = d; if (dup) S.draft.splice(i + 1, 0, { ...d, opts: [...d.opts] }); }
@@ -1450,6 +1470,13 @@ function render() {
   const sc = S._scKey === cle ? sels.map(q => { const e = app.querySelector(q); return e ? e.scrollTop : 0; }) : [];
   const focusSearch = document.activeElement && document.activeElement.id === 'srch';
   if (S.etat && S.view !== 'login') h = `<div class="shell">${rail()}<main class="pane">${h}</main></div>`;
+  if (S.etat && S.view !== 'login') {
+    const z = S.etat.raseAutoEtat;
+    if (z && z.dansCinqMinutes) {
+      const bouton = peut('admin') ? '<button class="btn dark" onclick="A.reporterRase()">Reporter de 30 min</button>' : '';
+      h = '<div style="background:#ffe4ad;color:#362200;padding:12px;text-align:center;font-weight:bold">La caisse va faire la rase à ' + hm(z.ts) + ' ' + bouton + '</div>' + h;
+    }
+  }
   app.innerHTML = h;
   S._scKey = cle;
   sels.forEach((q, i) => { const e = app.querySelector(q); if (e && sc[i]) e.scrollTop = sc[i]; });

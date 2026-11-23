@@ -1,11 +1,11 @@
 {
- "version": "3.5.4",
- "date": "2026-11-23T19:58:20.010Z",
- "notes": "3.5.4 : sécurité des accès et sessions, validation des commandes et réservations, exports CSV protégés, persistance renforcée et tests automatiques.",
+ "version": "3.5.5",
+ "date": "2026-11-23T23:15:43.417Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "3836a816a26c3d2e2de4eebb69b8b835fdfea55524df1cd31c4768857f7f60dd"
+   "sha256": "8ec82964f3c2d35b593360c9ca94418e4079e96d1522e4fd5f9b95c1d7ba6716"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "6e6670e3cb12c67ebe503c08512bd16bb5f939be0d7e10d7806803167dd17636"
+   "sha256": "980e26fd425782b2ebaa0d071d3d667a8157102cf759e190c4287dc84de6bb1f"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "d1f38ee222094c06cb2a2d0c48fb750f8d895e0a19a6829c296415763ba71026"
+   "sha256": "71d5d0b51a6356f9b7f79fefd77606f8fdf642ef566b7e69b8a2dceb926863f4"
   }
  ]
 }
