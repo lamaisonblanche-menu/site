@@ -326,7 +326,9 @@ function saveNow() {
   const limite = Date.now() - 60 * 864e5;
   if (db.bons.length > 5000) db.bons = db.bons.filter(b => b.ts > limite);
   const tmp = DB_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
+  const data = JSON.stringify(db);
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeFileSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   fs.renameSync(tmp, DB_FILE);
   const b = path.join(BACKUPS, 'caisse-' + new Date().toISOString().slice(0, 10) + '.json');
   if (!fs.existsSync(b)) {
@@ -823,7 +825,7 @@ function verifierResa(b) {
     couverts: parseInt(b.couverts, 10) || 0, salle: String(b.salle || ''), table: String(b.table || '').trim(), note: String(b.note || '').trim().slice(0, 200),
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) E('Choisissez la date');
-  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(r.heure)) E('Choisissez une heure valide');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.heure)) E('Choisissez une heure valide');
   const dateTest = new Date(r.date + 'T12:00:00');
   if (Number.isNaN(dateTest.getTime()) || dateLocale(dateTest.getTime()) !== r.date) E('Date de réservation invalide');
   if (!r.nom) E('Nom du client obligatoire');
@@ -1378,6 +1380,8 @@ const routes = {
     if (topCache.ids.length < 16) topCache.ts = 0;
     if (!partiel) { c.statut = 'payee'; c.ticket = tk.num; c.ferme = now(); }
     for (const p of paiements) if (p.mode === 'societe' && !db.config.societes.includes(p.societe)) db.config.societes.push(p.societe);
+    // Le ticket est conservé sur disque avant toute impression ou réponse au navigateur.
+    saveNow();
     journal(u, 'encaissement', 'Ticket ' + tk.num + ' table ' + c.table + ' ' + fmt(net) + ' DA (' + paiements.map(p => MODES[p.mode] + ' ' + fmt(p.montant)).join(' + ') + ')' + (remise ? ' remise ' + fmt(remise) : '') + (partiel ? ' — paiement partiel' : ''));
     save();
     const d = ticketDoc(tk);
@@ -1649,7 +1653,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/export/')) {
       // jeton passé dans l'URL pour les téléchargements
-      const s = sessions.get(q.t); const u = s && db.users.find(x => x.id === s.userId);
+      const s = sessions.get(q.t);
+      const valide = s && now() - s.ts <= SESSION_IDLE_MS && now() - (s.created || s.ts) <= SESSION_MAX_MS;
+      if (s && !valide) sessions.delete(q.t);
+      const u = valide && db.users.find(x => x.id === s.userId && x.actif);
       if (!peut(u, 'admin')) E('Réservé au responsable', 403);
       const du = q.du || '0000', au = q.au || '9999';
       let rows, nom;
