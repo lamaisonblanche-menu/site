@@ -272,6 +272,15 @@ if (!db.boissons10) {
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
 db.seq.resa = db.seq.resa || 0;
+// Article autonome de supplément : migration idempotente, sans modifier les anciennes ventes.
+if (!db.supplementArticle) {
+  if (!db.produits.some(p => p.id === 'supplement-fixe')) {
+    const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
+    if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+  }
+  db.supplementArticle = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Suppléments payants (version 3.5.3) : groupe d'options « Supplément », affiché comme un commentaire
 // sur la ligne (« SUPPLEMENT Frites (500 DA) ») et ajouté au prix du plat. Branché sur tous les plats cuisine/asiatique.
 if (!db.supp1) {
@@ -1111,6 +1120,7 @@ const routes = {
       const p = db.produits.find(p => p.id === x.pid);
       if (!p) continue;
       const qte = Number(x.qte);
+      if (p.id === 'supplement-fixe' && !String(x.note || '').trim()) E('Quel supplément ? Indiquez son nom avant de l’ajouter.');
       const cat = db.categories.find(k => k.id === p.cat) || {};
       // options (cuisson, accompagnement, suppléments…)
       const opts = [];
@@ -1126,7 +1136,7 @@ const routes = {
       }
       const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
       db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
     }
     if (!nouvelles.length) E('Rien à envoyer');
     for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
@@ -1607,6 +1617,15 @@ const routes = {
     const partoutAvant = new Set(db.produits.filter(p => p.partout).map(p => p.id));
     const postesAvant = Object.fromEntries(db.produits.filter(p => Array.isArray(p.postes)).map(p => [p.id, p.postes]));
     db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}), ...((Array.isArray(p.postes) ? p.postes : postesAvant[p.id]) ? { postes: Array.isArray(p.postes) ? p.postes : postesAvant[p.id] } : {}) }));
+    // Un article système ne peut pas être supprimé, renommé ou changé de prix depuis Gestion.
+    const supplement = db.produits.find(p => p.id === 'supplement-fixe');
+    if (supplement) {
+      supplement.nom = 'Supplément'; supplement.prix = 500; supplement.actif = true;
+      supplement.options = []; supplement.stock = null;
+    } else {
+      const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
+      if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+    }
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
     save(); return {};
