@@ -30,3 +30,14 @@ jobs:
           }
           console.log('Version et fichiers du canal de mise à jour vérifiés : '+v);
           NODE
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check app/main.js
+      - run: node --check app/maj.js
+      - run: node --check app/core/server.js
+      - run: node --test app/tests/caisse.test.js app/tests/integration.test.js app/tests/windows-updater.test.js
