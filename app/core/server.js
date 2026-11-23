@@ -823,7 +823,9 @@ function verifierResa(b) {
     couverts: parseInt(b.couverts, 10) || 0, salle: String(b.salle || ''), table: String(b.table || '').trim(), note: String(b.note || '').trim().slice(0, 200),
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) E('Choisissez la date');
-  if (!/^\d{2}:\d{2}$/.test(r.heure)) E('Choisissez l\'heure');
+  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(r.heure)) E('Choisissez une heure valide');
+  const dateTest = new Date(r.date + 'T12:00:00');
+  if (Number.isNaN(dateTest.getTime()) || dateLocale(dateTest.getTime()) !== r.date) E('Date de réservation invalide');
   if (!r.nom) E('Nom du client obligatoire');
   if (!(r.couverts >= 1 && r.couverts <= 200)) E('Nombre de personnes ?');
   if (r.salle && !db.config.salles.some(x => x.id === r.salle)) r.salle = '';
@@ -1091,7 +1093,12 @@ const routes = {
     if (u.role === 'cuisine') E('Non autorisé', 403);
     const c = getCmd(b.id);
     const besoin = {};
-    for (const x of b.lignes || []) besoin[x.pid] = (besoin[x.pid] || 0) + Math.max(1, parseInt(x.qte, 10) || 1);
+    if (!Array.isArray(b.lignes) || !b.lignes.length) E('Rien à envoyer');
+    for (const x of b.lignes) {
+      const q = Number(x.qte);
+      if (!Number.isInteger(q) || q < 1 || q > 99) E('Quantité invalide (1 à 99)');
+      besoin[x.pid] = (besoin[x.pid] || 0) + q;
+    }
     for (const [pid, q] of Object.entries(besoin)) {
       const p = db.produits.find(p => p.id === pid);
       if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
@@ -1100,13 +1107,17 @@ const routes = {
     for (const x of b.lignes || []) {
       const p = db.produits.find(p => p.id === x.pid);
       if (!p) continue;
-      const qte = Math.max(1, Math.min(99, parseInt(x.qte, 10) || 1));
+      const qte = Number(x.qte);
       const cat = db.categories.find(k => k.id === p.cat) || {};
       // options (cuisson, accompagnement, suppléments…)
       const opts = [];
       for (const gid of p.options || []) {
         const g = db.options.find(o => o.id === gid); if (!g) continue;
-        const choisis = (x.opts || []).filter(o => o.g === gid).map(o => g.choix[o.i]).filter(Boolean);
+        const indices = (x.opts || []).filter(o => o.g === gid).map(o => o.i);
+        if (indices.some(i => !Number.isInteger(i) || i < 0 || i >= g.choix.length)) E('Option invalide pour ' + p.nom);
+        if (new Set(indices).size !== indices.length) E('Option sélectionnée plusieurs fois');
+        if (!g.multiple && indices.length > 1) E('Une seule option autorisée pour « ' + g.nom + ' »');
+        const choisis = indices.map(i => g.choix[i]);
         if (g.obligatoire && !choisis.length) E('Choisissez « ' + g.nom + ' » pour ' + p.nom);
         for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
       }
@@ -1321,6 +1332,7 @@ const routes = {
     // paiements : un seul mode, ou plusieurs (ex. une partie en espèces, le reste par carte)
     let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode, montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
     pays = pays.map(p => ({ mode: p.mode, montant: Math.round(+p.montant || 0), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
+    if (pays.some(p => !Number.isSafeInteger(p.montant) || p.montant < 0)) E('Montant de paiement invalide');
     for (const p of pays) if (!MODES[p.mode]) E('Mode de paiement inconnu');
     const offert = pays.some(p => p.mode === 'offert');
     if (offert && pays.length > 1) E('Une table offerte ne peut pas être payée en plus');
