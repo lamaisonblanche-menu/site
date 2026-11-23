@@ -162,3 +162,11 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - 3.5.0 : réservations (onglet Résa, téléphone + site via Gmail IMAP, mail au patron).
 - 3.5.1 : table réservée bloquée de 30 min avant à 1 h après l'heure.
 - 3.5.2 : une table bloquée ne s'ouvre que par un caissier (badge/code d'un caissier pour un serveur).
+
+### 3.5.6 (24/11/2026, Claude) — part de la 3.5.5 de Codex, sans la remplacer
+- Groupe d'options « Supplément » : Gruyère et Parmesan ajoutés à 500 DA (l'article `supplement-fixe` de Codex reste pour les autres).
+- Sociétés sur facture ajoutées : SPA SGS QUALITEST ALGERIE, ALGERIENNE VIE, SPA FRERES RAHMOUNE DISMAC, SPA SARPI (mêmes noms que l'appli de gestion).
+- `config.raseAuto` ACTIVÉ (02:00, extinction) par migration `db.supp3` : demande du gérant.
+- `extinctionDeNuit()` : si la rase a déjà été faite à la main, le PC s'éteint quand même une fois par nuit (fenêtre d'1 h après l'heure,
+  pas de table ouverte, aucune activité depuis 5 min ; drapeau `db.extinctionNuit` = date). Windows + CAISSE_APP seulement.
+- Gestion → Réglages : infos de mise à jour rechargées à l'affichage (après « Enregistrer », l'écran affichait à tort « hors de l'application »).

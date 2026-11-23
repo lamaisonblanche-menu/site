@@ -737,7 +737,7 @@ function admReglages() {
     <div class="field"><label>Texte sous le QR code</label><input value="${esc(c.qrTexte || '')}" onchange="adm.cfg.qrTexte=this.value"></div>
     <button class="btn" onclick="A.testPrint('ticket')">Imprimer un ticket d’essai</button></div>
   <div class="panel"><h3>Clôture Z et extinction nocturnes</h3>
-    <p class="muted">La clôture automatique est désactivée par défaut. Les tables ouvertes repoussent la clôture de 30 minutes. Le montant des espèces ne sera pas inventé. Le PC principal Windows peut s'éteindre après sauvegarde.</p>
+    <p class="muted">Chaque nuit à l’heure choisie, si la rase n’a pas été faite, la caisse la fait toute seule puis éteint le PC. Si la rase a déjà été faite, le PC s’éteint simplement. Les tables ouvertes repoussent la clôture de 30 minutes. Le montant des espèces ne sera pas inventé. Le PC principal Windows peut s'éteindre après sauvegarde.</p>
     <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).actif ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),actif:this.checked}"> Activer la rase automatique</label>
     <div class="field"><label>Heure de la clôture</label><input type="time" value="${esc((c.raseAuto || {}).heure || '02:00')}" onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),heure:this.value}"></div>
     <label class="chk"><input type="checkbox" ${(c.raseAuto || {}).extinction !== false ? 'checked' : ''} onchange="adm.cfg.raseAuto={...(adm.cfg.raseAuto||{}),extinction:this.checked}"> Éteindre le PC Windows principal après sauvegarde</label>
@@ -753,6 +753,10 @@ function admReglages() {
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
 function admApp() {
+  // les infos de mise à jour n'étaient chargées qu'en passant par l'onglet (après « Enregistrer », l'écran disait à tort
+  // « Caisse ouverte hors de l'application Windows ») : on les recharge à l'affichage (version 3.5.6)
+  if (adm.maj === undefined && !adm._majCharge) { adm._majCharge = true; (async () => { adm.maj = await api('/api/maj').catch(() => null); if (window.caisseApp) adm.info = await caisseApp.info().catch(() => null); adm._majCharge = false; render(); })(); }
+  if (adm.maj === undefined || (adm.maj === null && window.caisseApp)) return `<p class="muted">${adm.maj === null ? 'Infos de mise à jour indisponibles pour le moment.' : 'Chargement…'}</p><div class="row"><button class="btn" onclick="A.atab('reglages')">Actualiser</button>${window.caisseApp ? '<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>' : ''}</div>`;
   const M = adm.maj || {}, E = M.etat || {}, I = adm.info;
   const quand = ts => ts ? new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'jamais';
   return `<table class="l">

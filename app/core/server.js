@@ -292,6 +292,20 @@ if (!db.supp1) {
   for (const p of db.produits) if (cuisines.has(p.cat)) { p.options = p.options || []; if (!p.options.includes('supplements')) p.options.push('supplements'); }
   db.supp1 = true;
 }
+// Version 3.5.6 (demandes du gérant) :
+// - suppléments Gruyère et Parmesan (500 DA) dans le groupe d'options « Supplément »
+// - sociétés payées sur facture (mêmes noms que l'appli de gestion)
+// - rase automatique de nuit ACTIVÉE à 2h avec extinction du PC (le gérant veut que le système soit éteint vers 2h)
+if (!db.supp3) {
+  const g = db.options.find(o => o.id === 'supplements');
+  if (g) for (const nom of ['Gruyère', 'Parmesan']) if (!g.choix.some(ch => ch.nom.toLowerCase() === nom.toLowerCase())) g.choix.push({ nom, prix: 500 });
+  db.config.societes = db.config.societes || [];
+  for (const soc of ['SPA SGS QUALITEST ALGERIE', 'ALGERIENNE VIE', 'SPA FRERES RAHMOUNE DISMAC', 'SPA SARPI'])
+    if (!db.config.societes.some(x => x.trim().toUpperCase() === soc)) db.config.societes.push(soc);
+  db.config.raseAuto = { ...(db.config.raseAuto || {}), actif: true, heure: (db.config.raseAuto || {}).heure || '02:00', extinction: true };
+  db.supp3 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -893,6 +907,30 @@ async function verifierRaseAuto() {
   } finally { raseAutoBusy = false; raseAutoReport = 0; }
 }
 setInterval(() => { verifierRaseAuto().catch(e => console.error(e)); }, 15000);
+// Extinction de nuit même quand la rase a déjà été faite à la main (version 3.5.6).
+// Une seule fois par nuit, dans l'heure qui suit l'heure réglée, si aucune table n'est ouverte et si personne
+// n'a utilisé la caisse depuis 5 minutes. La rase automatique ci-dessus s'occupe elle-même de l'extinction.
+function extinctionDeNuit() {
+  const cfg = db.config.raseAuto || {};
+  if (!cfg.actif || !cfg.extinction || raseAutoBusy || !/^([01]\d|2[0-3]):[0-5]\d$/.test(cfg.heure || '')) return;
+  const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
+  const debut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+  if (now() < debut || now() > debut + 3600000) return;
+  const cle = dateLocale(debut);
+  if (db.extinctionNuit === cle) return;
+  const j = jourCourant(false);
+  if (j && !j.clos && !j.rase && j.ouvert <= debut) return;           // rase automatique encore à faire : elle éteindra
+  if (now() - derniereActivite < 5 * 60000) return;                    // quelqu'un travaille encore sur la caisse
+  if (Object.values(db.commandes).some(c => c.statut === 'ouverte' && (c.lignes || []).some(l => !l.annule && !l.paye))) return;
+  db.extinctionNuit = cle;
+  journal(null, 'extinction de nuit', 'Rase déjà faite, extinction du PC');
+  saveNow();
+  envoyerAttente();
+  if (process.platform === 'win32' && process.env.CAISSE_APP && process.env.CAISSE_TEST_SHUTDOWN !== '1')
+    setTimeout(() => require('child_process').spawn('shutdown.exe', ['/s', '/t', '60'], { detached: true, stdio: 'ignore' }).unref(), 20000);
+  else console.log('extinction de nuit simulée');
+}
+setInterval(() => { try { extinctionDeNuit(); } catch (e) { console.error(e); } }, 30000);
 
 function verifierResa(b) {
   const r = {

@@ -1,11 +1,11 @@
 {
- "version": "3.5.5",
- "date": "2026-11-23T23:15:43.417Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.5.6",
+ "date": "2026-11-23T23:24:19.034Z",
+ "notes": "3.5.6 : suppléments gruyère et parmesan, sociétés sur facture, rase automatique activée à 2h et extinction du PC chaque nuit, correction de l'écran des mises à jour.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "8ec82964f3c2d35b593360c9ca94418e4079e96d1522e4fd5f9b95c1d7ba6716"
+   "sha256": "1e95443457b8ea47a23241b12e7e6a593869a619b770e6b4fbff836851f2a3cf"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "980e26fd425782b2ebaa0d071d3d667a8157102cf759e190c4287dc84de6bb1f"
+   "sha256": "851e876dc4bb8ae3ab7d0c70746942fa5bb1bc1b2759c5041fbbde6c627c3104"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "71d5d0b51a6356f9b7f79fefd77606f8fdf642ef566b7e69b8a2dceb926863f4"
+   "sha256": "702dae7027decfa518506653d400ff7ba7ad58c327eab30d5624cfa189d2f36d"
   }
  ]
 }
