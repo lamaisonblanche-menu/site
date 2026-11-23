@@ -1,11 +1,11 @@
 {
- "version": "3.3.9",
- "date": "2026-11-23T17:20:28.300Z",
- "notes": "Eaux en petit et grand modèle (150 / 200 DA) ; Coca, Coca zéro, Selecto, Hamoud blanche à 250 DA",
+ "version": "3.3.10",
+ "date": "2026-11-23T17:21:26.826Z",
+ "notes": "Sprite et Schweppes ajoutés (250 DA)",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "0d1896b5b6e221ef30d930c50a98815e1b6b3f0fd0297e807fa7a891810f405a"
+   "sha256": "92946641ce45f0abdac522e48f71b115adf8da98953fb1552ffa0d0a8852d56e"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "8dc70b5179ac248b11304e8415d71f0d3d52ccb2c8033c505f23704513f0a479"
+   "sha256": "d14df2ddae33c2df7b831bcbfffff8f4311e73819af8747f9e4dd36b0ddd2221"
   }
  ]
 }

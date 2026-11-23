@@ -121,7 +121,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 - 3.3.6 (`db.partout6`) : champ produit `partout: true` → le bon sort sur toutes les imprimantes de bons branchées (`postesDe(pid)`). Activé pour NY roll (×2), Pavlova, Profiteroles, Mochis glacés.
 - 3.3.7 : commande commune (asiatique + cuisine/cuisine2 dans le même envoi) → chaque bon de cuisine ajoute en bas « POUR INFO - FAIT PAR … » avec la partie de l'autre cuisine (`bon(…, infos)`), à l'envoi seulement (pas sur l'écran cuisine).
 - 3.3.8 (`db.postes8`) : champ produit `postes: ['cuisine','comptoir']` → bon sur ces imprimantes précises. Fondant chocolat glace et Nougat glacé : cuisine + comptoir.
-- 3.3.9 (`db.boissons9`) : Eau minérale / pétillante PM 150 et GM 200 ; « Soda » désactivé, remplacé par Coca, Coca zéro, Selecto, Hamoud blanche (250).
+- 3.3.9 (`db.boissons9`) : Eau minérale / pétillante PM 150 et GM 200 ; « Soda » désactivé, remplacé par Coca, Coca zéro, Selecto, Hamoud blanche (250) ; Sprite et Schweppes 250 en 3.3.10 (`db.boissons10`). Prix confirmés par le patron : Piña colada 700, Matcha latte 900.
 - **Pointage** : seulement sur la caisse principale (requête venant de 127.0.0.1) ; le bouton est caché sur les écrans de salle et l'API refuse.
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.
