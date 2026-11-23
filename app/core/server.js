@@ -828,7 +828,66 @@ async function envoyerAttente() {
     }
   } catch (e) {} finally { envoiEnCours = false; }
 }
+
 setInterval(envoyerAttente, 5 * 60000);
+let raseAutoBusy = false, raseAutoReport = 0, raseAutoAverti = '';
+async function verifierRaseAuto() {
+  const cfg = db.config.raseAuto || {};
+  if (raseAutoBusy || !cfg.actif || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(cfg.heure || '')) return;
+  const j = jourCourant(false);
+  if (!j || j.clos || j.rase) return;
+  const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
+  const debut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+  if (j.ouvert > debut) return;
+  const echeance = debut + raseAutoReport * 1800000;
+  if (now() < echeance) {
+    if (echeance - now() <= 300000 && raseAutoAverti !== String(echeance)) {
+      raseAutoAverti = String(echeance);
+      journal(null, 'avertissement rase automatique', 'Clôture prévue à ' + heure(echeance));
+      save();
+    }
+    return;
+  }
+  const r = resumeJour(j);
+  if (r.tablesOuvertes) {
+    raseAutoReport++;
+    journal(null, 'rase automatique reportée', r.tablesOuvertes + ' table(s) ouvertes ; report 30 minutes');
+    save();
+    return;
+  }
+  raseAutoBusy = true;
+  try {
+    const z = { ts: now(), par: 'Rase automatique', automatique: true, compte: null,
+      attendu: r.aRemettre, ecart: null, completePar: '', commentaire: 'Comptage physique à effectuer',
+      ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe,
+      societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
+    j.rase = z; j.clos = now();
+    journal(null, 'rase automatique', 'Journée ' + j.n + ' clôturée sans comptage physique');
+    const mail = db.config.mail || {};
+    if (mail.actif && mail.user && mail.pass) {
+      const jour = new Date(j.date + 'T12:00').toLocaleDateString('fr-FR');
+      const texte = 'Rase automatique du ' + jour + '\\n\\n' + raseDoc(r, z).texte() +
+        '\\nDONNEES-CAISSE ' + JSON.stringify(raseAppli(j, r, z));
+      db.mailsAttente.push({ dest: mail.dest || mail.user, sujet: '[Caisse MB] Rase automatique du ' + jour, texte, ts: now(), important: true });
+    }
+    saveNow();
+    const copie = path.join(BACKUPS, 'rase-auto-' + j.id + '.json');
+    fs.copyFileSync(DB_FILE, copie);
+    const fd = fs.openSync(copie, 'r'); try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    const impression = await imprimer('ticket', raseDoc(r, z));
+    if (!impression.ok) journal(null, 'impression rase auto', String(impression.erreur));
+    await Promise.race([envoyerAttente(), new Promise(resolve => setTimeout(resolve, 10000))]);
+    journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
+    saveNow();
+    if (cfg.extinction && process.platform === 'win32' && process.env.CAISSE_TEST_SHUTDOWN !== '1')
+      require('child_process').spawn('shutdown.exe', ['/s', '/t', '60'], { detached: true, stdio: 'ignore' }).unref();
+  } catch (e) {
+    journal(null, 'erreur rase automatique', String(e.message || e));
+    try { saveNow(); } catch (_) {}
+  } finally { raseAutoBusy = false; raseAutoReport = 0; }
+}
+setInterval(() => { verifierRaseAuto().catch(e => console.error(e)); }, 15000);
+
 function verifierResa(b) {
   const r = {
     date: String(b.date || ''), heure: String(b.heure || ''), nom: String(b.nom || '').trim().slice(0, 50), tel: String(b.tel || '').trim().slice(0, 30),
