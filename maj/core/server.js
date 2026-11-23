@@ -962,6 +962,8 @@ const routes = {
     const res = await imprimer('ticket', raseDoc(resumeJour(j), null));
     return { erreurs: res.ok ? [] : [res.erreur] };
   },
+  // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
+  'POST /api/code-valide': (b) => { const u = parCode(b.pin); return { ok: !!u && String(b.pin).length >= 4 }; },
   'POST /api/pointage': (b) => {
     const u = parCode(b.badge || b.pin);
     if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
@@ -1127,7 +1129,7 @@ const server = http.createServer(async (req, res) => {
       const fn = routes[key];
       if (!fn) E('Inconnu', 404);
       const body = req.method === 'POST' ? await lireCorps(req) : {};
-      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'GET /api/version' || key === 'GET /api/calme';
+      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
       if (req.method === 'POST') derniereActivite = now();
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);

@@ -1,11 +1,11 @@
 {
- "version": "3.2.3",
- "date": "2026-11-23T16:20:18.445Z",
- "notes": "Toute l'équipe ajoutée ; seuls les caissiers peuvent annuler un plat",
+ "version": "3.2.4",
+ "date": "2026-11-23T16:22:39.714Z",
+ "notes": "Connexion automatique dès que le code est bon, sans appuyer sur Entrer",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "8bac95a38f37afadb73bad656f4abdeaea9a73b43bc160a8ba2282b5d61018cf"
+   "sha256": "da37b62b234fc08c3abe13174a58e80da0d1c4cfc5dcf4378e9317e81d4f5c3d"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "6af9d300db8e86449577acb10d0f626b0defcb63f5b913e56a0b41550b1f9af3"
+   "sha256": "c3a3ed7bc84312b7389a1b11a4169d92dabd8fc63721f3a8b38d0cf1f038f64b"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1db117c3476f5a50b3151f228e5cbf5b1363071cf37ec6480cdf54cf2c19651c"
+   "sha256": "6e7242f8e025136d8b88ac7b1fcfc97542799f57f915a4e6f8363e8a4d7e1514"
   }
  ]
 }

@@ -709,8 +709,22 @@ function askPin(titre, cb, qui) {
 
 // ------------------------------------------------------------ Actions
 const A = window.A = {
-  pin(k) { if (k === 'C') pin = ''; else if (k === 'OK') return S.pointage ? pointer({ pin }) : login(); else if (pin.length < 6) pin += k; render(); },
-  pinTouch(k) { A.pin(k); if (pin.length === 6 && !S.pointage) login(); },
+  pin(k) {
+    if (k === 'C') pin = ''; else if (k === 'OK') return S.pointage ? pointer({ pin }) : login(); else if (pin.length < 6) pin += k;
+    render();
+    // connexion automatique : dès que le code tapé est bon, on entre sans appuyer sur « Entrer »
+    clearTimeout(S._auto);
+    if (pin.length >= 4 && /^\d$/.test(k)) {
+      const essai = pin;
+      S._auto = setTimeout(async () => {
+        if (pin !== essai) return;
+        const r = await fetch('/api/code-valide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: essai }) }).then(x => x.json()).catch(() => ({}));
+        if (r.ok && pin === essai) { if (S.pointage) pointer({ pin: essai }); else login({ pin: essai }); }
+        else if (pin === essai && essai.length === 6) { const l = $('#lerr'); if (l) l.textContent = 'Code incorrect'; }
+      }, 250);
+    }
+  },
+  pinTouch(k) { A.pin(k); },
   modePointage(on) { S.pointage = !!on; S.pointeMsg = null; pin = ''; render(); },
   logout() { if (S.draft.length && !confirm('Des articles ne sont pas envoyés. Sortir quand même ?')) return; logout(); },
   close: closeModal,
