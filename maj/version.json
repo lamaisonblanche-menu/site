@@ -1,11 +1,11 @@
 {
- "version": "3.2.6",
- "date": "2026-11-23T16:30:21.352Z",
- "notes": "Envoi automatique de la rase par mail pour l'appli de gestion",
+ "version": "3.3.0",
+ "date": "2026-11-23T16:34:50.327Z",
+ "notes": "Nouvelle apparence : barre latérale, plan de salle plus lisible, encaissement plein écran",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "c17fbb4bde718de57b503e111478cd6035c936d2c440c6a9b49b446733472355"
+   "sha256": "5eee6c0c5c6901f5e523f0a434bca4106e1ff7136deb451f982b0bb1a7b13716"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "3e1e962a7674c52c9cf05bb3e02395ce42d45bcdce41e2eb9c0a7f00f736b989"
+   "sha256": "04a8de0a452c6d2e616ed3ff5a195a5437a0d692a9c0d894f0fff32193111bd3"
   },
   {
    "chemin": "public/index.html",
@@ -33,7 +33,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "afa3c58d12c70b8a071d90848ce3b456c25b8e0a15a3ed1b3babd3ebd39467ba"
+   "sha256": "9b1ad7bf345bddd8873b5109fea97e5722b9767e9b00ccc3233b01b73cc00806"
   },
   {
    "chemin": "seed-menu.json",

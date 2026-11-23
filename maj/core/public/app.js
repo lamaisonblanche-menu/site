@@ -178,18 +178,26 @@ setInterval(() => {
 }, 1000);
 
 // ------------------------------------------------------------ Barre du haut
-function topbar() {
+function topbar() { return S.online ? '' : '<div class="offline">Connexion perdue avec la caisse principale… reconnexion en cours</div>'; }
+// barre de navigation à gauche (comme les caisses pro : plus de hauteur pour travailler)
+const ICO = {
+  tables: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
+  caisse: '<svg viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="10" rx="2"/><path d="M7 10V5h10v5M7 15h4"/></svg>',
+  kds: '<svg viewBox="0 0 24 24"><path d="M4 18h16M6 18c0-4 2.7-7 6-7s6 3 6 7M12 11V8M10 6h4"/></svg>',
+  admin: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  out: '<svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
+};
+function rail() {
   const u = S.etat.user, v = S.view;
-  return `${S.online ? '' : '<div class="offline">Connexion perdue avec la caisse principale… reconnexion en cours</div>'}
-  <div class="top">
-    <img src="logo.png" alt="">
-    ${u.role !== 'cuisine' ? `<button class="tbtn ${v === 'tables' || v === 'commande' ? 'on' : ''}" onclick="A.go('tables')">Tables</button>` : ''}
-    ${peut('caissier') ? `<button class="tbtn ${v === 'caisse' ? 'on' : ''}" onclick="A.go('caisse')">Caisse</button>` : ''}
-    ${u.role === 'cuisine' || peut('caissier') ? `<button class="tbtn ${v === 'kds' ? 'on' : ''}" onclick="A.go('kds')">Écran cuisine</button>` : ''}
-    ${peut('admin') ? `<button class="tbtn ${v === 'admin' ? 'on' : ''}" onclick="A.go('admin')">Gestion</button>` : ''}
-    <div class="who"><span><b>${esc(u.nom)}</b> <span class="role">${ROLE[u.role]}</span></span><span class="clock" id="clock">${hm(Date.now())}</span>
-    <button class="tbtn out" onclick="A.logout()">Sortir</button></div>
-  </div>`;
+  const it = (k, lab, on, fn) => `<button class="ri ${on ? 'on' : ''}" onclick="${fn}">${ICO[k]}<span>${lab}</span></button>`;
+  const ini = u.nom.split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase();
+  return `<nav class="rail"><img src="logo.png" alt="La Maison Blanche">
+    ${u.role !== 'cuisine' ? it('tables', 'Salle', v === 'tables' || v === 'commande', "A.go('tables')") : ''}
+    ${peut('caissier') ? it('caisse', 'Caisse', v === 'caisse', "A.go('caisse')") : ''}
+    ${u.role === 'cuisine' || peut('caissier') ? it('kds', 'Cuisine', v === 'kds', "A.go('kds')") : ''}
+    ${peut('admin') ? it('admin', 'Gestion', v === 'admin', "A.go('admin')") : ''}
+    <div class="rme"><div class="av">${esc(ini)}</div><b>${esc(u.nom)}</b><small>${ROLE[u.role]}</small><span class="clock" id="clock">${hm(Date.now())}</span></div>
+    ${it('out', 'Sortir', false, 'A.logout()')}</nav>`;
 }
 
 // ------------------------------------------------------------ Plans de salle
@@ -208,7 +216,8 @@ function planHtml(salle, edit) {
     let cls = 'ptab' + patron, inner = `<span class="pn">${esc(t.n)}</span>`;
     if (c) {
       cls += ' occ' + (c.additionTs ? ' add' : '') + (c.serveurId === S.etat.user.id ? ' mine' : '');
-      inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}</span>`;
+      const sv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
+      inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}</span>`;
       if (S.etat.prets.some(p => p.cmdId === c.id)) { cls += ' ring'; inner += '<span class="pb">🔔</span>'; }
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
     }
@@ -245,8 +254,11 @@ function viewTables() {
         <div class="em num">${da(totalCmd(c))}</div></button>`; }).join('') || '<p class="muted">Aucune commande à emporter en cours.</p>'}</div></div>`;
   } else body = planHtml(salle);
   const occ = S.salle === 'emporter' ? emp.length : cmdsSalle(S.salle).length;
+  const enCours = S.etat.commandes.reduce((a, c) => a + totalCmd(c), 0);
+  const mes = S.etat.commandes.filter(c => c.serveurId === S.etat.user.id).length;
   return topbar() + `<div class="tbar"><div class="tabs">${tabs}</div>
-    ${S.salle === 'emporter' ? '' : `<div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span>🔔 Prêt</span><span>⏸ Suite à réclamer</span><b>${occ} en cours</b></div>`}</div>${body}`;
+    ${S.salle === 'emporter' ? '' : `<div class="legend"><span><i class="l-libre"></i>Libre</span><span><i class="l-occ"></i>Occupée</span><span><i class="l-add"></i>Addition</span><span><i class="l-mine"></i>Votre table</span><span>🔔 Prêt</span><span>⏸ Suite à réclamer</span></div>`}
+    <div class="sum"><div><b>${occ}</b><small>tables ici</small></div><div><b>${S.etat.commandes.length}</b><small>en cours</small></div>${mes ? `<div><b>${mes}</b><small>à moi</small></div>` : ''}${peut('caissier') ? `<div><b class="num">${fmt(enCours)}</b><small>DA à encaisser</small></div>` : ''}</div></div>${body}`;
 }
 
 // ------------------------------------------------------------ Commande (écran type FrontCash)
@@ -294,7 +306,7 @@ function viewCommande() {
       <span class="tp num">${l.offert ? 'offert' : fmt(l.qte * l.prix)}</span><span class="tok">✓</span></div>`;
   const ligneD = (d, i) => { const p = prod(d.pid); return `<div class="tl d ${S.flash === i ? 'flash' : ''}">
       <button class="qb" onclick="A.dqte(${i},-1)">−</button><span class="tq">${d.qte}</span><button class="qb" onclick="A.dqte(${i},1)">+</button>
-      <span class="tn" onclick="A.feuille(${i})">${esc(p.nom)}${d.emporter && c.salle !== 'emporter' ? ' <span class="emp">🥡</span>' : ''}${optsTxt(optsDe(d))}${d.note ? `<small class="n">${esc(d.note)}</small>` : ''}</span><button class="qb ed" onclick="A.feuille(${i})" title="Cuisson, commentaire, à emporter, suite">✎</button>
+      <span class="tn" onclick="A.feuille(${i})">${esc(p.nom)}${d.emporter && c.salle !== 'emporter' ? ' <span class="emp">🥡</span>' : ''}${optsTxt(optsDe(d))}${d.note ? `<small class="n">${esc(d.note)}</small>` : ''}</span><button class="qb edb" onclick="A.feuille(${i})" title="Cuisson, commentaire, à emporter, suite">✎</button>
       <span class="tp num">${fmt(d.qte * prixDraft(d))}</span></div>`; };
   const att = enAttente(c);
   const blocs = suites.map(s => {
@@ -693,7 +705,7 @@ function admJournal() {
 }
 
 // ------------------------------------------------------------ Fenêtres
-function modal(html, wide) { const m = $('#modal'); m.innerHTML = `<div class="mbox ${wide ? 'wide' : ''}">${html}</div>`; m.hidden = false; }
+function modal(html, wide) { const m = $('#modal'); m.innerHTML = `<div class="mbox ${wide === 'full' ? 'full' : wide ? 'wide' : ''}">${html}</div>`; m.hidden = false; }
 function closeModal() { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; window.__pinCb = null; window.__badgeCapture = null; }
 $('#modal').addEventListener('pointerdown', e => { if (e.target.id === 'modal') closeModal(); });
 const mh = t => `<div class="mh"><h2>${t}</h2><button class="x" onclick="A.close()">×</button></div>`;
@@ -1282,23 +1294,28 @@ Object.assign(A, {
     const n = totalCmd(c);
     let recu = '';
     const ticket = () => localStorage.getItem('mb_ticket') !== '0';
-    const billets = () => { const s = new Set(); for (const m of [500, 1000, 2000, 5000, 10000]) { const v = Math.ceil(n / m) * m; if (v > n) s.add(v); } [1000, 2000, 5000, 10000].forEach(v => { if (v > n) s.add(v); }); return [...s].sort((a, b) => a - b).slice(0, 5); };
+    const billets = () => { const s = new Set(); for (const m of [500, 1000, 2000, 5000, 10000]) s.add((Math.floor(n / m) + 1) * m); if (n < 20000) s.add(20000); return [...s].sort((a, b) => a - b).slice(0, 6); };
     const draw = () => {
       const r = +recu || 0, rendu = r - n;
-      modal(mh('Encaisser · ' + esc(titreCmd(c))) + `<div class="cash">
-        <div><div class="cl">À payer</div><div class="cbig num">${fmt(n)} <small>DA</small></div>
-          <button class="cexact" onclick="A.cgo(${n})">Compte juste · ${fmt(n)} DA</button>
-          <div class="cl" style="margin-top:12px">Le client donne :</div>
-          <div class="cbil">${billets().map(b => `<button class="${r === b ? 'on' : ''}" onclick="A.cb(${b})">${fmt(b)}</button>`).join('')}</div>
-          <div class="crow"><span>Reçu</span><b class="num">${r ? da(r) : '—'}</b></div>
-          <div class="crow rendu ${r && rendu < 0 ? 'bad' : ''}"><span>${r && rendu < 0 ? 'Il manque' : 'À rendre'}</span><b class="num">${r ? da(Math.abs(rendu)) : '—'}</b></div>
-        </div>
-        <div>${numpad('cash', v => { recu = v; draw(); })}
-          <button class="btn ok big" style="width:100%;margin-top:10px" ${r >= n ? '' : 'disabled'} onclick="A.cgo(${r})">Valider ${r > n ? '· rendre ' + da(rendu) : ''}</button></div>
-      </div>
-      <div class="cother"><span class="muted">Autre paiement :</span>
-        <button class="chip" onclick="A.encaisser('tpe')">Carte TPE</button><button class="chip" onclick="A.encaisser('cheque')">Chèque</button><button class="chip" onclick="A.encaisser('societe')">Facture société</button><button class="chip" onclick="A.encaisser('offert')">Offert</button><button class="chip" onclick="A.encaisser('especes')">Partager / plusieurs paiements</button><button class="chip" onclick="A.encaisser('especes',null,true)">Remise</button><button class="chip" onclick="A.separer()">Séparer par articles</button>
-        <label class="chk" style="margin-left:auto"><input type="checkbox" ${ticket() ? 'checked' : ''} onchange="localStorage.setItem('mb_ticket',this.checked?'1':'0')"> Ticket</label></div>`, true);
+      const lignes = c.lignes.filter(l => !l.annule && !l.paye);
+      modal(`<div class="ps">
+        <div class="ps-l"><div class="ps-t">${esc(titreCmd(c))}</div><div class="ps-s">${c.couverts} couv. · ${lignes.reduce((a, l) => a + l.qte, 0)} articles</div>
+          <div class="ps-lines">${lignes.map(l => `<div><span>${l.qte}</span><span>${esc(l.nom)}${(l.opts || []).length ? '<small>' + l.opts.map(o => esc(o.nom)).join(', ') + '</small>' : ''}</span><b class="num">${l.offert ? 'offert' : fmt(l.qte * l.prix)}</b></div>`).join('')}</div>
+          <div class="ps-tot"><span>Total</span><b class="num">${fmt(n)} DA</b></div>
+          <div class="ps-other"><span>Autre paiement</span>
+            <div><button onclick="A.encaisser('tpe')">Carte TPE</button><button onclick="A.encaisser('cheque')">Chèque</button><button onclick="A.encaisser('societe')">Facture</button><button onclick="A.encaisser('offert')">Offert</button></div>
+            <div><button onclick="A.encaisser('especes')">Partager / plusieurs</button><button onclick="A.separer()">Séparer</button><button onclick="A.encaisser('especes',null,true)">Remise</button></div></div></div>
+        <div class="ps-r"><button class="x" onclick="A.close()">×</button>
+          <div class="ps-k">Espèces</div>
+          <button class="ps-exact" onclick="A.cgo(${n})"><small>Le client donne le compte juste</small>${fmt(n)} DA</button>
+          <div class="ps-k">Ou il donne :</div>
+          <div class="ps-bil">${billets().map(b => `<button class="${r === b ? 'on' : ''}" onclick="A.cb(${b})"><b class="num">${fmt(b)}</b><small>rendre ${fmt(b - n)}</small></button>`).join('')}</div>
+          <div class="ps-k">Autre montant</div>
+          <div class="ps-in"><div class="num">${r ? fmt(r) : '<span class="muted">0</span>'} <small>DA</small></div>${numpad('cash', v => { recu = v; draw(); })}</div>
+          <div class="ps-rendu ${r && rendu < 0 ? 'bad' : ''}"><span>${r && rendu < 0 ? 'Il manque' : 'À rendre'}</span><b class="num">${r ? fmt(Math.abs(rendu)) + ' DA' : '—'}</b></div>
+          <div class="ps-foot"><label class="chk"><input type="checkbox" ${ticket() ? 'checked' : ''} onchange="localStorage.setItem('mb_ticket',this.checked?'1':'0')"> Imprimer le ticket</label>
+          <button class="btn ok big" ${r >= n ? '' : 'disabled'} onclick="A.cgo(${r})">Valider${r > n ? ' · rendre ' + da(rendu) : ''}</button></div>
+        </div></div>`, 'full');
       npv.cash = recu;
     };
     A.cb = b => { recu = String(b); draw(); };
@@ -1332,6 +1349,7 @@ function render() {
   const cle = S.view + '|' + S.adminTab + '|' + S.cmdId;
   const sc = S._scKey === cle ? sels.map(q => { const e = app.querySelector(q); return e ? e.scrollTop : 0; }) : [];
   const focusSearch = document.activeElement && document.activeElement.id === 'srch';
+  if (S.etat && S.view !== 'login') h = `<div class="shell">${rail()}<main class="pane">${h}</main></div>`;
   app.innerHTML = h;
   S._scKey = cle;
   sels.forEach((q, i) => { const e = app.querySelector(q); if (e && sc[i]) e.scrollTop = sc[i]; });
