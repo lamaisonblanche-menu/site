@@ -6,6 +6,7 @@ const path = require('path');
 const net = require('net');
 const crypto = require('crypto');
 const os = require('os');
+const { execFile } = require('child_process');
 
 const PORT = +process.env.PORT || 8080;
 const DIR = __dirname;
@@ -263,8 +264,36 @@ class Doc {
   buf() { return Buffer.concat(this.parts); }
   texte() { return this.txt.join('\n') + '\n'; }
 }
+// Imprimante branchée en USB sur ce PC : envoi par le spouleur Windows (données brutes ESC/POS)
+let fileUSB = Promise.resolve();
+function imprimerUSB(p, buf) {
+  const travail = () => new Promise(resolve => {
+    if (process.platform !== 'win32') return resolve({ ok: false, erreur: 'Impression USB possible seulement sur le PC Windows de la caisse' });
+    const f = path.join(os.tmpdir(), 'mb-ticket-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.bin');
+    fs.writeFileSync(f, buf);
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(DIR, 'impression-usb.ps1'), '-Printer', p.windows, '-File', f],
+      { timeout: 25000, windowsHide: true }, (err, out, errOut) => {
+        try { fs.unlinkSync(f); } catch (e) {}
+        const r = String(out || '').trim();
+        if (r.endsWith('OK')) return resolve({ ok: true });
+        const raison = r.includes('introuvable') ? 'introuvable dans Windows (vérifiez son nom)' : r.includes('ERR') ? r.replace(/^.*ERR /s, 'erreur ') : (err ? err.message.split('\n')[0] : String(errOut || '').split('\n')[0]);
+        resolve({ ok: false, erreur: 'Imprimante ' + p.nom + ' (USB « ' + p.windows + ' ») : ' + raison });
+      });
+  });
+  const r = fileUSB.then(travail);
+  fileUSB = r.catch(() => {});
+  return r;
+}
+function imprimantesWindows() {
+  return new Promise(resolve => {
+    if (process.platform !== 'win32') return resolve([]);
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Printer | ForEach-Object { $_.Name }'], { timeout: 20000, windowsHide: true },
+      (err, out) => resolve(String(out || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean)));
+  });
+}
 function imprimer(poste, doc) {
   const p = db.config.imprimantes[poste];
+  if (p && p.type === 'usb' && p.windows) return imprimerUSB(p, doc.buf());
   return new Promise((resolve) => {
     if (!p || !p.ip) {
       const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
@@ -1017,6 +1046,7 @@ const routes = {
     journal(u, 'réglages modifiés', Object.keys(b).join(', '));
     save(); return db.config;
   },
+  'GET /api/admin/imprimantes-windows': async (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return { liste: await imprimantesWindows(), windows: process.platform === 'win32' }; },
   'POST /api/admin/test-impression': async (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const p = db.config.imprimantes[b.poste]; if (!p) E('Imprimante inconnue');

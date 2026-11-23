@@ -1,11 +1,15 @@
 {
- "version": "3.2.0",
- "date": "2026-11-23T14:14:12.496Z",
- "notes": "Nouvelle prise de commande, encaissement rapide en espèces, commentaires, à emporter, logo et QR code sur les tickets",
+ "version": "3.2.1",
+ "date": "2026-11-23T15:58:28.587Z",
+ "notes": "Imprimante des tickets en USB (branchée sur le PC de caisse)",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "33bdaf9e2d6bcbde2e4e613e865e403f8fe21fc621078d34c30b0bdc7f68d903"
+   "sha256": "3822728783049fc2f22a56d1ee74d62352c49fbf81c6b54b50830d6f61c3af22"
+  },
+  {
+   "chemin": "impression-usb.ps1",
+   "sha256": "b48917204f7aabd603ef27234ac411b941829f9b4c3a89dbc5e55854b32edc33"
   },
   {
    "chemin": "logo-ticket.bin",
@@ -13,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "8111d68f993dbfcdf03512b4791f69793b09886bdef2aeb018471125a133351e"
+   "sha256": "981b899797adcb9fa8f62159ed988668cdfdf6d1e529ada08ce6465cd5437785"
   },
   {
    "chemin": "public/index.html",
@@ -37,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1f1acb9bc660c98a927c5459189b641e014a73989e391e114f183a050bb093c7"
+   "sha256": "cce8414d83c764f280d9b61db8ff69f5fb1074d0c9f38ca58e851f9d3c5c3180"
   }
  ]
 }

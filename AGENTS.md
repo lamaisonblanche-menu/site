@@ -81,7 +81,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
    Toute nouvelle donnée passe par une migration dans server.js (voir les blocs `if (db.version < N)`),
    sans jamais supprimer ou renommer un champ existant.
 
-## 5. Ce que fait la caisse (version 3.2.0)
+## 5. Ce que fait la caisse (version 3.2.1)
 
 - **Plans de salle** repris de FrontCash : Gastro (1-12, 14-18), Brunch (20-38), Terrasse (100-129), modifiables (glisser-déposer).
 - **Onglet À emporter** : commandes E1, E2… par journée, nom/téléphone client, heure de retrait. Vente rapide au comptoir.
@@ -91,7 +91,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
   à emporter par plat, suite. Note pour toute la commande. Réclame des suites.
 - **Encaissement** : espèces en 2 gestes (compte juste, billets suggérés, rendu en grand), TPE, chèque, facture société,
   offert (code responsable), plusieurs paiements, partage ÷N, séparation par articles, remise (code responsable).
-- **Imprimantes réseau ESC/POS (port 9100)**, 5 postes : `ticket` (caisse + tiroir), `cuisine` (principale), `cuisine2`,
+- **Imprimantes ESC/POS**, en réseau (IP, port 9100) ou **en USB sur le PC de caisse** (type `usb` : envoi brut par le spouleur Windows via `core/impression-usb.ps1`, nom de l'imprimante Windows dans `windows`). L'imprimante des tickets (`ticket`) est en USB. 5 postes : `ticket` (caisse + tiroir), `cuisine` (principale), `cuisine2`,
   `asiatique`, `comptoir`. Chaque groupe de la carte choisit son imprimante. Bons groupés par suite, réclame,
   messages, annulations, addition, ticket avec logo + QR code, rapport X, rapport Z.
   Sans IP configurée, les impressions sont écrites dans `data/impressions-simulees/`.
