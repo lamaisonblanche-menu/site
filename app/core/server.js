@@ -204,6 +204,24 @@ if (!db.equipe4) {
   db.equipe4 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Postes (version 3.3.5) : crêpes, pancakes, desserts du brunch et fondant sortent au comptoir.
+// Les desserts de la carte gastro (profiteroles, pavlova, crème brûlée, nougat) restent en cuisine, dans un groupe à part.
+if (!db.postes5) {
+  const vers = db.config.imprimantes.comptoir ? 'comptoir' : null;
+  const des = db.categories.find(c => c.id === 'desserts');
+  if (vers && des) {
+    const GASTRO = ['Profiteroles chocolat', 'Pavlova', 'Crème brûlée', 'Nougat glacé fruits rouges'];
+    if (!db.categories.some(c => c.id === 'desserts-carte')) {
+      db.categories.push({ id: 'desserts-carte', nom: 'Desserts de la carte', poste: des.poste, couleur: des.couleur, suite: des.suite, univers: des.univers, ordre: des.ordre + 0.5 });
+      db.categories.sort((a, b) => a.ordre - b.ordre).forEach((c, i) => (c.ordre = i));
+    }
+    for (const p of db.produits) if (p.cat === 'desserts' && GASTRO.includes(p.nom)) p.cat = 'desserts-carte';
+    des.poste = vers;
+    const cg = db.categories.find(c => c.id === 'crepes-et-gaufres'); if (cg) cg.poste = vers;
+  }
+  db.postes5 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -1099,7 +1117,10 @@ const routes = {
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
   'POST /api/code-valide': (b) => { const u = parCode(b.pin); return { ok: !!u && String(b.pin).length >= 4 }; },
-  'POST /api/pointage': (b) => {
+  'POST /api/pointage': (b, _u, req) => {
+    // le pointage se fait seulement sur le PC de la caisse principale (pas sur les écrans de salle)
+    const ip = String((req && req.socket && req.socket.remoteAddress) || '');
+    if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Le pointage se fait uniquement sur la caisse principale', 403);
     const u = parCode(b.badge || b.pin);
     if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
     const ouvert = db.pointages.find(p => p.userId === u.id && !p.out && now() - p.in < 20 * 3600e3);

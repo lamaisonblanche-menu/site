@@ -13,6 +13,8 @@ const da = n => fmt(n) + ' DA';
 const hm = ts => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const ROLE = { admin: 'Responsable', caissier: 'Caisse', serveur: 'Serveur', cuisine: 'Cuisine' };
 const SUITES = ['Direct', 'Entrées', 'Plats', 'Desserts', 'Suite 4', 'Suite 5'];
+// pointage seulement sur le PC de la caisse principale (celui qui fait tourner le serveur)
+const CAISSE_PRINCIPALE = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte TPE', societe: 'Facture', offert: 'Offert', mixte: 'Plusieurs modes' };
 const LV = { cuisine: 0, serveur: 1, caissier: 2, admin: 3 };
 const peut = r => S.etat && LV[S.etat.user.role] >= LV[r];
@@ -125,7 +127,7 @@ function viewLogin() {
       <button class="k" onclick="A.pin('C')">Effacer</button><button onclick="A.pinTouch('0')">0</button><button class="k" onclick="A.pin('OK')">${P ? 'Pointer' : 'Entrer'}</button></div>
     <div class="err" id="lerr"></div>
     <div class="hl"><b>Passez votre badge</b> sur le lecteur ou tapez votre code</div>
-    <button class="btn ${P ? 'dark' : ''} ptg" onclick="A.modePointage(${P ? 0 : 1})">${P ? '← Retour à la caisse' : '⏱ Pointer mon arrivée / mon départ'}</button>
+    ${CAISSE_PRINCIPALE ? `<button class="btn ${P ? 'dark' : ''} ptg" onclick="A.modePointage(${P ? 0 : 1})">${P ? '← Retour à la caisse' : '⏱ Pointer mon arrivée / mon départ'}</button>` : ''}
   </div></div>`;
 }
 async function pointer(cred) {
@@ -549,7 +551,7 @@ function admPointage() {
   let h = `<div class="row" style="margin-bottom:14px">${per.map(([k, n]) => `<button class="chip ${S.periode === k ? 'on' : ''}" onclick="S.periode='${k}';A.atab('pointage')">${n}</button>`).join('')}
     <input type="date" value="${du}" onchange="A.perso('du',this.value,'pointage')" class="dt"> → <input type="date" value="${au}" onchange="A.perso('au',this.value,'pointage')" class="dt">
     <span class="grow"></span><button class="btn" onclick="A.ptAdd()">+ Ajouter</button><a class="btn" href="/export/pointages.csv?t=${S.token}&du=${du}&au=${au}">Exporter</a></div>
-    <p class="muted">Chacun pointe en passant son badge après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion. Vous pouvez corriger les heures ici.</p>`;
+    <p class="muted">Chacun pointe en passant son badge après avoir touché « Pointer mon arrivée / mon départ » sur l’écran de connexion de la caisse principale (pas sur les écrans de salle). Vous pouvez corriger les heures ici.</p>`;
   if (!adm.pointages) return h + '<p>Chargement…</p>';
   const parNom = {};
   for (const p of adm.pointages) (parNom[p.nom] = parNom[p.nom] || []).push(p);

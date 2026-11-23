@@ -117,5 +117,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
 
 - La carte a été reprise du site (sushis, rolls et lattes en 3.3.1 ; Rigatoni au saumon et Cromesquis d’escargots en 3.3.2). Il manque des groupes de FrontCash (Plats traditionnels, Formules, Suppléments).
 - Aucun groupe n'est encore envoyé sur l'imprimante « Cuisine 2 » : c'est au patron de dire lesquels.
+- 3.3.5 (`db.postes5`) : groupes « Desserts » (desserts du brunch + Fondant chocolat glace) et « Crêpes et gaufres » imprimés au **comptoir** ; desserts gastro (profiteroles, pavlova, crème brûlée, nougat) dans le groupe « Desserts de la carte », en cuisine.
+- **Pointage** : seulement sur la caisse principale (requête venant de 127.0.0.1) ; le bouton est caché sur les écrans de salle et l'API refuse.
 - Pas encore testé sur les vraies imprimantes ni sur Windows au restaurant.
 - Le patron ne code pas : expliquer simplement, en français, ce qui a changé et ce qu'il doit faire.

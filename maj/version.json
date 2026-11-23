@@ -1,11 +1,11 @@
 {
- "version": "3.3.4",
- "date": "2026-11-23T16:55:00.886Z",
- "notes": "Code imposé : Lyes (maître d'hôtel) 1515",
+ "version": "3.3.5",
+ "date": "2026-11-23T17:07:39.405Z",
+ "notes": "Crêpes, pancakes, desserts du brunch et fondant imprimés au comptoir ; pointage seulement sur la caisse principale",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "2b2677e32d2d343ba86d20a6e43d42ac10a5da8b9be8e13ea4bd6a6aa83d3882"
+   "sha256": "649819783a78ba424b97fcf4d29fb809866b0b3659f901c0c0dac285ad9cca78"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "04a8de0a452c6d2e616ed3ff5a195a5437a0d692a9c0d894f0fff32193111bd3"
+   "sha256": "5e02c71810fa7a97aa3f0fc178ee4860a74f05e08f051f718a16ba850113345d"
   },
   {
    "chemin": "public/index.html",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "351517e2fc2e03f23294c3bc403b1a782d67808ed762f10af2a5d33164d45719"
+   "sha256": "2c55467e6e508eed2b7b858d8d1021b506efd91be8e3b623b71dad01ba259e04"
   }
  ]
 }
