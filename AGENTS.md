@@ -97,7 +97,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
   Sans IP configurée, les impressions sont écrites dans `data/impressions-simulees/`.
 - **Écran cuisine** (rôle « cuisine ») : bons par poste, couleurs selon l'attente, bouton PRÊT → cloche chez le serveur, ruptures.
 - **Annulation d'un plat déjà envoyé : seuls les caissiers** (et le responsable). Un serveur doit faire passer le badge ou le code d'un caissier.
-- **Équipe** : serveurs, caissiers et comptes « cuisine » (bar et cuisine) ajoutés en 3.2.3 (une seule fois, drapeau `db.equipeInitiale`).
+- **Équipe** : serveurs, caissiers et comptes « cuisine » (bar et cuisine) ajoutés en 3.2.3 (une seule fois, drapeau `db.equipeInitiale`). Codes imposés par le patron en 3.3.3 (drapeau `db.equipe3`) : Mustapha 2000, Zoheir 1993 (chef de rang), Zahir 1996.
 - **Badges** (lecteur USB qui tape comme un clavier) pour se connecter, autoriser, pointer arrivée/départ.
 - **Gestion** : rapports, carte et prix, options, équipe/codes/badges, plans, imprimantes, pointage, réglages, journal.
 - **Rase envoyée par mail** (Gmail, mot de passe d'application dans `config.mail`, jamais envoyé aux écrans) au format de la collection `caisse` de l'appli de gestion (ligne `DONNEES-CAISSE {json}`), rangée chaque nuit par une tâche planifiée Claude.
