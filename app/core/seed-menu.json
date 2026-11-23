@@ -1,0 +1,20 @@
+[
+ ["Brunch œufs","cuisine","#f6e7b0",[["Œuf à la turque",1500],["Œuf Benedict",2000]]],
+ ["Brunch classiques","cuisine","#f6e7b0",[["Toast avocat saumon",2600],["Club sandwich saumon fumé",2700],["Club sandwich poulet fumé",2200],["Croissant croque-monsieur",2000],["Long toast tunacado",2500]]],
+ ["Brunch autres envies","cuisine","#f6e7b0",[["Salade César",1600],["Crêpe salée poulet, épinard",1500],["Sandwich La Maison Blanche",2300],["Sandwich salade César",1700]]],
+ ["Burgers","cuisine","#f5d3a6",[["Burger bœuf",2000],["Burger poulet crispy",1800]]],
+ ["Entrées froides","cuisine","#c8ecd9",[["Carpaccio de bœuf",2500],["Burrata, carpaccio de tomates",2000],["Salade grecque",2200],["Salade de quinoa aux crustacés",2800],["Médaillon de foie gras",3300]]],
+ ["Entrées chaudes","cuisine","#f4c6d0",[["Tarte aux crevettes",2700],["Escargots de Bourgogne",2300],["Duo calamars crevettes à l'ail",2800],["Gambas tempura",3200],["Saint-Jacques, pommes vertes",3300],["Soupe du jour",1800],["Soupe aux fruits de mer",2400],["Moules frites",2100],["Boureks × 2",800]]],
+ ["Viandes","cuisine","#f1d9e3",[["Cœur de filet, sauce morilles",4500],["Côte de bœuf (2 pers.)",9000],["Méchoui d'agneau",5000],["Souris d'agneau confite",4500],["Entrecôte poivre vert",3200]]],
+ ["Volailles","cuisine","#efe3cc",[["Ballotine de poulet au saumon",3000],["Magret de canard au cassis",4500],["Blanquette exotique MB",3000]]],
+ ["Poissons","cuisine","#bfe0f2",[["Saumon à l'orange",4500],["Daurade aux crustacés",3700],["Loup de mer",3700]]],
+ ["Pâtes fraîches","cuisine","#f2a27a",[["Raviolis ricotta épinards",2600],["Tagliatelles saumon fumé",2800],["Tagliatelles poulet champignons",2400],["Linguine alla scoglio",4500],["Spaghettis moules pesto",2800]]],
+ ["Asiatique box","asiatique","#e3e1dc",[["Duo signature × 24",5400],["Party box × 54",14200]]],
+ ["Asiatique plats","asiatique","#e3e1dc",[["Poke bowl",3200],["Wok au poulet",2400],["Ramen gyoza",2500],["Ramen aux crevettes",3200],["Taco crispy",3100],["Mochis glacés × 2",2000]]],
+ ["Desserts","cuisine","#ddd3f0",[["Cake fondant caramel",1500],["Hot cookie",1600],["Brioche perdue tiramisu",1500],["Brioche perdue caramel",2000],["NY roll citron meringué",1000],["NY roll pistache",1200],["Matilda cake",1000],["Tiramisu",1000],["Meringue lemon cake",1000]]],
+ ["Crêpes et gaufres","cuisine","#ddd3f0",[["Crêpe Suzette glace vanille",1600],["Crêpe Nutella",1500],["Crêpe pistache",1500],["Gaufre Nutella",1500],["Gaufre pistache",1500],["Pancake beurre miel",1000],["Granola bowl",1800]]],
+ ["Boissons","comptoir","#cfe3f7",[["Eau minérale",200],["Eau pétillante",200],["Soda",250],["Café",400],["Cappuccino",500],["Chocolat chaud",700],["Thé",400],["Infusion",400]]],
+ ["Mocktails","comptoir","#9fd3c7",[["Parfum des femmes",650],["Exotic passion",750],["Exotic mango",750],["Exotic fruits rouges",750],["Mojito classique",650],["Mojito fraise",750],["Piña colada",700],["Ice tea pêche",700],["Ice tea fruits des bois",700],["Cocktail Maison Blanche",1000]]],
+ ["Jus detox","comptoir","#b9dd8f",[["Detox ananas pomme menthe",700],["Detox orange carotte dattes",800],["Detox pomme gingembre coco",800]]],
+ ["Jus et smoothies","comptoir","#f7d774",[["Jus d'orange",500],["Jus de citron",500],["Jus de mangue",900],["Jus de fraise",700],["Smoothie pistachio kunafa",1100],["Smoothie peanut butter",1100]]]
+]

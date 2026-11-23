@@ -1,0 +1,61 @@
+{
+  "name": "caisse-maison-blanche",
+  "productName": "Caisse La Maison Blanche",
+  "version": "1.0.0",
+  "description": "Caisse La Maison Blanche",
+  "author": "La Maison Blanche",
+  "main": "main.js",
+  "private": true,
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "build": {
+    "appId": "dz.lamaisonblanche.caisse",
+    "productName": "Caisse La Maison Blanche",
+    "files": [
+      "main.js",
+      "maj.js",
+      "preload.js",
+      "setup.html",
+      "attente.html",
+      "icon.png",
+      "logo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "core",
+        "to": "core",
+        "filter": [
+          "**/*",
+          "!data/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "afterPack": "./outils/icone-exe.js",
+    "directories": {
+      "output": "dist"
+    },
+    "electronLanguages": [
+      "fr",
+      "en-US",
+      "ar"
+    ]
+  },
+  "scripts": {
+    "construire": "electron-builder --win --x64 && cd outils && makensis -DVERSION=1.0.0 installeur.nsi",
+    "publier": "node outils/publier.js"
+  }
+}

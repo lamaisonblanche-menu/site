@@ -1,0 +1,1045 @@
+// Caisse La Maison Blanche — serveur local (aucune dépendance, Node 18+)
+'use strict';
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const net = require('net');
+const crypto = require('crypto');
+const os = require('os');
+
+const PORT = +process.env.PORT || 8080;
+const DIR = __dirname;
+const DATA = process.env.CAISSE_DATA || path.join(DIR, 'data');
+let VERSION = 'dev'; try { VERSION = fs.readFileSync(path.join(DIR, 'VERSION'), 'utf8').trim(); } catch (e) {}
+// échanges avec l'application Windows (mises à jour)
+let majEtat = null;
+if (process.send) process.on('message', m => { if (m && m.type === 'maj') { majEtat = m.etat; broadcast(); } });
+let derniereActivite = 0;
+const DB_FILE = path.join(DATA, 'caisse.json');
+const BACKUPS = path.join(DATA, 'sauvegardes');
+const PRINTS = path.join(DATA, 'impressions-simulees');
+for (const d of [DATA, BACKUPS, PRINTS]) fs.mkdirSync(d, { recursive: true });
+
+// ---------------------------------------------------------------- Données
+function slug(s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
+// Plans de salle repris de FrontCash (positions en % du plan, centre de la table)
+function grille(cols, rows, places) {
+  return places.map(([n, c, r]) => ({ n: String(n), x: +((c + .5) / cols * 100).toFixed(2), y: +((r + .5) / rows * 100).toFixed(2) }));
+}
+function sallesInitiales() {
+  return [
+    {
+      id: 'gastro', nom: 'Gastro', fond: 'creme', ratio: 1.87, taille: 6.5,
+      tables: [[1, 21.1, 23.8], [4, 37.6, 23.8], [7, 53.7, 23.8], [8, 69.9, 23.8], [11, 78.3, 23.8], [12, 78.9, 7.6], [14, 95.2, 7.6], [15, 95, 23.3], [16, 94.4, 37.8], [17, 93.8, 52.3], [18, 92.9, 66.9],
+        [2, 22.4, 52.9], [5, 38.2, 52.9], [9, 61.5, 52.9], [10, 77.6, 52.9], [3, 23.3, 80.2], [6, 38.5, 80.2]].map(([n, x, y]) => ({ n: String(n), x, y })),
+      deco: [{ type: 'bar', x: 55.3, y: 51 }, { type: 'caisse', x: 46.3, y: 92 }, { type: 'wc', x: 92, y: 92 }],
+    },
+    {
+      id: 'brunch', nom: 'Brunch', fond: 'damier', ratio: 12 / 9, taille: 7.5, grille: [12, 9],
+      tables: grille(12, 9, [[20, 0, 0], [25, 2, 0], [33, 8, 0], [35, 10, 0], [21, 0, 2], [26, 2, 2], [32, 6, 2], [34, 8, 2], [36, 10, 2],
+        [22, 0, 4], [27, 2, 4], [30, 4, 4], [31, 6, 4], [37, 10, 4], [23, 0, 6], [28, 2, 6], [38, 10, 6], [24, 0, 8], [29, 2, 8]]),
+      deco: [],
+    },
+    {
+      id: 'terrasse', nom: 'Terrasse', fond: 'herbe', ratio: 12 / 7, taille: 7.5, grille: [12, 7],
+      tables: grille(12, 7, [[103, 0, 0], [104, 1, 0], [105, 2, 0], [106, 3, 0], [107, 4, 0], [108, 5, 0], [109, 6, 0], [110, 7, 0], [111, 8, 0], [112, 9, 0], [113, 10, 0], [114, 11, 0],
+        [116, 9, 1], [115, 11, 1], [102, 0, 2], [118, 9, 2], [117, 11, 2], [129, 5, 3], [119, 11, 3],
+        [101, 0, 4], [128, 5, 4], [127, 7, 4], [121, 9, 4], [120, 11, 4], [122, 11, 5], [100, 0, 6], [126, 8, 6], [125, 9, 6], [124, 10, 6], [123, 11, 6]]),
+      deco: [{ type: 'sapin', x: +((4.5 / 12) * 100).toFixed(2), y: +((6.5 / 7) * 100).toFixed(2) }],
+    },
+  ];
+}
+const IMPRIMANTES = () => ({
+  ticket: { nom: 'Caisse (tickets clients)', ip: '', port: 9100 },
+  cuisine: { nom: 'Cuisine principale', ip: '', port: 9100 },
+  cuisine2: { nom: 'Cuisine 2', ip: '', port: 9100 },
+  asiatique: { nom: 'Asiatique', ip: '', port: 9100 },
+  comptoir: { nom: 'Comptoir', ip: '', port: 9100 },
+});
+
+function dbInitiale() {
+  const seed = JSON.parse(fs.readFileSync(path.join(DIR, 'seed-menu.json'), 'utf8'));
+  const categories = [], produits = [];
+  seed.forEach(([nom, poste, couleur, items], i) => {
+    const id = slug(nom);
+    categories.push({ id, nom, poste, couleur, suite: suiteParDefaut(nom, poste), ordre: i });
+    items.forEach(([n, prix]) => produits.push({ id: 'p' + (produits.length + 1), nom: n, prix, cat: id, actif: true, options: [], stock: null }));
+  });
+  const options = optionsInitiales();
+  for (const p of produits) if (CUISSON.test(p.nom)) p.options = ['cuisson'];
+  return {
+    version: 3, options,
+    config: {
+      nom: 'La Maison Blanche', adresse: '23 rue des Frères Ben Ali, Hydra - Alger', tel: '+213 541 55 96 72',
+      piedTicket: 'Merci de votre visite - A bientot !',
+      fondCaisse: 15000, tablePatron: '18',
+      imprimantes: IMPRIMANTES(),
+      largeur: 48, pageCode: 16, sansAccents: false, tiroirAuto: true,
+      deconnexionServeurSec: 60,
+      salles: sallesInitiales(),
+      societes: [],
+      motifsSortie: ['Influenceuse', 'Dépense du restaurant', 'Achat marché', 'Avance sur salaire', 'Autre'],
+      motifsAnnulation: ['Erreur de saisie', 'Client a changé d\'avis', 'Plat refusé / retour', 'Rupture', 'Autre'],
+    },
+    users: [
+      { id: 'u1', nom: 'Patron', role: 'admin', pin: '1234', badge: '', actif: true },
+      { id: 'u2', nom: 'Caisse 1', role: 'caissier', pin: '1111', badge: '', actif: true },
+      { id: 'u3', nom: 'Serveur 1', role: 'serveur', pin: '2222', badge: '', actif: true },
+    ],
+    categories, produits,
+    commandes: {}, tickets: [], sorties: [], jours: [], journal: [],
+    bons: [], pointages: [],
+    seq: { ticket: 0, cmd: 0, ligne: 0, sortie: 0, jour: 0, bon: 0, pointage: 0 },
+  };
+}
+// Suites (ordre d'envoi en cuisine) : 0 = direct (boissons), 1 = entrées, 2 = plats, 3 = desserts
+const SUITES = ['Direct', 'Entrées', 'Plats', 'Desserts', 'Suite 4', 'Suite 5'];
+function suiteParDefaut(nom, poste) {
+  if (poste === 'comptoir') return 0;
+  if (/entr[ée]e|brunch/i.test(nom)) return 1;
+  if (/dessert|cr[êe]pe|gaufre/i.test(nom)) return 3;
+  return 2;
+}
+const CUISSON = /c[œo]e?ur de filet|c[ôo]te de b|entrec[ôo]te|burger b/i;
+function optionsInitiales() {
+  return [{ id: 'cuisson', nom: 'Cuisson', obligatoire: true, multiple: false, choix: ['Bleu', 'Saignant', 'À point', 'Bien cuit'].map(nom => ({ nom, prix: 0 })) }];
+}
+
+let db;
+try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
+catch (e) {
+  if (fs.existsSync(DB_FILE)) { console.error('Fichier de données illisible : ' + DB_FILE + '. Restaurez une sauvegarde du dossier data/sauvegardes.'); process.exit(1); }
+  db = dbInitiale();
+}
+// Mise à jour d'une caisse déjà installée avec la première version
+if ((db.version || 1) < 2) {
+  const neuf = dbInitiale();
+  const ip = (k) => (db.config.imprimantes[k] || {}).ip || '';
+  db.config.imprimantes = IMPRIMANTES();
+  db.config.imprimantes.ticket.ip = ip('ticket'); db.config.imprimantes.cuisine.ip = ip('cuisine'); db.config.imprimantes.comptoir.ip = ip('bar');
+  if (!Object.values(db.commandes).some(c => c.statut === 'ouverte')) db.config.salles = neuf.config.salles;
+  if (!db.tickets.length) { db.categories = neuf.categories; db.produits = neuf.produits; }
+  for (const c of db.categories) { if (c.poste === 'bar') c.poste = 'comptoir'; if (!c.couleur) c.couleur = '#efe3cc'; }
+  for (const u of db.users) if (u.badge === undefined) u.badge = '';
+  db.version = 2;
+}
+// Mise à jour vers la version 3 (suites, options, ruptures, écran cuisine, pointage)
+if (db.version < 3) {
+  for (const c of db.categories) if (c.suite === undefined) c.suite = suiteParDefaut(c.nom, c.poste);
+  db.options = db.options || optionsInitiales();
+  for (const p of db.produits) { if (!Array.isArray(p.options)) p.options = CUISSON.test(p.nom) ? ['cuisson'] : []; if (p.stock === undefined) p.stock = null; }
+  db.bons = db.bons || []; db.pointages = db.pointages || [];
+  db.seq.bon = db.seq.bon || 0; db.seq.pointage = db.seq.pointage || 0;
+  db.version = 3;
+}
+for (const s of db.config.salles) {
+  if (s.tables.length && typeof s.tables[0] === 'string') s.tables = s.tables.map((n, i) => ({ n, x: 8 + (i % 10) * 9.5, y: 12 + Math.floor(i / 10) * 20 }));
+  s.deco = s.deco || []; s.fond = s.fond || 'creme'; s.ratio = s.ratio || 1.6; s.taille = s.taille || 7;
+}
+
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 150);
+  broadcast();
+}
+function saveNow() {
+  const limite = Date.now() - 60 * 864e5;
+  if (db.bons.length > 5000) db.bons = db.bons.filter(b => b.ts > limite);
+  const tmp = DB_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(db));
+  fs.renameSync(tmp, DB_FILE);
+  const b = path.join(BACKUPS, 'caisse-' + new Date().toISOString().slice(0, 10) + '.json');
+  if (!fs.existsSync(b)) {
+    fs.copyFileSync(DB_FILE, b);
+    const all = fs.readdirSync(BACKUPS).filter(f => f.endsWith('.json')).sort();
+    while (all.length > 90) fs.unlinkSync(path.join(BACKUPS, all.shift()));
+  }
+}
+saveNow();
+process.on('SIGINT', () => { saveNow(); process.exit(0); });
+process.on('SIGTERM', () => { saveNow(); process.exit(0); });
+
+const now = () => Date.now();
+function journal(user, action, detail) { db.journal.push({ ts: now(), user: user ? user.nom : '-', action, detail }); if (db.journal.length > 20000) db.journal.splice(0, 5000); }
+function dateLocale(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+// Journée de caisse : s'ouvre à la première vente, se ferme à la rase
+function jourCourant(creer) {
+  let j = db.jours.find(x => !x.clos);
+  if (!j && creer) {
+    db.seq.jour++;
+    j = { id: 'J' + db.seq.jour, n: db.seq.jour, date: dateLocale(now()), ouvert: now(), clos: null, rase: null };
+    db.jours.push(j);
+  }
+  return j;
+}
+
+// ---------------------------------------------------------------- Sessions
+const sessions = new Map(); // token -> {userId, ts}
+function userDe(req) {
+  const t = req.headers['x-token'];
+  const s = t && sessions.get(t);
+  if (!s) return null;
+  const u = db.users.find(x => x.id === s.userId && x.actif);
+  if (!u) return null;
+  s.ts = now();
+  return u;
+}
+// un code OU un badge (lecteur de cartes) identifie la personne
+function parCode(code) { code = String(code || '').trim(); if (!code) return null; return db.users.find(u => u.actif && (u.pin === code || (u.badge && u.badge === code))); }
+function pinAdmin(pin) { const u = parCode(pin); return u && u.role === 'admin' ? u : null; }
+const ROLES = { cuisine: 0, serveur: 1, caissier: 2, admin: 3 };
+function peut(u, role) { return u && ROLES[u.role] >= ROLES[role]; }
+
+// ---------------------------------------------------------------- Impression ESC/POS
+const ESC = 0x1b, GS = 0x1d;
+const CP1252 = { 'œ': 0x9c, 'Œ': 0x8c, '€': 0x80, '’': 0x27, '‘': 0x27, '“': 0x22, '”': 0x22, '–': 0x2d, '—': 0x2d, '…': 0x2e, ' ': 0x20, ' ': 0x20 };
+function enc(str) {
+  const cfg = db.config;
+  if (cfg.sansAccents) str = str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/œ/g, 'oe').replace(/Œ/g, 'OE');
+  const out = [];
+  for (const ch of str) {
+    if (CP1252[ch] !== undefined) out.push(CP1252[ch]);
+    else { const c = ch.codePointAt(0); out.push(c < 256 ? c : 0x3f); }
+  }
+  return Buffer.from(out);
+}
+class Doc {
+  constructor() { this.parts = [Buffer.from([ESC, 0x40, ESC, 0x74, db.config.pageCode || 16])]; this.w = db.config.largeur || 48; this.txt = []; }
+  raw(...b) { this.parts.push(Buffer.from(b)); return this; }
+  t(s) { this.parts.push(enc(s + '\n')); this.txt.push(s); return this; }
+  center(on) { return this.raw(ESC, 0x61, on ? 1 : 0); }
+  bold(on) { return this.raw(ESC, 0x45, on ? 1 : 0); }
+  size(n) { return this.raw(GS, 0x21, n === 2 ? 0x11 : n === 3 ? 0x01 : 0); } // 2 = double, 3 = double hauteur
+  line(ch = '-') { return this.t(ch.repeat(this.w)); }
+  lr(a, b, w) { w = w || this.w; a = String(a); b = String(b); const sp = w - a.length - b.length; if (sp >= 1) return this.t(a + ' '.repeat(sp) + b); return this.t(a.slice(0, w - b.length - 1) + ' ' + b); }
+  feed(n = 4) { return this.raw(ESC, 0x64, n); }
+  cut() { this.feed(4); return this.raw(GS, 0x56, 66, 0); }
+  drawer() { return this.raw(ESC, 0x70, 0, 25, 250); }
+  buf() { return Buffer.concat(this.parts); }
+  texte() { return this.txt.join('\n') + '\n'; }
+}
+function imprimer(poste, doc) {
+  const p = db.config.imprimantes[poste];
+  return new Promise((resolve) => {
+    if (!p || !p.ip) {
+      const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
+      fs.writeFileSync(f, doc.texte(), 'utf8');
+      return resolve({ ok: true, simule: true });
+    }
+    const sock = net.connect({ host: p.ip, port: +p.port || 9100 });
+    let fini = false;
+    const fin = (r) => { if (fini) return; fini = true; try { sock.destroy(); } catch (e) {} resolve(r); };
+    sock.setTimeout(5000, () => fin({ ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') ne répond pas' }));
+    sock.on('error', (e) => fin({ ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') : ' + e.code }));
+    sock.on('connect', () => sock.end(doc.buf(), () => setTimeout(() => fin({ ok: true }), 200)));
+  });
+}
+const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const heure = ts => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const dateH = ts => new Date(ts).toLocaleDateString('fr-FR') + ' ' + heure(ts);
+function salleNom(id) { const s = db.config.salles.find(x => x.id === id); return s ? s.nom : (id === 'comptoir' ? 'Comptoir' : id); }
+function nomUser(id) { const u = db.users.find(x => x.id === id); return u ? u.nom : '-'; }
+function postesBons() { return Object.keys(db.config.imprimantes).filter(k => k !== 'ticket'); }
+function posteDe(pid) {
+  const p = db.produits.find(x => x.id === pid); const c = p && db.categories.find(x => x.id === p.cat);
+  const k = c ? c.poste : 'cuisine';
+  return db.config.imprimantes[k] && k !== 'ticket' ? k : postesBons()[0];
+}
+const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
+
+function lignesBon(d, l) {
+  d.size(3).bold(1).t(l.qte + '  ' + l.nom).bold(0).size(0);
+  for (const o of l.opts || []) d.bold(1).t('    + ' + o.nom).bold(0);
+  if (l.note) d.bold(1).t('    >> ' + l.note).bold(0);
+}
+function bon(poste, cmd, lignes, titre) {
+  const d = new Doc();
+  d.center(1).size(2).bold(1).t(((db.config.imprimantes[poste] || {}).nom || poste).toUpperCase()).size(0);
+  if (titre) d.t(titre);
+  d.bold(0).center(0).line('=');
+  d.size(2).bold(1).t('TABLE ' + cmd.table).size(0).bold(0);
+  d.t(salleNom(cmd.salle) + ' - ' + (cmd.couverts || '?') + ' couv.');
+  d.t('Serveur : ' + nomUser(cmd.serveurId) + '   ' + heure(now()));
+  d.line();
+  const suites = [...new Set(lignes.map(l => l.suite || 0))].sort((a, b) => a - b);
+  for (const s of suites) {
+    const attente = s > (cmd.suite || 0) && s > 0;
+    if (suites.length > 1 || attente) d.center(1).bold(1).t('--- ' + SUITES[s].toUpperCase() + (attente ? ' : ATTENDRE LA RÉCLAME' : '') + ' ---').bold(0).center(0);
+    for (const l of lignes.filter(l => (l.suite || 0) === s)) lignesBon(d, l);
+  }
+  d.line();
+  d.cut();
+  return d;
+}
+// Écran cuisine : un bon par poste et par suite
+function creerBons(c, lignes, type) {
+  const parPoste = {};
+  for (const l of lignes) (parPoste[posteDe(l.pid)] = parPoste[posteDe(l.pid)] || []).push(l);
+  for (const [poste, ls] of Object.entries(parPoste)) {
+    const suites = [...new Set(ls.map(l => l.suite || 0))];
+    for (const s of suites) {
+      db.seq.bon++;
+      db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste, ts: now(), suite: s, type: type || 'commande',
+        etat: s > (c.suite || 0) && s > 0 ? 'attente' : 'a_faire',
+        lignes: ls.filter(l => (l.suite || 0) === s).map(l => ({ id: l.id, qte: l.qte, nom: l.nom, opts: (l.opts || []).map(o => o.nom), note: l.note })) });
+    }
+  }
+}
+function enteteTicket(d) {
+  const c = db.config;
+  d.center(1).size(2).bold(1).t(c.nom.toUpperCase()).size(0).bold(0).t(c.adresse).t('Tel ' + c.tel).center(0).line();
+}
+function lignesTicket(d, lignes, sansPayees) {
+  const grp = {};
+  for (const l of lignes) { if (l.annule || (sansPayees && l.paye)) continue; const o = (l.opts || []).filter(x => x.prix).map(x => x.nom).join(', '); const k = l.nom + '|' + o + '|' + l.prix + '|' + (l.offert ? 1 : 0); (grp[k] = grp[k] || { ...l, o, qte: 0 }).qte += l.qte; }
+  for (const l of Object.values(grp)) { d.lr(l.qte + ' x ' + l.nom, l.offert ? 'OFFERT' : fmt(l.qte * l.prix)); if (l.o) d.t('    + ' + l.o); }
+}
+// paiements d'un ticket (les anciens tickets n'ont qu'un mode)
+function paiementsDe(t) { return t.paiements || [{ mode: t.mode, montant: t.mode === 'offert' ? 0 : t.net, societe: t.societe, reference: t.reference }]; }
+const sommeMode = (tks, m) => tks.reduce((s, t) => s + paiementsDe(t).filter(p => p.mode === m).reduce((a, p) => a + p.montant, 0), 0);
+function ticketDoc(tk, duplicata) {
+  const d = new Doc();
+  enteteTicket(d);
+  if (duplicata) d.center(1).bold(1).t('*** DUPLICATA ***').bold(0).center(0);
+  d.t('Ticket n° ' + tk.num + '   ' + dateH(tk.ts));
+  d.t(salleNom(tk.salle) + ' - Table ' + tk.table + ' - ' + (tk.couverts || 1) + ' couv.');
+  d.t('Serveur : ' + tk.serveur + '   Caisse : ' + tk.caissier);
+  d.line();
+  lignesTicket(d, tk.lignes);
+  d.line();
+  if (tk.remise > 0) { d.lr('Sous-total', fmt(tk.total) + ' DA'); d.lr('Remise', '-' + fmt(tk.remise) + ' DA'); }
+  d.size(2).bold(1).lr('TOTAL', fmt(tk.net) + ' DA', Math.floor(d.w / 2)).size(0).bold(0);
+  if (tk.partiel) d.t('Paiement partiel de la table');
+  if (tk.mode === 'offert') d.t('Offert - ' + (tk.motif || ''));
+  else for (const p of paiementsDe(tk)) d.lr(MODES[p.mode] + (p.mode === 'societe' ? ' ' + p.societe : '') + (p.reference ? ' n° ' + p.reference : ''), fmt(p.montant) + ' DA');
+  if (tk.recu && tk.rendu > 0) { d.lr('Espèces reçues', fmt(tk.recu) + ' DA'); d.lr('Rendu', fmt(tk.rendu) + ' DA'); }
+  d.line().center(1).t(db.config.piedTicket).center(0);
+  d.cut();
+  return d;
+}
+function additionDoc(cmd) {
+  const d = new Doc();
+  enteteTicket(d);
+  d.center(1).bold(1).t('ADDITION').bold(0).center(0);
+  d.t(salleNom(cmd.salle) + ' - Table ' + cmd.table + '   ' + dateH(now()));
+  d.t('Serveur : ' + nomUser(cmd.serveurId));
+  d.line();
+  lignesTicket(d, cmd.lignes, true);
+  d.line();
+  if (cmd.lignes.some(l => l.paye)) d.t('(articles déjà réglés non repris)');
+  d.size(2).bold(1).lr('TOTAL', fmt(totalCmd(cmd)) + ' DA', Math.floor(d.w / 2)).size(0).bold(0);
+  if (cmd.couverts > 1) d.lr('Soit par personne (' + cmd.couverts + ')', fmt(totalCmd(cmd) / cmd.couverts) + ' DA');
+  d.line().center(1).t('Ceci n\'est pas un ticket de caisse').center(0);
+  d.cut();
+  return d;
+}
+function totalCmd(cmd) { return cmd.lignes.reduce((s, l) => s + (l.annule || l.offert || l.paye ? 0 : l.qte * l.prix), 0); }
+
+// ---------------------------------------------------------------- Calculs journée
+function resumeJour(j) {
+  if (!j) return null;
+  const tks = db.tickets.filter(t => t.jour === j.id && !t.annule);
+  const sorties = db.sorties.filter(s => s.jour === j.id);
+  const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
+  const especes = sommeMode(tks, 'especes'), societe = sommeMode(tks, 'societe'), cheque = sommeMode(tks, 'cheque'), tpe = sommeMode(tks, 'tpe');
+  const offert = sum(tks.filter(t => t.mode === 'offert'), t => t.total);
+  const totalSorties = sum(sorties, s => s.montant);
+  const parServeur = {}, parCaissier = {};
+  for (const t of tks) { if (t.mode === 'offert') continue; parServeur[t.serveur] = (parServeur[t.serveur] || 0) + t.net; parCaissier[t.caissier] = (parCaissier[t.caissier] || 0) + t.net; }
+  const annulations = [];
+  for (const c of Object.values(db.commandes)) if (c.jour === j.id) for (const l of c.lignes) if (l.annule && l.envoye) annulations.push({ table: c.table, nom: l.nom, qte: l.qte, montant: l.qte * l.prix, motif: l.annule.motif, par: l.annule.par });
+  const ouvertes = Object.values(db.commandes).filter(c => c.statut === 'ouverte');
+  return {
+    jour: j, nbTickets: tks.length, ca: especes + cheque + tpe + societe, especes, cheque, tpe, societe, offert,
+    remises: sum(tks, t => t.remise || 0), patron: sum(tks.filter(t => t.patron), t => t.net),
+    couverts: sum(tks, t => t.couverts || 0),
+    sorties, totalSorties, fondCaisse: db.config.fondCaisse,
+    attenduTiroir: db.config.fondCaisse + especes - totalSorties,
+    aRemettre: especes - totalSorties,
+    parServeur, parCaissier, annulations,
+    totalAnnulations: sum(annulations, a => a.montant),
+    tablesOuvertes: ouvertes.length, montantOuvert: sum(ouvertes, totalCmd),
+  };
+}
+function rapport(du, au) {
+  const tks = db.tickets.filter(t => !t.annule && t.date >= du && t.date <= au);
+  const plats = {}, cats = {}, jours = {}, serveurs = {}, heures = {};
+  let ca = 0, especes = 0, cheque = 0, tpe = 0, societe = 0, offert = 0, remises = 0, couverts = 0;
+  for (const t of tks) {
+    if (t.mode !== 'offert') { ca += t.net; jours[t.date] = (jours[t.date] || 0) + t.net; serveurs[t.serveur] = (serveurs[t.serveur] || 0) + t.net; const h = new Date(t.ts).getHours(); heures[h] = (heures[h] || 0) + t.net; }
+    if (t.mode === 'offert') offert += t.total;
+    for (const p of paiementsDe(t)) { if (p.mode === 'especes') especes += p.montant; else if (p.mode === 'cheque') cheque += p.montant; else if (p.mode === 'tpe') tpe += p.montant; else if (p.mode === 'societe') societe += p.montant; }
+    remises += t.remise || 0; couverts += t.couverts || 0;
+    for (const l of t.lignes) {
+      if (l.annule) continue;
+      const p = plats[l.nom] = plats[l.nom] || { nom: l.nom, cat: l.catNom || '', qte: 0, montant: 0 };
+      p.qte += l.qte; p.montant += l.offert ? 0 : l.qte * l.prix;
+      const cn = l.catNom || 'Autre'; cats[cn] = (cats[cn] || 0) + (l.offert ? 0 : l.qte * l.prix);
+    }
+  }
+  const sorties = db.sorties.filter(s => s.date >= du && s.date <= au);
+  // période précédente de même durée, pour comparer
+  const j0 = new Date(du + 'T12:00'), j1 = new Date(au + 'T12:00'), n = Math.round((j1 - j0) / 864e5) + 1;
+  const pd = new Date(j0); pd.setDate(pd.getDate() - n); const pa = new Date(j0); pa.setDate(pa.getDate() - 1);
+  const pdu = dateLocale(pd.getTime()), pau = dateLocale(pa.getTime());
+  const precedent = db.tickets.filter(t => !t.annule && t.mode !== 'offert' && t.date >= pdu && t.date <= pau).reduce((s, t) => s + t.net, 0);
+  // temps de préparation (écran cuisine)
+  const prep = {};
+  for (const b of db.bons) { if (!b.pretTs || b.type !== 'commande') continue; const d = dateLocale(b.ts); if (d < du || d > au) continue; const k = (db.config.imprimantes[b.poste] || {}).nom || b.poste; (prep[k] = prep[k] || []).push((b.pretTs - b.ts) / 60000); }
+  const tempsPrep = Object.fromEntries(Object.entries(prep).map(([k, v]) => [k, Math.round(v.reduce((a, x) => a + x, 0) / v.length)]));
+  return {
+    precedent, precedentDu: pdu, precedentAu: pau, tempsPrep,
+    du, au, nbTickets: tks.length, ca, especes, cheque, tpe, societe, offert, remises, couverts,
+    ticketMoyen: tks.length ? Math.round(ca / tks.length) : 0,
+    plats: Object.values(plats).sort((a, b) => b.qte - a.qte),
+    categories: cats, jours, serveurs, heures,
+    sorties: sorties.reduce((s, x) => s + x.montant, 0),
+    rases: db.jours.filter(j => j.rase && j.date >= du && j.date <= au).map(j => ({ n: j.n, date: j.date, ...j.rase })),
+  };
+}
+function raseDoc(r, rase) {
+  const d = new Doc();
+  enteteTicket(d);
+  d.center(1).size(2).bold(1).t(rase ? 'RAPPORT Z' : 'RAPPORT X').size(0).t('Journée n° ' + r.jour.n + ' du ' + new Date(r.jour.ouvert).toLocaleDateString('fr-FR')).bold(0).center(0);
+  if (rase) d.t('Clôture ' + dateH(rase.ts) + ' par ' + rase.par); else d.center(1).t('Lecture en cours de journée - ' + dateH(now())).center(0);
+  d.line();
+  d.lr('Tickets', r.nbTickets); d.lr('Couverts', r.couverts);
+  d.bold(1).lr('CHIFFRE D\'AFFAIRES', fmt(r.ca) + ' DA').bold(0);
+  d.lr('  dont espèces', fmt(r.especes)); d.lr('  dont chèques', fmt(r.cheque)); d.lr('  dont carte (TPE)', fmt(r.tpe)); d.lr('  dont sur facture', fmt(r.societe));
+  d.lr('Remises', fmt(r.remises)); d.lr('Offerts', fmt(r.offert)); d.lr('Table ' + db.config.tablePatron + ' (patron)', fmt(r.patron));
+  d.lr('Annulations après envoi', fmt(r.totalAnnulations));
+  d.line();
+  d.bold(1).t('Par serveur').bold(0); for (const [k, v] of Object.entries(r.parServeur)) d.lr('  ' + k, fmt(v));
+  d.bold(1).t('Par caissier').bold(0); for (const [k, v] of Object.entries(r.parCaissier)) d.lr('  ' + k, fmt(v));
+  d.line();
+  d.bold(1).t('Sorties de caisse').bold(0);
+  for (const s of r.sorties) d.lr('  ' + s.motif + (s.detail ? ' - ' + s.detail : ''), fmt(s.montant));
+  d.lr('Total sorties', fmt(r.totalSorties));
+  d.line();
+  d.lr('Fond de caisse', fmt(r.fondCaisse));
+  if (rase) {
+    d.lr('Espèces attendues (rase)', fmt(rase.attendu));
+    d.lr('Espèces comptées', fmt(rase.compte));
+    d.bold(1).lr('ÉCART', (rase.ecart > 0 ? '+' : '') + fmt(rase.ecart) + ' DA').bold(0);
+    if (rase.completePar) d.t('Écart complété par : ' + rase.completePar);
+    if (rase.commentaire) d.t('Note : ' + rase.commentaire);
+  } else { d.bold(1).lr('Espèces dans le tiroir', fmt(r.attenduTiroir) + ' DA').bold(0); d.lr('Tables encore ouvertes', r.tablesOuvertes + ' - ' + fmt(r.montantOuvert) + ' DA'); }
+  d.line();
+  d.bold(1).t('Plats vendus').bold(0);
+  const plats = {};
+  for (const t of db.tickets) if (t.jour === r.jour.id && !t.annule) for (const l of t.lignes) if (!l.annule) plats[l.nom] = (plats[l.nom] || 0) + l.qte;
+  for (const [k, v] of Object.entries(plats).sort((a, b) => b[1] - a[1])) d.lr('  ' + k, v);
+  if (rase) d.feed(2).t('Signature caissier :').feed(3).t('Signature responsable :');
+  d.cut();
+  return d;
+}
+
+// ---------------------------------------------------------------- Événements en direct
+const clients = new Set();
+function broadcast() { for (const r of clients) { try { r.write('data: maj\n\n'); } catch (e) {} } }
+setInterval(() => { for (const r of clients) { try { r.write(': ping\n\n'); } catch (e) {} } }, 25000);
+
+// ---------------------------------------------------------------- API
+class Err extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+const E = (msg, code = 400) => { throw new Err(code, msg); };
+
+function etatPublic(u) {
+  const c = { ...db.config };
+  return {
+    user: { id: u.id, nom: u.nom, role: u.role },
+    config: c,
+    categories: db.categories.slice().sort((a, b) => a.ordre - b.ordre),
+    produits: db.produits,
+    users: db.users.map(x => ({ id: x.id, nom: x.nom, role: x.role, actif: x.actif })),
+    commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte'),
+    jour: jourCourant(false) || null,
+    options: db.options, top: topVentes(), version: VERSION,
+    prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
+  };
+}
+let topCache = { ts: 0, ids: [] };
+function topVentes() {
+  if (now() - topCache.ts < 600000) return topCache.ids;
+  const lim = dateLocale(now() - 30 * 864e5), n = {};
+  for (const t of db.tickets) if (!t.annule && t.date >= lim) for (const l of t.lignes) if (!l.annule) n[l.pid] = (n[l.pid] || 0) + l.qte;
+  topCache = { ts: now(), ids: Object.entries(n).sort((a, b) => b[1] - a[1]).map(x => x[0]).filter(id => db.produits.some(p => p.id === id && p.actif)).slice(0, 16) };
+  return topCache.ids;
+}
+function bonsKds(poste) {
+  const lim = now() - 20 * 60000;
+  return db.bons.filter(b => (poste === 'tous' || b.poste === poste) && (b.etat === 'a_faire' || b.etat === 'attente' || (b.etat === 'pret' && b.pretTs > lim)))
+    .map(b => { const c = db.commandes[b.cmdId]; return { ...b, table: c ? c.table : b.table, salle: salleNom(c ? c.salle : b.salle), serveur: nomUser(b.serveurId), couverts: c ? c.couverts : '' }; });
+}
+function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
+
+const routes = {
+  'POST /api/login': (b) => {
+    const u = parCode(b.badge || b.pin);
+    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    const token = crypto.randomBytes(18).toString('hex');
+    sessions.set(token, { userId: u.id, ts: now() });
+    journal(u, 'connexion', '');
+    return { token, user: { id: u.id, nom: u.nom, role: u.role } };
+  },
+  'GET /api/etat': (b, u) => etatPublic(u),
+  'POST /api/logout': (b, u, req) => { sessions.delete(req.headers['x-token']); return {}; },
+
+  'POST /api/commande/ouvrir': (b, u) => {
+    if (u.role === 'cuisine') E('Non autorisé', 403);
+    const salle = b.salle, table = String(b.table || '');
+    if (!table) E('Table manquante');
+    const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
+    if (ex) return ex;
+    const j = jourCourant(true);
+    db.seq.cmd++;
+    const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null };
+    db.commandes[c.id] = c;
+    journal(u, 'ouverture table', salleNom(salle) + ' ' + table);
+    save();
+    return c;
+  },
+  'POST /api/commande/envoyer': async (b, u) => {
+    if (u.role === 'cuisine') E('Non autorisé', 403);
+    const c = getCmd(b.id);
+    const besoin = {};
+    for (const x of b.lignes || []) besoin[x.pid] = (besoin[x.pid] || 0) + Math.max(1, parseInt(x.qte, 10) || 1);
+    for (const [pid, q] of Object.entries(besoin)) {
+      const p = db.produits.find(p => p.id === pid);
+      if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
+    }
+    const nouvelles = [];
+    for (const x of b.lignes || []) {
+      const p = db.produits.find(p => p.id === x.pid);
+      if (!p) continue;
+      const qte = Math.max(1, Math.min(99, parseInt(x.qte, 10) || 1));
+      const cat = db.categories.find(k => k.id === p.cat) || {};
+      // options (cuisson, accompagnement, suppléments…)
+      const opts = [];
+      for (const gid of p.options || []) {
+        const g = db.options.find(o => o.id === gid); if (!g) continue;
+        const choisis = (x.opts || []).filter(o => o.g === gid).map(o => g.choix[o.i]).filter(Boolean);
+        if (g.obligatoire && !choisis.length) E('Choisissez « ' + g.nom + ' » pour ' + p.nom);
+        for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
+      }
+      const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
+      db.seq.ligne++;
+      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.nom, prix: p.prix + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: String(x.note || '').slice(0, 80), envoye: now(), par: u.id, annule: null, offert: false });
+    }
+    if (!nouvelles.length) E('Rien à envoyer');
+    for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
+    const suiteAvant = c.lignes.some(l => l.envoye);
+    c.lignes.push(...nouvelles);
+    // la première suite commandée part tout de suite, les suivantes attendent la réclame
+    const actives = c.lignes.filter(l => !l.annule && !l.paye && l.suite > 0).map(l => l.suite);
+    if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
+    if (b.couverts) c.couverts = +b.couverts;
+    creerBons(c, nouvelles);
+    save();
+    const erreurs = [];
+    for (const poste of postesBons()) {
+      const ls = nouvelles.filter(l => posteDe(l.pid) === poste);
+      if (!ls.length) continue;
+      const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : ''));
+      if (!r.ok) erreurs.push(r.erreur);
+    }
+    journal(u, 'envoi', 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
+    return { commande: c, erreurs };
+  },
+  'POST /api/commande/reclamer': async (b, u) => {
+    const c = getCmd(b.id);
+    const att = c.lignes.filter(l => !l.annule && !l.paye && l.suite > (c.suite || 0));
+    if (!att.length) E('Rien en attente pour cette table');
+    const s = Math.min(...att.map(l => l.suite));
+    c.suite = s;
+    const ls = att.filter(l => l.suite === s);
+    for (const bn of db.bons) if (bn.cmdId === c.id && bn.etat === 'attente' && bn.suite === s) { bn.etat = 'a_faire'; bn.ts = now(); bn.reclame = true; }
+    save();
+    const erreurs = [];
+    for (const poste of postesBons()) {
+      const lp = ls.filter(l => posteDe(l.pid) === poste);
+      if (!lp.length) continue;
+      const d = new Doc();
+      d.center(1).size(2).bold(1).t('RÉCLAME').t(SUITES[s].toUpperCase()).size(0).bold(0).center(0).line('=');
+      d.size(2).bold(1).t('TABLE ' + c.table).size(0).bold(0).t(salleNom(c.salle) + '   ' + heure(now()) + '   ' + nomUser(c.serveurId)).line();
+      for (const l of lp) lignesBon(d, l);
+      d.line().cut();
+      const r = await imprimer(poste, d);
+      if (!r.ok) erreurs.push(r.erreur);
+    }
+    journal(u, 'réclame', 'Table ' + c.table + ' : ' + SUITES[s]);
+    return { commande: c, suite: SUITES[s], erreurs };
+  },
+  'POST /api/commande/message': async (b, u) => {
+    const c = getCmd(b.id);
+    const texte = String(b.texte || '').trim().slice(0, 140);
+    if (!texte) E('Message vide');
+    const postes = b.poste === 'tous' ? postesBons() : [b.poste].filter(p => postesBons().includes(p));
+    if (!postes.length) E('Choisissez où envoyer le message');
+    const erreurs = [];
+    for (const poste of postes) {
+      db.seq.bon++;
+      db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: u.id, poste, ts: now(), suite: 0, type: 'message', etat: 'a_faire', lignes: [{ qte: '', nom: texte, opts: [], note: '' }] });
+      const d = new Doc();
+      d.center(1).size(2).bold(1).t('MESSAGE').size(0).bold(0).center(0).line('=');
+      d.size(2).bold(1).t('TABLE ' + c.table).size(0).bold(0).t(nomUser(u.id) + '   ' + heure(now())).line();
+      d.size(3).bold(1).t(texte).size(0).bold(0).line().cut();
+      const r = await imprimer(poste, d); if (!r.ok) erreurs.push(r.erreur);
+    }
+    save();
+    journal(u, 'message', 'Table ' + c.table + ' : ' + texte);
+    return { erreurs };
+  },
+  'POST /api/commande/servi': (b, u) => {
+    for (const bn of db.bons) if (bn.cmdId === b.id && bn.etat === 'pret' && (!b.bon || bn.id === b.bon)) { bn.etat = 'servi'; bn.serviTs = now(); }
+    save(); return {};
+  },
+  // ---- écran cuisine
+  'GET /api/kds': (b, u, req, q) => ({ bons: bonsKds(q.poste || 'tous'), produits: db.produits.filter(p => p.actif).map(p => ({ id: p.id, nom: p.nom, stock: p.stock, poste: posteDe(p.id) })) }),
+  'POST /api/kds/pret': (b, u) => {
+    const bn = db.bons.find(x => x.id === b.id); if (!bn) E('Bon introuvable');
+    if (bn.type === 'commande') { bn.etat = 'pret'; bn.pretTs = now(); bn.pretPar = u.nom; } else { bn.etat = 'servi'; bn.pretTs = now(); }
+    save(); return {};
+  },
+  'POST /api/kds/rappel': (b, u) => {
+    const bn = db.bons.find(x => x.id === b.id); if (!bn) E('Bon introuvable');
+    bn.etat = 'a_faire'; bn.pretTs = null; save(); return {};
+  },
+  'POST /api/produit/stock': (b, u) => {
+    if (u.role === 'serveur') E('Seuls la cuisine, la caisse et le responsable gèrent les ruptures', 403);
+    const p = db.produits.find(x => x.id === b.pid); if (!p) E('Article introuvable');
+    p.stock = b.stock === null || b.stock === '' || b.stock === undefined ? null : Math.max(0, parseInt(b.stock, 10) || 0);
+    journal(u, 'rupture / stock', p.nom + ' : ' + (p.stock === null ? 'disponible' : p.stock === 0 ? 'ÉPUISÉ' : 'reste ' + p.stock));
+    save(); return { pid: p.id, stock: p.stock };
+  },
+  'POST /api/commande/reimprimer-bons': async (b, u) => {
+    const c = getCmd(b.id);
+    const erreurs = [];
+    for (const poste of postesBons()) {
+      const ls = c.lignes.filter(l => !l.annule && posteDe(l.pid) === poste);
+      if (!ls.length) continue;
+      const r = await imprimer(poste, bon(poste, c, ls, '** RÉIMPRESSION **'));
+      if (!r.ok) erreurs.push(r.erreur);
+    }
+    return { erreurs };
+  },
+  'POST /api/commande/annuler-ligne': async (b, u) => {
+    const c = getCmd(b.id);
+    const l = c.lignes.find(x => x.id === b.ligne);
+    if (!l || l.annule) E('Ligne introuvable');
+    if (l.paye) E('Cet article est déjà payé');
+    const chef = pinAdmin(b.pin);
+    if (!chef) E('Code du responsable obligatoire pour annuler un article déjà envoyé', 403);
+    if (!b.motif) E('Motif obligatoire');
+    const q = Math.max(1, Math.min(l.qte, parseInt(b.qte, 10) || l.qte));
+    let cible = l;
+    if (q < l.qte) { l.qte -= q; db.seq.ligne++; cible = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(cible); }
+    cible.annule = { par: chef.nom, demandePar: u.nom, motif: b.motif, ts: now() };
+    const pr = db.produits.find(p => p.id === l.pid); if (pr && pr.stock !== null && pr.stock !== undefined) pr.stock += q;
+    db.seq.bon++;
+    db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: posteDe(l.pid), ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] });
+    journal(u, 'annulation article', 'Table ' + c.table + ' : ' + q + ' ' + l.nom + ' (' + b.motif + ') autorisé par ' + chef.nom);
+    save();
+    const poste = posteDe(l.pid);
+    const d = new Doc();
+    d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t('Table ' + c.table + ' - ' + heure(now())).line();
+    d.size(3).bold(1).t(q + '  ' + l.nom).size(0).bold(0).t('Motif : ' + b.motif).cut();
+    const r = await imprimer(poste, d);
+    return { commande: c, erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'POST /api/commande/offrir-ligne': (b, u) => {
+    const c = getCmd(b.id);
+    const l = c.lignes.find(x => x.id === b.ligne);
+    if (!l || l.annule) E('Ligne introuvable');
+    if (l.paye) E('Cet article est déjà payé');
+    const chef = pinAdmin(b.pin);
+    if (!chef) E('Code du responsable obligatoire', 403);
+    l.offert = !l.offert;
+    journal(u, l.offert ? 'article offert' : 'article plus offert', 'Table ' + c.table + ' : ' + l.qte + ' ' + l.nom + ' par ' + chef.nom);
+    save();
+    return c;
+  },
+  'POST /api/commande/modifier': (b, u) => {
+    const c = getCmd(b.id);
+    if (b.couverts) c.couverts = Math.max(1, +b.couverts);
+    if (b.salle && b.table) {
+      const t = String(b.table);
+      const occ = Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.id !== c.id && x.salle === b.salle && x.table === t);
+      if (occ) {
+        // fusion des deux tables
+        occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = [];
+        journal(u, 'fusion tables', c.table + ' -> ' + t);
+        save(); return occ;
+      }
+      journal(u, 'transfert table', salleNom(c.salle) + ' ' + c.table + ' -> ' + salleNom(b.salle) + ' ' + t);
+      c.salle = b.salle; c.table = t;
+    }
+    if (b.serveurId && peut(u, 'caissier')) c.serveurId = b.serveurId;
+    save();
+    return c;
+  },
+  'POST /api/commande/fermer-vide': (b, u) => {
+    const c = getCmd(b.id);
+    if (c.lignes.some(l => !l.annule && !l.paye)) E('La table a encore des articles : il faut les annuler ou encaisser.');
+    c.statut = 'annulee'; c.ferme = now();
+    journal(u, 'fermeture table vide', 'Table ' + c.table);
+    save(); return {};
+  },
+  'POST /api/commande/addition': async (b, u) => {
+    const c = getCmd(b.id);
+    if (!c.lignes.some(l => !l.annule && !l.paye)) E('La table est vide');
+    c.additionTs = now(); save();
+    const r = await imprimer('ticket', additionDoc(c));
+    journal(u, 'addition', 'Table ' + c.table + ' ' + fmt(totalCmd(c)) + ' DA');
+    return { erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'POST /api/commande/encaisser': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Seule la caisse peut encaisser', 403);
+    const c = getCmd(b.id);
+    const restantes = () => c.lignes.filter(l => !l.annule && !l.paye);
+    if (!restantes().length) E('La table est vide');
+    // Séparation : on ne paie qu'une partie des articles
+    let lignes;
+    if (Array.isArray(b.lignes) && b.lignes.length) {
+      lignes = [];
+      for (const x of b.lignes) {
+        const l = c.lignes.find(k => k.id === x.id && !k.annule && !k.paye);
+        if (!l) E('Article introuvable ou déjà payé');
+        const q = Math.max(1, Math.min(l.qte, parseInt(x.qte, 10) || l.qte));
+        if (q < l.qte) { l.qte -= q; db.seq.ligne++; const n = { ...l, id: 'L' + db.seq.ligne, qte: q }; c.lignes.push(n); lignes.push(n); }
+        else lignes.push(l);
+      }
+    } else lignes = restantes();
+    const total = lignes.reduce((s, l) => s + (l.offert ? 0 : l.qte * l.prix), 0);
+    let remise = 0;
+    if (b.remise && +b.remise.valeur > 0) {
+      if (!pinAdmin(b.pin)) E('Code du responsable obligatoire pour une remise', 403);
+      remise = b.remise.type === 'pct' ? Math.round(total * Math.min(100, +b.remise.valeur) / 100) : Math.min(total, Math.round(+b.remise.valeur));
+    }
+    // paiements : un seul mode, ou plusieurs (ex. une partie en espèces, le reste par carte)
+    let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode, montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
+    pays = pays.map(p => ({ mode: p.mode, montant: Math.round(+p.montant || 0), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
+    for (const p of pays) if (!MODES[p.mode]) E('Mode de paiement inconnu');
+    const offert = pays.some(p => p.mode === 'offert');
+    if (offert && pays.length > 1) E('Une table offerte ne peut pas être payée en plus');
+    if (offert && !pinAdmin(b.pin)) E('Code du responsable obligatoire pour offrir la table', 403);
+    for (const p of pays) if (p.mode === 'societe' && !p.societe) E('Nom de la société obligatoire');
+    const net = offert ? 0 : total - remise;
+    if (pays.length === 1 && !offert && !(pays[0].montant > 0)) pays[0].montant = net;
+    const somme = offert ? 0 : pays.reduce((s, p) => s + p.montant, 0);
+    if (somme < net) E('Il manque ' + fmt(net - somme) + ' DA');
+    const recu = pays.filter(p => p.mode === 'especes').reduce((s, p) => s + p.montant, 0);
+    const rendu = somme - net;
+    if (rendu > recu) E('Seules les espèces peuvent dépasser le montant à payer');
+    // on garde ce qui est réellement encaissé (espèces = reçu - rendu)
+    let aDeduire = rendu;
+    const paiements = [];
+    for (const p of pays.slice().reverse()) { let m = p.montant; if (p.mode === 'especes' && aDeduire > 0) { const k = Math.min(m, aDeduire); m -= k; aDeduire -= k; } if (m > 0 || offert) paiements.unshift({ ...p, montant: offert ? 0 : m }); }
+    const modes = [...new Set(paiements.map(p => p.mode))];
+    const mode = modes.length === 1 ? modes[0] : 'mixte';
+    const j = db.jours.find(x => x.id === c.jour && !x.clos) || jourCourant(true);
+    db.seq.ticket++;
+    for (const l of lignes) l.paye = db.seq.ticket;
+    const partiel = restantes().length > 0;
+    const tk = {
+      num: db.seq.ticket, cmdId: c.id, jour: j.id, date: j.date, ts: now(), salle: c.salle, table: c.table, couverts: partiel ? 0 : c.couverts,
+      serveur: nomUser(c.serveurId), serveurId: c.serveurId, caissier: u.nom, lignes: lignes.map(l => ({ ...l })), total, remise: offert ? 0 : remise, net,
+      mode, paiements, societe: paiements.filter(p => p.mode === 'societe').map(p => p.societe).join(', '), reference: paiements.map(p => p.reference).filter(Boolean).join(', '),
+      motif: b.motif || '', recu, rendu: recu ? rendu : 0,
+      patron: c.table === String(db.config.tablePatron), partiel,
+    };
+    db.tickets.push(tk);
+    if (topCache.ids.length < 16) topCache.ts = 0;
+    if (!partiel) { c.statut = 'payee'; c.ticket = tk.num; c.ferme = now(); }
+    for (const p of paiements) if (p.mode === 'societe' && !db.config.societes.includes(p.societe)) db.config.societes.push(p.societe);
+    journal(u, 'encaissement', 'Ticket ' + tk.num + ' table ' + c.table + ' ' + fmt(net) + ' DA (' + paiements.map(p => MODES[p.mode] + ' ' + fmt(p.montant)).join(' + ') + ')' + (remise ? ' remise ' + fmt(remise) : '') + (partiel ? ' — paiement partiel' : ''));
+    save();
+    const d = ticketDoc(tk);
+    const tiroir = recu > 0 && db.config.tiroirAuto;
+    if (tiroir) d.drawer();
+    const r = b.imprimer === false && !tiroir ? { ok: true } : await imprimer('ticket', b.imprimer === false ? new Doc().drawer() : d);
+    return { ticket: tk, partiel, erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'POST /api/tiroir': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    journal(u, 'ouverture tiroir', b.motif || '');
+    const r = await imprimer('ticket', new Doc().drawer());
+    return { erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'GET /api/caisse': (b, u, req, q) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const j = jourCourant(false);
+    return {
+      resume: resumeJour(j),
+      tickets: j ? db.tickets.filter(t => t.jour === j.id).slice().reverse() : [],
+      derniereRase: db.jours.filter(x => x.rase).slice(-1)[0] || null,
+    };
+  },
+  'POST /api/ticket/reimprimer': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const tk = db.tickets.find(t => t.num === +b.num);
+    if (!tk) E('Ticket introuvable');
+    journal(u, 'duplicata', 'Ticket ' + tk.num);
+    const r = await imprimer('ticket', ticketDoc(tk, true));
+    return { erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'POST /api/ticket/annuler': (b, u) => {
+    const chef = pinAdmin(b.pin);
+    if (!chef) E('Code du responsable obligatoire', 403);
+    const tk = db.tickets.find(t => t.num === +b.num);
+    if (!tk || tk.annule) E('Ticket introuvable');
+    const j = db.jours.find(x => x.id === tk.jour);
+    if (j && j.clos) E('La journée de ce ticket est déjà clôturée');
+    if (!b.motif) E('Motif obligatoire');
+    tk.annule = { par: chef.nom, motif: b.motif, ts: now() };
+    if (b.rouvrir) {
+      const c = db.commandes[tk.cmdId];
+      if (c) {
+        if (c.statut !== 'ouverte' && Object.values(db.commandes).some(x => x.statut === 'ouverte' && x.salle === c.salle && x.table === c.table && x.id !== c.id)) E('La table ' + c.table + ' est de nouveau occupée : impossible de la rouvrir. Annulez sans rouvrir.');
+        for (const l of c.lignes) if (l.paye === tk.num) l.paye = null;
+        c.statut = 'ouverte'; delete c.ticket;
+      }
+    }
+    journal(u, 'annulation ticket', 'Ticket ' + tk.num + ' ' + fmt(tk.net) + ' DA (' + b.motif + ') par ' + chef.nom + (b.rouvrir ? ', table rouverte' : ''));
+    save(); return {};
+  },
+  'POST /api/sortie': (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const montant = Math.round(+b.montant);
+    if (!(montant > 0)) E('Montant invalide');
+    if (!b.motif) E('Motif obligatoire');
+    const j = jourCourant(true);
+    db.seq.sortie++;
+    const s = { id: 'S' + db.seq.sortie, jour: j.id, date: j.date, ts: now(), montant, motif: b.motif, detail: String(b.detail || '').slice(0, 120), par: u.nom };
+    db.sorties.push(s);
+    journal(u, 'sortie de caisse', fmt(montant) + ' DA ' + s.motif + ' ' + s.detail);
+    save();
+    return s;
+  },
+  'POST /api/sortie/supprimer': (b, u) => {
+    if (!pinAdmin(b.pin)) E('Code du responsable obligatoire', 403);
+    const i = db.sorties.findIndex(s => s.id === b.id);
+    if (i < 0) E('Sortie introuvable');
+    const s = db.sorties[i]; const j = db.jours.find(x => x.id === s.jour);
+    if (j && j.clos) E('Journée déjà clôturée');
+    db.sorties.splice(i, 1); journal(u, 'suppression sortie', fmt(s.montant) + ' ' + s.motif); save(); return {};
+  },
+  'POST /api/rase': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const j = jourCourant(false);
+    if (!j) E('Aucune journée ouverte');
+    const r = resumeJour(j);
+    if (r.tablesOuvertes && !b.forcer) E('Il reste ' + r.tablesOuvertes + ' table(s) ouverte(s) (' + fmt(r.montantOuvert) + ' DA). Encaissez-les avant la rase.');
+    const compte = Math.round(+b.compte);
+    if (!(compte >= 0)) E('Indiquez le montant compté');
+    const attendu = r.aRemettre;
+    const rase = { ts: now(), par: u.nom, compte, attendu, ecart: compte - attendu, completePar: String(b.completePar || ''), commentaire: String(b.commentaire || ''), ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe, societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
+    j.rase = rase; j.clos = now();
+    journal(u, 'rase', 'Journée ' + j.n + ' CA ' + fmt(r.ca) + ' compté ' + fmt(compte) + ' écart ' + fmt(rase.ecart));
+    save();
+    saveNow();
+    const res = await imprimer('ticket', raseDoc(r, rase));
+    return { rase, resume: r, erreurs: res.ok ? [] : [res.erreur] };
+  },
+  'POST /api/rapport-x': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const j = jourCourant(false); if (!j) E('Aucune journée ouverte');
+    journal(u, 'rapport X', '');
+    const res = await imprimer('ticket', raseDoc(resumeJour(j), null));
+    return { erreurs: res.ok ? [] : [res.erreur] };
+  },
+  'POST /api/pointage': (b) => {
+    const u = parCode(b.badge || b.pin);
+    if (!u) E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401);
+    const ouvert = db.pointages.find(p => p.userId === u.id && !p.out && now() - p.in < 20 * 3600e3);
+    let type, duree = 0;
+    if (ouvert) {
+      if (now() - ouvert.in < 60000) E(u.nom + ' : arrivée déjà pointée à ' + heure(ouvert.in));
+      ouvert.out = now(); type = 'depart'; duree = Math.round((ouvert.out - ouvert.in) / 60000);
+    } else {
+      db.seq.pointage++;
+      db.pointages.push({ id: 'P' + db.seq.pointage, userId: u.id, nom: u.nom, in: now(), out: null });
+      type = 'arrivee';
+    }
+    journal(u, 'pointage', type === 'arrivee' ? 'arrivée' : 'départ');
+    save();
+    return { nom: u.nom, type, heure: heure(now()), duree };
+  },
+  'GET /api/admin/pointages': (b, u, req, q) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const du = q.du || '0000', au = q.au || '9999';
+    return db.pointages.filter(p => { const d = dateLocale(p.in); return d >= du && d <= au; }).sort((a, b) => a.in - b.in);
+  },
+  'POST /api/admin/pointage': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (b.nouveau) {
+      const x = db.users.find(k => k.id === b.userId); if (!x) E('Personne inconnue');
+      db.seq.pointage++; db.pointages.push({ id: 'P' + db.seq.pointage, userId: x.id, nom: x.nom, in: +b.in, out: b.out ? +b.out : null, corrige: u.nom });
+    } else {
+      const i = db.pointages.findIndex(p => p.id === b.id); if (i < 0) E('Pointage introuvable');
+      if (b.supprimer) db.pointages.splice(i, 1);
+      else { const p = db.pointages[i]; if (b.in) p.in = +b.in; p.out = b.out ? +b.out : null; p.corrige = u.nom; if (p.out && p.out < p.in) E('Le départ est avant l\'arrivée'); }
+    }
+    journal(u, 'pointage corrigé', b.id || 'ajout'); save(); return {};
+  },
+  'GET /api/version': () => ({ version: VERSION }),
+  // « calme » = aucune table ouverte et personne n'a touché la caisse depuis 3 minutes (pour installer une mise à jour)
+  'GET /api/calme': () => ({ calme: !Object.values(db.commandes).some(c => c.statut === 'ouverte') && now() - derniereActivite > 180000 }),
+  'GET /api/maj': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return { version: VERSION, app: !!process.send, etat: majEtat }; },
+  'POST /api/maj/verifier': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); if (process.send) process.send({ type: 'verifier' }); return {}; },
+  'POST /api/maj/installer': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (Object.values(db.commandes).some(c => c.statut === 'ouverte') && !b.forcer) E('Des tables sont ouvertes : la mise à jour s\'installera toute seule quand elles seront encaissées.');
+    journal(u, 'mise à jour', 'installation demandée'); saveNow();
+    if (process.send) process.send({ type: 'installer' }); return {};
+  },
+  'POST /api/rase/reimprimer': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const j = db.jours.find(x => x.id === b.jour && x.rase);
+    if (!j) E('Rase introuvable');
+    const res = await imprimer('ticket', raseDoc(resumeJour(j), j.rase));
+    return { erreurs: res.ok ? [] : [res.erreur] };
+  },
+
+  // ---------------- Administration
+  'GET /api/rapport': (b, u, req, q) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const t = dateLocale(now());
+    return rapport(q.du || t, q.au || t);
+  },
+  'GET /api/journal': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return db.journal.slice(-500).reverse(); },
+  'GET /api/admin/users': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return db.users; },
+  'POST /api/admin/users': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const list = b.users || [];
+    const codes = new Map();
+    const unique = (code, nom) => { if (!code) return; if (codes.has(code)) E('Le même code ou badge est utilisé par ' + codes.get(code) + ' et ' + nom); codes.set(code, nom); };
+    for (const x of list) {
+      if (!x.nom || !/^\d{4,6}$/.test(String(x.pin))) E('Chaque personne doit avoir un nom et un code de 4 à 6 chiffres');
+      if (!['admin', 'caissier', 'serveur', 'cuisine'].includes(x.role)) E('Rôle inconnu');
+      if (x.actif) { unique(String(x.pin), x.nom); unique(String(x.badge || '').trim(), x.nom); }
+    }
+    if (!list.some(x => x.actif && x.role === 'admin')) E('Il faut garder au moins un responsable actif');
+    db.users = list.map((x, i) => ({ id: x.id || ('u' + now() + i), nom: String(x.nom).slice(0, 30), role: x.role, pin: String(x.pin), badge: String(x.badge || '').trim().slice(0, 64), actif: !!x.actif }));
+    journal(u, 'équipe modifiée', db.users.length + ' personnes');
+    save(); return db.users;
+  },
+  'POST /api/admin/carte': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (!Array.isArray(b.categories) || !Array.isArray(b.produits)) E('Données invalides');
+    if (Array.isArray(b.options)) db.options = b.options.filter(g => g.nom && Array.isArray(g.choix)).map((g, i) => ({ id: g.id || ('o' + now() + i), nom: String(g.nom).slice(0, 30), obligatoire: !!g.obligatoire, multiple: !!g.multiple, choix: g.choix.filter(ch => ch.nom).map(ch => ({ nom: String(ch.nom).slice(0, 30), prix: Math.max(0, Math.round(+ch.prix || 0)) })) }));
+    const gids = new Set(db.options.map(g => g.id));
+    db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), ordre: i }));
+    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0) }));
+    topCache.ts = 0;
+    journal(u, 'carte modifiée', db.produits.length + ' articles');
+    save(); return {};
+  },
+  'POST /api/admin/config': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const keep = ['nom', 'adresse', 'tel', 'piedTicket', 'fondCaisse', 'tablePatron', 'imprimantes', 'largeur', 'pageCode', 'sansAccents', 'tiroirAuto', 'deconnexionServeurSec', 'salles', 'societes', 'motifsSortie', 'motifsAnnulation'];
+    for (const k of keep) if (b[k] !== undefined) db.config[k] = b[k];
+    if (!db.config.imprimantes.ticket) db.config.imprimantes.ticket = IMPRIMANTES().ticket;
+    if (!postesBons().length) db.config.imprimantes.cuisine = IMPRIMANTES().cuisine;
+    for (const s of db.config.salles) { const vus = new Set(); s.tables = (s.tables || []).filter(t => t && t.n && !vus.has(String(t.n)) && vus.add(String(t.n))).map(t => ({ n: String(t.n).slice(0, 8), x: Math.max(0, Math.min(100, +t.x || 0)), y: Math.max(0, Math.min(100, +t.y || 0)) })); }
+    db.config.fondCaisse = Math.round(+db.config.fondCaisse || 0);
+    journal(u, 'réglages modifiés', Object.keys(b).join(', '));
+    save(); return db.config;
+  },
+  'POST /api/admin/test-impression': async (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const p = db.config.imprimantes[b.poste]; if (!p) E('Imprimante inconnue');
+    const d = new Doc();
+    d.center(1).size(2).bold(1).t('TEST').size(0).bold(0).t(p.nom).t(dateH(now())).t('Accents : é è à ç ô œ ù').center(0).line();
+    d.lr('Gauche', 'Droite').cut();
+    if (b.poste === 'ticket' && b.tiroir) d.drawer();
+    const r = await imprimer(b.poste, d);
+    return r;
+  },
+};
+
+function lireCorps(req) {
+  return new Promise((res, rej) => {
+    let s = '';
+    req.on('data', c => { s += c; if (s.length > 5e6) { rej(new Err(413, 'Trop gros')); req.destroy(); } });
+    req.on('end', () => { try { res(s ? JSON.parse(s) : {}); } catch (e) { rej(new Err(400, 'JSON invalide')); } });
+  });
+}
+function csv(rows) { return '﻿' + rows.map(r => r.map(v => { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';')).join('\r\n'); }
+
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  const q = Object.fromEntries(url.searchParams);
+  try {
+    if (url.pathname === '/api/events') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.write('retry: 2000\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
+    }
+    if (url.pathname.startsWith('/export/')) {
+      // jeton passé dans l'URL pour les téléchargements
+      const s = sessions.get(q.t); const u = s && db.users.find(x => x.id === s.userId);
+      if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+      const du = q.du || '0000', au = q.au || '9999';
+      let rows, nom;
+      if (url.pathname === '/export/tickets.csv') {
+        nom = 'tickets'; rows = [['Ticket', 'Date', 'Heure', 'Salle', 'Table', 'Couverts', 'Serveur', 'Caissier', 'Total', 'Remise', 'Net', 'Paiement', 'Société', 'Annulé']];
+        for (const t of db.tickets) if (t.date >= du && t.date <= au) rows.push([t.num, t.date, heure(t.ts), salleNom(t.salle), t.table, t.couverts, t.serveur, t.caissier, t.total, t.remise, t.net, paiementsDe(t).map(p => MODES[p.mode] + ' ' + p.montant).join(' + '), [t.societe, t.reference].filter(Boolean).join(' '), t.annule ? 'oui' : '']);
+      } else if (url.pathname === '/export/pointages.csv') {
+        nom = 'pointages'; rows = [['Nom', 'Date', 'Arrivée', 'Départ', 'Durée (h)', 'Corrigé par']];
+        for (const p of db.pointages.slice().sort((a, b) => a.in - b.in)) { const d = dateLocale(p.in); if (d >= du && d <= au) rows.push([p.nom, d, heure(p.in), p.out ? heure(p.out) : '', p.out ? ((p.out - p.in) / 3600000).toFixed(2).replace('.', ',') : '', p.corrige || '']); }
+      } else if (url.pathname === '/export/plats.csv') {
+        nom = 'plats'; const r = rapport(du, au); rows = [['Plat', 'Catégorie', 'Quantité', 'Montant']]; for (const p of r.plats) rows.push([p.nom, p.cat, p.qte, p.montant]);
+      } else if (url.pathname === '/export/rases.csv') {
+        nom = 'rases'; rows = [['Journée', 'Date', 'Tickets', 'CA', 'Espèces', 'Chèques', 'TPE', 'Sur facture', 'Sorties', 'Attendu', 'Compté', 'Écart', 'Complété par', 'Caissier']];
+        for (const j of db.jours) if (j.rase && j.date >= du && j.date <= au) rows.push([j.n, j.date, j.rase.nbTickets, j.rase.ca, j.rase.especes, j.rase.cheque || 0, j.rase.tpe || 0, j.rase.societe, j.rase.sorties, j.rase.attendu, j.rase.compte, j.rase.ecart, j.rase.completePar, j.rase.par]);
+      } else if (url.pathname === '/export/sorties.csv') {
+        nom = 'sorties'; rows = [['Date', 'Heure', 'Montant', 'Motif', 'Détail', 'Par']];
+        for (const s of db.sorties) if (s.date >= du && s.date <= au) rows.push([s.date, heure(s.ts), s.montant, s.motif, s.detail, s.par]);
+      } else if (url.pathname === '/export/sauvegarde.json') {
+        saveNow(); res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="caisse-sauvegarde-' + dateLocale(now()) + '.json"' }); return res.end(fs.readFileSync(DB_FILE));
+      } else E('Export inconnu', 404);
+      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="' + nom + '-' + du + '-' + au + '.csv"' });
+      return res.end(csv(rows));
+    }
+    if (url.pathname.startsWith('/api/')) {
+      const key = req.method + ' ' + url.pathname;
+      const fn = routes[key];
+      if (!fn) E('Inconnu', 404);
+      const body = req.method === 'POST' ? await lireCorps(req) : {};
+      const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'GET /api/version' || key === 'GET /api/calme';
+      if (req.method === 'POST') derniereActivite = now();
+      const u = publique ? null : userDe(req);
+      if (!publique && !u) E('Session expirée, reconnectez-vous', 401);
+      const out = await fn(body, u, req, q);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(out));
+    }
+    // fichiers de l'interface
+    let p = url.pathname === '/' ? '/index.html' : url.pathname;
+    const f = path.normalize(path.join(DIR, 'public', p));
+    if (!f.startsWith(path.join(DIR, 'public')) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Introuvable'); }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    fs.createReadStream(f).pipe(res);
+  } catch (e) {
+    const code = e.code && typeof e.code === 'number' ? e.code : 500;
+    if (code === 500) console.error(e);
+    res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ erreur: code === 500 ? 'Erreur interne : ' + e.message : e.message }));
+  }
+});
+
+server.on('error', e => { console.error('Impossible de démarrer : ' + e.message); process.exit(e.code === 'EADDRINUSE' ? 3 : 1); });
+server.listen(PORT, '0.0.0.0', () => {
+  if (process.send) process.send({ type: 'pret', port: PORT });
+  const ips = Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+  console.log('');
+  console.log('  Caisse La Maison Blanche est lancée.');
+  console.log('  Sur ce PC      : http://localhost:' + PORT);
+  for (const ip of ips) console.log('  Écrans de salle : http://' + ip + ':' + PORT);
+  console.log('  Ne fermez pas cette fenêtre pendant le service.');
+  console.log('');
+});

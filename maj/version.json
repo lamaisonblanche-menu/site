@@ -1,0 +1,39 @@
+{
+ "version": "3.1.0",
+ "date": "2026-11-23T13:47:45.085Z",
+ "notes": "Première version de l'application Windows",
+ "fichiers": [
+  {
+   "chemin": "VERSION",
+   "sha256": "b2f44d3b6e29f8b1b73ea4735f006affc4d198e1fd9c7d50e736159b1ef636c6"
+  },
+  {
+   "chemin": "public/app.js",
+   "sha256": "482fb251340878e97cb15f57d7adc68ba8e7ec38c21b23f7e96e3aacd041bf53"
+  },
+  {
+   "chemin": "public/index.html",
+   "sha256": "17f331810bed2664c28617815fbd9edbabc27a24e573085e7e5a5194179f59bb"
+  },
+  {
+   "chemin": "public/logo.png",
+   "sha256": "8f664de163b58224aea21bd8ecf0b1089b278e2d54a4defcf6af92d635671ab0"
+  },
+  {
+   "chemin": "public/manifest.webmanifest",
+   "sha256": "6d41abe8477ffab0ff3409ac8d79646ae1689aa88a950a344d84ac6b8c6a26b1"
+  },
+  {
+   "chemin": "public/style.css",
+   "sha256": "ab29d745298e902151a9dda0ac06e392e9a044c2121ae022049bd12f759b1706"
+  },
+  {
+   "chemin": "seed-menu.json",
+   "sha256": "ea3cb39d55b14f14c2722814e8a28d9af7c64be3c087dfade68e01732d202cfd"
+  },
+  {
+   "chemin": "server.js",
+   "sha256": "8a42e5a237f5e151291dc16d7f592a4253020f8ad7c7eb829b908aba1710ab17"
+  }
+ ]
+}
