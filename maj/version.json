@@ -1,7 +1,7 @@
 {
  "version": "3.5.7",
- "date": "2026-11-23T23:34:38.266Z",
- "notes": "3.5.7 : pointage réparé, tables vides qui bloquaient la rase, mail de la rase automatique corrigé, connexions gardées après une mise à jour, récap par société, Wafi code 1009.",
+ "date": "2026-11-23T23:34:48.051Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
