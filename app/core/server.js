@@ -304,6 +304,24 @@ if (!db.desserts353) {
   }
   db.desserts353 = true;
 }
+// Tarif confirmé par le patron : supplément frites à 500 DA.
+if (!db.supplementFrites353) {
+  let cat = db.categories.find(c => ['supplement', 'supplements'].includes(slug(c.nom)));
+  const p = db.produits.find(p => /^supplements?-frites$/.test(slug(p.nom)) ||
+    (cat && p.cat === cat.id && slug(p.nom) === 'frites'));
+  if (p) {
+    p.prix = 500;
+    p.actif = true;
+  } else {
+    if (!cat) {
+      cat = { id: 'supplements', nom: 'Suppléments', poste: 'cuisine', couleur: '#efe3cc', suite: 2, univers: 'La carte',
+        ordre: Math.max(0, ...db.categories.map(c => c.ordre)) + 1 };
+      db.categories.push(cat);
+    }
+    db.produits.push({ id: 'ps-supplement-frites', nom: 'Supplément frites', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
+  }
+  db.supplementFrites353 = true;
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};

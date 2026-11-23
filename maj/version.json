@@ -1,7 +1,7 @@
 {
  "version": "3.5.3",
- "date": "2026-11-23T18:39:28.531Z",
- "notes": "Sécurise les encaissements et annulations, fiabilise les réservations et l’import Gmail, et conserve le routage des bons de cuisine.",
+ "date": "2026-11-23T18:47:10.146Z",
+ "notes": "Fiabilise les encaissements, les réservations Gmail et les bons, et ajoute le supplément frites à 500 DA.",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -41,7 +41,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "b5df257ad70ac7d5fa36a3a953b379ca945f0f428efcee4c7575bae1cd3c8e13"
+   "sha256": "a948f54c17a028bbd385d86510ab53e0bfa4aa8993a04b9e218c44f3a577fa65"
   }
  ]
 }
