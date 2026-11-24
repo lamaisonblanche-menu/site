@@ -1185,7 +1185,7 @@ function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvabl
 
 // Envoi d'articles sur une commande (3.6.0) : utilisé par « Envoyer » et par l'acceptation d'une commande QR.
 // verifierLignes ne modifie rien (lève une erreur lisible si un article est invalide, épuisé ou incomplet).
-function verifierLignes(c, lignes) {
+function verifierLignes(c, lignes, opt = {}) {
   const besoin = {};
   if (!Array.isArray(lignes) || !lignes.length) E('Rien à envoyer');
   for (const x of lignes) {
@@ -1195,6 +1195,7 @@ function verifierLignes(c, lignes) {
   }
   for (const [pid, q] of Object.entries(besoin)) {
     const p = db.produits.find(p => p.id === pid);
+    if (QR.estEssai(pid) && (opt.source !== 'qr' || q !== 1)) E('Ce plat d’essai est réservé à une commande QR et à une portion.');
     if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
   }
   const nouvelles = [];
@@ -1223,7 +1224,7 @@ function verifierLignes(c, lignes) {
   return nouvelles;
 }
 async function envoyerLignes(c, lignes, u, opt = {}) {
-  const prets = verifierLignes(c, lignes);
+  const prets = verifierLignes(c, lignes, opt);
   const nouvelles = prets.map(l => { db.seq.ligne++; return { id: 'L' + db.seq.ligne, ...l, envoye: now(), par: u.id, annule: null, offert: false, ...(opt.source ? { source: opt.source } : {}) }; });
   for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
   const suiteAvant = c.lignes.some(l => l.envoye);
@@ -1413,6 +1414,7 @@ const routes = {
     bn.etat = 'a_faire'; bn.pretTs = null; save(); return {};
   },
   'POST /api/produit/stock': (b, u) => {
+    if (QR.estEssai(b.pid)) E('Stock réservé à la campagne QR', 403);
     if (u.role === 'serveur') E('Seuls la cuisine, la caisse et le responsable gèrent les ruptures', 403);
     const p = db.produits.find(x => x.id === b.pid); if (!p) E('Article introuvable');
     p.stock = b.stock === null || b.stock === '' || b.stock === undefined ? null : Math.max(0, parseInt(b.stock, 10) || 0);
@@ -1814,7 +1816,9 @@ const routes = {
     db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), univers: String(c.univers || 'La carte').slice(0, 20), ordre: i }));
     const partoutAvant = new Set(db.produits.filter(p => p.partout).map(p => p.id));
     const postesAvant = Object.fromEntries(db.produits.filter(p => Array.isArray(p.postes)).map(p => [p.id, p.postes]));
-    db.produits = b.produits.filter(p => p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}), ...((Array.isArray(p.postes) ? p.postes : postesAvant[p.id]) ? { postes: Array.isArray(p.postes) ? p.postes : postesAvant[p.id] } : {}) }));
+    const essais = db.produits.filter(p => QR.estEssai(p.id));
+    db.produits = b.produits.filter(p => !QR.estEssai(p.id) && p.nom && db.categories.some(c => c.id === p.cat)).map((p, i) => ({ id: p.id || ('p' + now() + i), nom: String(p.nom).slice(0, 40), prix: Math.max(0, Math.round(+p.prix || 0)), cat: p.cat, actif: p.actif !== false, options: (p.options || []).filter(g => gids.has(g)), stock: p.stock === null || p.stock === '' || p.stock === undefined ? null : Math.max(0, parseInt(p.stock, 10) || 0), ...((p.partout !== undefined ? p.partout : partoutAvant.has(p.id)) ? { partout: true } : {}), ...((Array.isArray(p.postes) ? p.postes : postesAvant[p.id]) ? { postes: Array.isArray(p.postes) ? p.postes : postesAvant[p.id] } : {}) }));
+    db.produits.push(...essais);
     // Un article système ne peut pas être supprimé, renommé ou changé de prix depuis Gestion.
     const supplement = db.produits.find(p => p.id === 'supplement-fixe');
     if (supplement) {

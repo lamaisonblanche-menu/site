@@ -1,11 +1,11 @@
 {
- "version": "3.6.1",
- "date": "2026-11-24T01:08:03.181Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.2",
+ "date": "2026-11-24T09:03:18.255Z",
+ "notes": "Clavier tactile pour les employés et avant-premières QR",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "de58d841bd709aa85a66ecc500dfbb48e7c207e84c399e30e751e8ccad6e8c9b"
+   "sha256": "bb8408e7188bc6e00f87159c1898e6bfee03926fb2c65b5af3f372a7abfbc7fb"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "71cffde1eea2efc0211fcfc2caba5194651725e3ffdaf89521aaff90d91abcee"
+   "sha256": "0538365fba47b5c3bf442a3ed4140eabe5d79ed03a5012b8100655255332a904"
   },
   {
    "chemin": "public/index.html",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "50189233722eb86ae6bd3084742f7b569c071909960cd695d3c66957f95f6b98"
+   "sha256": "a4c3041a66f5ed3e435a58ca3786acad464e5caa4bd491be250ef90c7f32e6eb"
   },
   {
    "chemin": "seed-menu.json",
@@ -45,7 +45,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "711831324750f3d93bd54eb868a3505c64c63d6a3026778ac8e92c54455780fe"
+   "sha256": "7b453c5c8c60a60a9b41482bb70ba29aabf4843c5494b4625b94e78cf3fe609e"
   }
  ]
 }
