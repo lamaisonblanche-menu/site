@@ -1,7 +1,7 @@
 {
  "version": "3.6.6",
- "date": "2026-11-24T09:45:10.604Z",
- "notes": "Bouton Coller pour la clé secrète QR",
+ "date": "2026-11-24T09:45:21.529Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
