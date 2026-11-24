@@ -1,7 +1,7 @@
 {
  "version": "3.7.6",
- "date": "2026-11-24T15:27:37.784Z",
- "notes": "Permet aux caissiers de mettre à jour la caisse et aux serveurs de reprendre toutes les tables.",
+ "date": "2026-11-24T15:28:18.610Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
