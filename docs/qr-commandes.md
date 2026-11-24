@@ -72,3 +72,11 @@ Fait et testé (rien de publié) :
 - 24/11 01:30 (Claude) : interface caisse, relais, page client, PDF des QR, tests.
 - 24/11 01:40 (Claude) : relais EN LIGNE https://mb-commandes.lamaisonblanche.workers.dev (compte Cloudflare de Manil, secret CAISSE_SECRET posé, connu de Manil seulement). Test complet téléphone → relais réel → caisse OK. Page : RELAIS renseigné sur la branche claude/qr-page-commande. Reste : feu vert de Manil pour publier la caisse 3.6.0 et fusionner la page dans main, puis saisir adresse + clé dans Gestion → Commandes QR.
 - 24/11 01:50 (Claude) : PUBLIÉ avec l’accord de Manil : caisse 3.6.0 (branche caisse) et page commande/ (branche main, en ligne). Reste : Manil saisit adresse du relais + clé dans Gestion → Commandes QR et coche « Accepter », puis test réel sur une table.
+
+## Correctifs 3.6.1
+- Le téléphone demande une position fraîche à l'envoi d'une commande ou d'une demande d'addition. Le Worker vérifie la distance maximale de 100 m et refuse les positions dont la précision déclarée dépasse 100 m. Il ne stocke pas les coordonnées. Ce contrôle repose sur la position déclarée par le navigateur.
+- Le panier garde l'identifiant d'envoi après rechargement, traite les articles retirés de la carte et applique la limite de 20 unités par ligne.
+- Le relais limite les demandes d'addition à une par minute et par table. En caisse, une addition dont l'impression échoue reste en attente.
+- La caisse sauvegarde les bons en attente par imprimante et ne réimprime que ceux dont l'envoi n'a pas été confirmé. Après une coupure pendant l'envoi à une imprimante, vérifier le bon papier avant de relancer.
+- En caisse, l'article « Supplément » reste l'unique supplément à 500 DA avec libellé obligatoire. Les anciens choix prédéfinis sont retirés de la carte, et les ventes historiques gardent leur libellé.
+- Déploiement coordonné : publier et contrôler d'abord la page client, puis déployer le Worker Cloudflare. Le Worker mis à jour refusera les anciennes pages encore ouvertes jusqu'à leur rechargement. La mise à jour de caisse comporte les changements d'impression et de carte.
