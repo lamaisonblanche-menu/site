@@ -1803,6 +1803,19 @@ const routes = {
   },
 
   // ---------------- Administration
+  'POST /api/admin/suivi-bureau': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    if (b.desactiver === true) { delete db.suiviBureau; saveNow(); return { actif: false }; }
+    if (!db.suiviBureau?.cle || b.renouveler === true) {
+      db.suiviBureau = { cle: crypto.randomBytes(32).toString('hex') };
+      saveNow();
+    }
+    let reseaux = {};
+    try { reseaux = os.networkInterfaces(); } catch {}
+    const adresses = Object.values(reseaux).flat().filter(x => x && x.family === 'IPv4' && !x.internal)
+      .map(x => 'http://' + x.address + ':' + PORT + '/suivi/');
+    return { actif: true, cle: db.suiviBureau.cle, adresses: [...new Set(adresses)] };
+  },
   'GET /api/rapport': (b, u, req, q) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const t = dateLocale(now());
@@ -1908,10 +1921,23 @@ const QR = require('./qr.js')({ db: () => db, routes, E, now, save, saveNow, jou
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
+const suivi = require('./suivi.js');
+const outilsSuivi = {
+  data: DATA, publicDir: path.join(DIR, 'public'), rapport, resumeJour, jourCourant, now, dateLocale, csv,
+  rapportLignes: (q, exportComplet = false) => suivi.lignesVentes(db, q, dateLocale(now()), E, {
+    exportComplet, couts: suivi.lireCouts(DATA), salleNom,
+  }),
+};
+const rapportsBureau = suivi.gestionnaire(outilsSuivi);
+suivi.demarrer(outilsSuivi);
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const q = Object.fromEntries(url.searchParams);
   try {
+    if (url.pathname === '/suivi' && req.method === 'GET') {
+      res.writeHead(302, { Location: '/suivi/' }); return res.end();
+    }
+    if (url.pathname.startsWith('/suivi/')) return rapportsBureau(req, res, db.suiviBureau?.cle, '/suivi');
     if (url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('retry: 2000\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
