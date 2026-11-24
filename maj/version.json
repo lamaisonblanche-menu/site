@@ -1,7 +1,7 @@
 {
  "version": "3.6.2",
- "date": "2026-11-24T02:16:26.341Z",
- "notes": "Avant-premières QR : plats en quantité limitée et retours de dégustation",
+ "date": "2026-11-24T02:31:34.893Z",
+ "notes": "Avant-premières et suivi des suggestions QR",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "f92f67e7ed944578b0327840990a3584f5f23a2762a36f46b41295e14dfd7f83"
+   "sha256": "ce5e5486f3b558b82ea414ae9baa7fff65b91e86526c6a27de9a1de0b6ea6784"
   },
   {
    "chemin": "public/index.html",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "0e61da8a8a877b64391ef53c3d1805569fba2f38d892fe947e8bf4734196ebf7"
+   "sha256": "bb27dac21e1f32f5c03d1b0b4ca3275e197af5071c075bd8db24e9b71b66afd8"
   },
   {
    "chemin": "seed-menu.json",
