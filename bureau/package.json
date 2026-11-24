@@ -46,6 +46,6 @@
     ]
   },
   "scripts": {
-    "construire": "electron-builder --win --x64 && cd outils && makensis -DVERSION=1.0.0 installeur.nsi"
+    "construire": "electron-builder --win --x64 && cd outils && makensis -INPUTCHARSET UTF8 -DVERSION=1.0.0 installeur.nsi"
   }
 }

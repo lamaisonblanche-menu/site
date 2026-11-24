@@ -33,7 +33,11 @@ jobs:
         run: npx electron-builder --win --x64
       - name: Construire l installateur
         working-directory: bureau/outils
-        run: '& "${env:ProgramFiles(x86)}\NSIS\makensis.exe" -DVERSION=1.0.0 installeur.nsi'
+        run: |
+          $m = @("${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $m) { choco install nsis -y --no-progress | Out-Null; $m = @("${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+          & $m /INPUTCHARSET UTF8 -DVERSION=1.0.0 installeur.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis : $LASTEXITCODE" }
       - name: Installation silencieuse sans droits administrateur
         run: |
           $p = Start-Process -FilePath "bureau\dist\Installer-Rapports-La-Maison-Blanche.exe" -ArgumentList '/S' -Wait -PassThru
