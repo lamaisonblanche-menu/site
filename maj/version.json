@@ -1,11 +1,11 @@
 {
- "version": "3.7.1",
- "date": "2026-11-24T11:22:07.308Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.2",
+ "date": "2026-11-24T12:10:45.853Z",
+ "notes": "Nouveaux plats : Plat du jour 4 500 DA, Spaghettis pesto burrata 2 300 DA, Linguine aux crevettes 2 800 DA",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "4e99e7eac21c2b71a97139cacca695d98c93fbd7dd26505f04f5271809ac4b94"
+   "sha256": "c6985d515b3473f1ea6ec6306d74ea3cb913b64740172689a8e2b1edde3ec9fc"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "0334fafcacf50f5a098839b6ae3c01785cd761fb9b86c2f7820bb275b4881fa5"
+   "sha256": "9e4a3d5f56f363f77a42d0a6ce05d1384d568926463326322dd8141017be0bc3"
   },
   {
    "chemin": "suivi.js",

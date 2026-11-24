@@ -405,6 +405,33 @@ if (!db.latte7) {
   db.latte7 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Nouveaux plats (version 3.7.2, demande du gérant) : Plat du jour 4 500 DA (famille « Plats du jour », en cuisine),
+// Spaghettis pesto burrata 2 300 DA et Linguine aux crevettes 2 800 DA dans « Pâtes fraîches ».
+// Articles normaux de la carte, distincts des avant-premières QR (essai-…) qui restent inchangées.
+if (!db.carte8) {
+  const n = x => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const pates = db.categories.find(c => c.id === 'pates-fraiches') || db.categories.find(c => n(c.nom) === 'pates fraiches');
+  let jour = db.categories.find(c => c.id === 'plats-du-jour') || db.categories.find(c => /^plats? du jour$/.test(n(c.nom)));
+  if (!jour) {
+    const ref = pates || db.categories.find(c => c.poste === 'cuisine') || {};
+    jour = { id: 'plats-du-jour', nom: 'Plats du jour', poste: db.config.imprimantes.cuisine ? 'cuisine' : (ref.poste || 'cuisine'), couleur: '#f7d9a8', suite: ref.suite || 2, univers: ref.univers || 'La carte', ordre: (ref.ordre !== undefined ? ref.ordre : db.categories.length) - 0.5 };
+    db.categories.push(jour);
+    db.categories.sort((a, b) => a.ordre - b.ordre).forEach((c, i) => (c.ordre = i));
+  }
+  const ajouts = [[jour, 'Plat du jour', 4500]];
+  if (pates) ajouts.push([pates, 'Spaghettis pesto burrata', 2300], [pates, 'Linguine aux crevettes', 2800]);
+  const faits = [];
+  for (const [cat, nom, prix] of ajouts) {
+    const ex = db.produits.find(p => !String(p.id).startsWith('essai-') && n(p.nom) === n(nom));
+    if (ex) { if (ex.prix !== prix) { faits.push(nom + ' ' + ex.prix + ' → ' + prix); ex.prix = prix; } ex.actif = true; continue; }
+    db.seq.produit = (db.seq.produit || 0) + 1;
+    db.produits.push({ id: 'ps' + Date.now().toString(36) + db.seq.produit, nom, prix, cat: cat.id, actif: true, options: [], stock: null });
+    faits.push(nom + ' ' + prix + ' DA');
+  }
+  if (faits.length) db.journal.push({ ts: Date.now(), user: '-', action: 'plats ajoutés', detail: faits.join(' ; ') });
+  db.carte8 = true;
+  setTimeout(() => saveNow(), 0);
+}
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);

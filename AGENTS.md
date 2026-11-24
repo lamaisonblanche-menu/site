@@ -209,3 +209,6 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.6.8 (24/11/2026, Claude) — alerte QR plus grosse (demande de Manil)
 - Nouvelle commande QR / addition : grande bannière rouge en haut (`qrAlerte`, `#qralerte`) au lieu du petit toast ; reste 12 s, un appui ouvre le panneau QR.
 - Bouton 📱 en alerte : plus grand, rouge, texte « Commande(s) QR » + nombre. Panneau remonté (bottom 112px).
+
+### 3.7.2 (24/11/2026, Claude) — nouveaux plats (demande de Manil)
+- Migration `db.carte8` : famille « Plats du jour » (cuisine, juste avant Pâtes fraîches) avec l'article « Plat du jour » 4 500 DA (le serveur précise le plat dans le commentaire) ; « Spaghettis pesto burrata » 2 300 DA et « Linguine aux crevettes » 2 800 DA ajoutés comme articles normaux dans « Pâtes fraîches ». Les avant-premières QR `essai-…` ne sont pas touchées.
