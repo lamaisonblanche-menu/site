@@ -130,6 +130,17 @@ test('avant-premières de l’activation au retour en caisse', async t => {
   assert.deepEqual((await web(uri)).produits.map(p => p.prix), [2800]);
   const dernier = index === 0 ? t2 : t1;
   const linguine = commander(dernier, 'client-linguine', plats[1].id);
+  const boisson = carte.produits.find(p => p.nom === 'Cocktail Maison Blanche');
+  assert.ok(boisson);
+  const impression = { t: dernier, id: crypto.randomUUID(), produits: [boisson.id] };
+  const suivre = action => web('/api/suggestions', { ...impression, action });
+  assert.equal((await suivre('affichage')).ok, true);
+  assert.equal((await suivre('affichage')).ok, true);
+  assert.equal((await suivre('clic')).ok, true);
+  assert.equal((await suivre('ajout')).ok, true);
+  linguine.suggestion = impression.id;
+  linguine.suggestionsAjoutees = [boisson.id];
+  linguine.lignes.push({ pid: boisson.id, qte: 1 });
   const l = await web('/api/commande', linguine, '192.0.2.3');
   assert.equal(l.http, 200);
   await jusquA(async () => (await pos('/api/etat', null, caissier)).qr?.attente.some(c => c.id === l.id));
@@ -138,6 +149,11 @@ test('avant-premières de l’activation au retour en caisse', async t => {
     const r = await web('/api/commande?id=' + l.id + '&a=client-linguine');
     return r.statut === 'acceptee' && r;
   });
-  assert.equal(statutLinguine.total, 2800);
+  assert.equal(statutLinguine.total, 2800 + boisson.prix);
+  const rapport = await jusquA(async () => {
+    const r = await pos('/api/qr/admin', null, admin);
+    return r.suiviSuggestions?.find(g => g.acceptes === 1);
+  });
+  assert.deepEqual([rapport.affichages, rapport.clics, rapport.ajouts, rapport.acceptes], [1, 1, 1, 1]);
   assert.deepEqual((await web(uri)).produits, []);
 });
