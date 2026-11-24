@@ -197,7 +197,8 @@ function vueCarte() {
   if (vedette) {
     var p = vedette.produit, ph = photo(p);
     h += '<section class="sec"><h2>' + esc(vedette.titre) + '</h2><button class="it" data-pid="' + esc(p.id) + '" onclick="A.ouvrir(this.dataset.pid)">' +
-      (ph ? '<img src="' + ph + '" alt="">' : '') + '<div class="tx"><div class="n">' + esc(p.nom) + '</div><div class="p">' + da(p.prix) +
+      (ph ? '<img src="' + ph + '" alt="">' : '') + '<div class="tx"><div class="n">' + esc(p.nom) + '</div>' +
+      (DESC[p.nom] ? '<div class="d">' + esc(DESC[p.nom]) + '</div>' : '') + '<div class="p">' + da(p.prix) +
       '</div></div><span class="plus">+</span></button></section>';
   }
   S.carte.categories.filter(function (c) { return c.univers === S.univers; }).forEach(function (c) {
