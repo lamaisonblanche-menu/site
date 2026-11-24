@@ -1,7 +1,7 @@
 {
  "version": "3.7.3",
- "date": "2026-11-24T13:38:18.645Z",
- "notes": "Codes des serveurs : plus de blocage de l'écran après quelques fautes de frappe, message clair si le code est faux",
+ "date": "2026-11-24T13:38:28.559Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
