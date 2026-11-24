@@ -1,11 +1,11 @@
 {
- "version": "3.6.4",
- "date": "2026-11-24T09:29:32.109Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.5",
+ "date": "2026-11-24T09:32:42.151Z",
+ "notes": "Adresse du relais QR pré-remplie",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "9a989ebd95efe334f4248db1d63432eaa07e6fbe0e1234e47c91e5fc88906ca1"
+   "sha256": "40803a7a78dc98a2ebe1d1d0a901433465279db2c2d9314a6206eff688386016"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "bb27dac21e1f32f5c03d1b0b4ca3275e197af5071c075bd8db24e9b71b66afd8"
+   "sha256": "ca9421d397bdf6575328abb3a2a684c7749b8a7f5998f51d659102d7b25dfec7"
   },
   {
    "chemin": "seed-menu.json",

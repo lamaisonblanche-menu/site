@@ -56,6 +56,8 @@ module.exports = function qrCommandes(K) {
       suites: 'direct',
       ...(db.config.qr || {}),
     };
+    // 3.6.5 : adresse du relais pré-remplie (publique), il ne reste que la clé secrète à taper
+    if (!db.config.qr.relais) db.config.qr.relais = 'https://mb-commandes.lamaisonblanche.workers.dev';
     produitsEssai();
     tablesQr();
   }

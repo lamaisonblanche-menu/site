@@ -196,3 +196,6 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.6.4 (24/11/2026, Claude) — correctif saisie
 - BUG corrigé : un champ en cours de saisie était vidé à chaque mise à jour automatique de l'écran (`render()` après un événement SSE, ex. synchro QR toutes les 3 s) : la clé du relais « s'effaçait ». `render()` garde maintenant le champ actif (même id ou même rang, même vue) : valeur, focus et curseur, et le `change` part en quittant le champ.
 - Gestion → Commandes QR : adresse et clé du relais enregistrées dès la frappe (`oninput`), espaces retirés.
+
+### 3.6.5 (24/11/2026, Claude)
+- `qr.js` : adresse du relais pré-remplie si vide (https://mb-commandes.lamaisonblanche.workers.dev). La clé secrète n’est JAMAIS mise dans le code (dépôt public) : le gérant la tape lui-même.
