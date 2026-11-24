@@ -53,7 +53,7 @@ function lignesVentes(db, q, aujourdhui, erreur, { exportComplet, couts, salleNo
     const ligne = {
       ticket: t.num ?? null, date: t.date, table: t.table, salle: salleNom(t.salle), saisiA, encaisseA: t.ts || null,
       heure: saisiA ? HEURE_ALGER.formatToParts(saisiA).find(p => p.type === 'hour').value + ' h' : 'Non renseignée',
-      article: l.nom, famille: l.catNom || 'Sans famille', origine,
+      article: l.nom, options: (l.opts || []).map(o => o.nom).filter(Boolean).join(', '), famille: l.catNom || 'Sans famille', origine,
       vendeur: origine === 'QR code' ? origine : (l.saisiPar || vendeurs.get(l.par) || 'Non renseigné'),
       caissier: t.caissier, qte: l.qte, prix: l.prix, net, statut, coutCentimes,
       margeCentimes: coutCentimes === null ? null : net * 100 - coutCentimes,
@@ -145,10 +145,10 @@ function demarrer(K) {
       const [du, au] = periode(q, aujourdHui, erreur);
       const rapport = K.rapportLignes(q, route === '/api/export.csv');
       if (route === '/api/export.csv') {
-        const lignes = [['Ticket', 'Date', 'Saisie', 'Encaissement', 'Salle', 'Table', 'Article', 'Famille', 'Origine', 'Vendeur', 'Caissier', 'Quantité', 'Prix unitaire DA', 'Remise DA', 'Net DA', 'Statut', 'Coût matière DA', 'Marge matière DA']];
+        const lignes = [['Ticket', 'Date', 'Saisie', 'Encaissement', 'Salle', 'Table', 'Article', 'Options', 'Famille', 'Origine', 'Vendeur', 'Caissier', 'Quantité', 'Prix unitaire DA', 'Remise DA', 'Net DA', 'Statut', 'Coût matière DA', 'Marge matière DA']];
         const horodatage = ts => ts ? new Date(ts).toISOString() : '';
         const dinars = c => c == null ? '' : (c / 100).toFixed(2).replace('.', ',');
-        for (const l of rapport.lignes) lignes.push([l.ticket, l.date, horodatage(l.saisiA), horodatage(l.encaisseA), l.salle, l.table, l.article, l.famille, l.origine, l.vendeur, l.caissier, l.qte, l.prix, l.remise, l.net, l.statut, dinars(l.coutCentimes), dinars(l.margeCentimes)]);
+        for (const l of rapport.lignes) lignes.push([l.ticket, l.date, horodatage(l.saisiA), horodatage(l.encaisseA), l.salle, l.table, l.article, l.options, l.famille, l.origine, l.vendeur, l.caissier, l.qte, l.prix, l.remise, l.net, l.statut, dinars(l.coutCentimes), dinars(l.margeCentimes)]);
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename="ventes-' + du + '-' + au + '.csv"');
         return res.end(K.csv(lignes));
