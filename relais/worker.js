@@ -61,6 +61,7 @@ export class Relais {
       if (url.pathname === '/api/table' && req.method === 'GET') return await this.table(url);
       if (url.pathname === '/api/carte' && req.method === 'GET') return await this.carte();
       if (url.pathname === '/api/commande' && req.method === 'POST') return await this.enSerie(() => this.commande(req));
+      if (url.pathname === '/api/suggestions' && req.method === 'POST') return await this.enSerie(() => this.suggestion(req));
       if (url.pathname === '/api/essais' && req.method === 'GET') return await this.essais(url);
       if (url.pathname === '/api/essais/retour' && req.method === 'POST') return await this.enSerie(() => this.retourEssai(req));
       if (url.pathname === '/api/commande' && req.method === 'GET') return await this.statut(url);
@@ -87,6 +88,14 @@ export class Relais {
       if (e.attente.includes(id)) { e.attente = e.attente.filter(x => x !== id); change = true; }
     }
     for (const s of (b.statuts || []).slice(0, 500)) { const c = await this.st.get('c:' + s.id); if (c) { c.statut = s.statut; c.motif = s.motif || ''; c.retirees = s.retirees || []; c.total = s.total || 0; c.decision = Date.now(); await this.st.put('c:' + s.id, c); } statutsOk.push(s.id); }
+    for (const s of (b.statuts || []).slice(0, 500)) {
+      if (s.statut !== 'acceptee') continue;
+      const c = await this.st.get('c:' + s.id), v = e.suggestions?.[c?.suggestion];
+      if (!v) continue;
+      const acceptes = (c.attribution || []).filter(l => !(s.retirees || []).includes(l.index)).map(l => l.pid);
+      v.acceptes = [...new Set(v.acceptes.concat(acceptes))];
+      if (acceptes.length) change = true;
+    }
     // ménage des vieilles commandes, une fois par heure
     if (!e.menage || Date.now() - e.menage > 3600000) {
       e.menage = Date.now(); change = true;
@@ -98,7 +107,7 @@ export class Relais {
     // commandes pas encore reçues par la caisse (la caisse les dédoublonne par id)
     const commandes = [];
     if (e.attente.length) { const m = await this.st.get(e.attente.map(id => 'c:' + id)); for (const c of m.values()) if (!c.recu) commandes.push({ id: c.id, sid: c.sid, type: c.type, jeton: c.jeton, lignes: c.lignes, note: c.note, appareil: c.appareil, client: c.client, ts: c.ts }); }
-    return json({ commandes, acksOk, statutsOk, retoursEssais: e.retoursEssais || [] });
+    return json({ commandes, acksOk, statutsOk, retoursEssais: e.retoursEssais || [], suiviSuggestions: this.bilanSuggestions(e) });
   }
 
   // ---------------------------------------------------------- téléphone
@@ -112,7 +121,46 @@ export class Relais {
     const e = await this.charger();
     if (!e.carte) return json({ erreur: 'Carte indisponible pour le moment' }, 503);
     const { essais, ...carte } = e.carte;
-    return json({ ...carte, positionRequise: true, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
+    return json({ ...carte, positionRequise: true, suiviSuggestions: true, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
+  }
+  async suggestion(req) {
+    const b = await req.json().catch(() => ({})), e = await this.charger();
+    const t = e.tables[b.t || ''];
+    if (!t || t.pause || !this.enLigne() || typeof b.id !== 'string' || !/^[a-zA-Z0-9-]{8,60}$/.test(b.id) ||
+        !['affichage', 'clic', 'ajout'].includes(b.action) || !Array.isArray(b.produits)) return json({ erreur: 'Suggestion invalide' }, 400);
+    const produits = b.produits.slice(0, 2).filter(id => e.carte?.produits.some(p => p.id === id));
+    if (!produits.length) return json({ erreur: 'Suggestion invalide' }, 400);
+    const recent = Object.fromEntries(Object.entries(e.suggestions || {}).filter(([, v]) => Date.now() - v.ts < 14 * 86400000));
+    const ancien = recent[b.id];
+    if (!ancien && b.action !== 'affichage') return json({ ok: false }, 409);
+    if (ancien && (ancien.salle !== t.salle || ancien.table !== t.table)) return json({ ok: false }, 409);
+    if (!ancien && Object.keys(recent).length >= 200) return json({ ok: false }, 429);
+    const v = ancien || { ts: Date.now(), salle: t.salle, table: t.table, affiches: [...new Set(produits)], clics: [], ajouts: [], acceptes: [] };
+    if (b.action !== 'affichage') {
+      const champ = b.action === 'clic' ? 'clics' : 'ajouts';
+      v[champ] = [...new Set(v[champ].concat(produits.filter(id => v.affiches.includes(id))))];
+    }
+    recent[b.id] = v;
+    const etat = { ...e, suggestions: recent };
+    await this.st.put('etat', etat);
+    this.etat = etat;
+    return json({ ok: true });
+  }
+  bilanSuggestions(e) {
+    const bilan = new Map();
+    for (const v of Object.values(e.suggestions || {})) {
+      if (Date.now() - v.ts >= 14 * 86400000) continue;
+      for (const id of v.affiches) {
+        const k = v.salle + '/' + id;
+        const ligne = bilan.get(k) || { salle: v.salle, nom: e.carte?.produits.find(p => p.id === id)?.nom || id, affichages: 0, clics: 0, ajouts: 0, acceptes: 0 };
+        ligne.affichages++;
+        if (v.clics.includes(id)) ligne.clics++;
+        if (v.ajouts.includes(id)) ligne.ajouts++;
+        if (v.acceptes.includes(id)) ligne.acceptes++;
+        bilan.set(k, ligne);
+      }
+    }
+    return [...bilan.values()];
   }
   offresDisponibles(e) {
     return (e.carte?.essais || []).filter(p => !e.essaisPris?.[p.id]);
@@ -204,7 +252,10 @@ export class Relais {
       if (hT.length >= LIM.tableLong || hI.length >= LIM.ipLong) return json({ erreur: 'Trop de commandes en peu de temps. Un serveur va venir vous voir.' }, 429);
     }
     const id = 'Q' + maint.toString(36) + Math.random().toString(36).slice(2, 6);
-    const c = { id, sid, type, jeton: b.t, lignes, note: String(b.note || '').slice(0, 200), appareil: String(b.appareil || '').slice(0, 40), client: String(b.client || '').slice(0, 40), ts: maint, recu: 0, statut: 'envoyee', ...(essaisChoisis.size ? { essais: [...essaisChoisis.values()], tableEssai: t.table } : {}) };
+    const v = e.suggestions?.[b.suggestion];
+    const attribution = v && v.salle === t.salle && v.table === t.table && Array.isArray(b.suggestionsAjoutees)
+      ? lignes.map((l, index) => ({ pid: l.pid, index })).filter(l => v.affiches.includes(l.pid) && b.suggestionsAjoutees.includes(l.pid)) : [];
+    const c = { id, sid, type, jeton: b.t, lignes, note: String(b.note || '').slice(0, 200), appareil: String(b.appareil || '').slice(0, 40), client: String(b.client || '').slice(0, 40), ts: maint, recu: 0, statut: 'envoyee', ...(attribution.length ? { suggestion: b.suggestion, attribution } : {}), ...(essaisChoisis.size ? { essais: [...essaisChoisis.values()], tableEssai: t.table } : {}) };
     if (type === 'addition') {
       e.additions = Object.fromEntries(Object.entries(e.additions || {}).filter(([, ts]) => maint - ts < 60000));
       e.additions[b.t] = maint;
