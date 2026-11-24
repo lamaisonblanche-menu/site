@@ -638,10 +638,10 @@ function admEquipe() {
   <div class="panel"><table class="l"><tr><th>Nom</th><th style="width:170px">Rôle</th><th style="width:120px">Code</th><th style="width:250px">Badge</th><th style="width:70px">Actif</th></tr>
   ${adm.users.map((u, i) => `<tr class="${u.actif ? '' : 'x'}"><td><input value="${esc(u.nom)}" onchange="A.uset(${i},'nom',this.value)"></td>
     <td><select onchange="A.uset(${i},'role',this.value)">${Object.entries(ROLE).map(([k, n]) => `<option value="${k}" ${u.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
-    <td><input inputmode="numeric" maxlength="6" value="${esc(u.pin)}" onchange="A.uset(${i},'pin',this.value)"></td>
+    <td><button class="btn sm" onclick="A.employeClavier(${i})" aria-label="Changer le code de ${esc(u.nom)}">Changer le code</button></td>
     <td><div class="row" style="flex-wrap:nowrap">${u.badge ? `<span class="pill ok">✓ badge enregistré</span><button class="btn sm ghost" onclick="A.uset(${i},'badge','');A.rr()">Retirer</button>` : `<button class="btn sm" onclick="A.badge(${i})">Passer le badge…</button>`}</div></td>
     <td><input type="checkbox" style="width:26px;height:26px" ${u.actif ? 'checked' : ''} onchange="A.uset(${i},'actif',this.checked)"></td></tr>`).join('')}</table></div>
-  <p class="muted">N’oubliez pas « Enregistrer » après avoir ajouté les badges.</p>`;
+  <p class="muted">Cliquez sur « Enregistrer » pour appliquer les modifications.</p>`;
 }
 function cfgDraft() { if (!adm.cfg) adm.cfg = JSON.parse(JSON.stringify(S.etat.config)); return adm.cfg; }
 
@@ -790,6 +790,8 @@ function admQr() {
   <div class="cols"><div class="panel"><h3>Activation</h3>
     <p>${c.actif ? (enLigne ? '🟢 En ligne : les clients peuvent commander' : '🟠 Activé mais relais injoignable' + (Q.sync.erreur ? ' : ' + esc(Q.sync.erreur) : '')) : '⚪ Désactivé : les clients voient seulement la carte'}</p>
     <label class="chk"><input type="checkbox" ${c.actif ? 'checked' : ''} onchange="adm.qrCfg.actif=this.checked"> Accepter les commandes des clients</label>
+    <label class="chk"><input type="checkbox" ${c.testCocktail ? 'checked' : ''} onchange="adm.qrCfg.testCocktail=this.checked"> Test cocktail signature à la validation du panier</label>
+    ${Q.testCocktail?.some(g => g.paniers) ? `<div class="panel"><h3>Test cocktail signature</h3><table class="l"><tr><th>Groupe</th><th>Paniers</th><th>Commandes acceptées</th><th>Avec cocktail</th><th>Panier moyen accepté</th></tr>${Q.testCocktail.map(g => `<tr><td>${g.groupe === 'cocktail' ? 'Suggestion cocktail' : 'Témoin'}</td><td>${g.paniers}</td><td>${g.commandes}</td><td>${g.cocktails}</td><td>${g.commandes ? da(Math.round(g.net / g.commandes)) : '—'}</td></tr>`).join('')}</table></div>` : ''}
     ${Q.suiviSuggestions?.length ? `<div class="panel"><h3>Suggestions QR · 200 paniers maximum sur 14 jours</h3><table class="l"><tr><th>Salle</th><th>Article</th><th>Affichages</th><th>Clics</th><th>Ajouts</th><th>Acceptés en caisse</th></tr>${Q.suiviSuggestions.map(r => `<tr><td>${esc(r.salle)}</td><td>${esc(r.nom)}</td><td>${r.affichages}</td><td>${r.clics}</td><td>${r.ajouts}</td><td>${r.acceptes}</td></tr>`).join('')}</table></div>` : ''}
     ${Q.retoursEssais?.length ? `<div class="panel"><h3>Retours de dégustation</h3>${Q.retoursEssais.map(r => `<p><b>${esc(r.nom)}</b> · Table ${esc(r.table)}<br>${esc(r.texte)}</p>`).join('')}</div>` : ''}
     <label class="chk"><input type="checkbox" ${c.essais ? 'checked' : ''} onchange="adm.qrCfg.essais=this.checked"> Activer les deux avant-premières QR · une portion par plat</label>
@@ -1248,7 +1250,43 @@ const A = window.A = {
   quitterApp() { if (confirm('Fermer la caisse sur ce PC ?')) caisseApp.quitter(); },
   saveCarte() { act(async () => { await api('/api/admin/carte', adm.carte); adm.carte = null; toast('Carte enregistrée ✓'); refresh(); }); },
   uset(i, k, v) { adm.users[i][k] = v; if (k === 'actif') render(); },
-  addUser() { adm.users.push({ nom: '', role: 'serveur', pin: String(Math.floor(1000 + Math.random() * 9000)), badge: '', actif: true }); render(); },
+  addUser() { A.employeClavier(); },
+  employeClavier(i) {
+    const nouveau = i === undefined;
+    const u = nouveau ? null : adm.users[i];
+    if (!nouveau && !u) return;
+    let clavierNom = nouveau, nom = '', code = '';
+    const afficher = () => {
+      modal(mh(nouveau ? 'Ajouter un employé' : 'Changer le code · ' + esc(u.nom)) +
+        (clavierNom
+          ? `<div class="field"><label for="employe-nom">Nom</label><input id="employe-nom" maxlength="30" value="${esc(nom)}" oninput="A.employeNom(this.value)"></div>${clavier('employe-nom')}`
+          : `<p class="muted">Saisissez un code de 4 à 6 chiffres.</p><div class="amount" aria-label="${code.length} chiffres saisis">${'•'.repeat(code.length) || '&nbsp;'}</div><div class="npad">${[1,2,3,4,5,6,7,8,9,'C',0,'⌫'].map(k => `<button onclick="A.employeTouche('${k}')">${k === 'C' ? 'Effacer' : k}</button>`).join('')}</div>`) +
+        `<div class="mf"><button class="btn" onclick="A.close()">Annuler</button><button class="btn dark" onclick="A.employeConfirmer()">${clavierNom ? 'Choisir le code' : 'Valider'}</button></div>`, clavierNom);
+    };
+    A.employeTouche = k => {
+      if (k === 'C') code = '';
+      else if (k === '⌫') code = code.slice(0, -1);
+      else if (/^\d$/.test(k) && code.length < 6) code += k;
+      afficher();
+    };
+    A.employeNom = v => { nom = v.slice(0, 30); };
+    A.employeConfirmer = () => {
+      if (clavierNom) {
+        nom = nom.trim();
+        if (!nom) return toast('Saisissez le nom de l’employé.', true);
+        clavierNom = false;
+        return afficher();
+      }
+      if (code.length < 4) return toast('Saisissez au moins 4 chiffres.', true);
+      if (adm.users.some((x, index) => index !== i && x.actif && (x.pin === code || x.badge === code)) && (nouveau || u.actif)) {
+        return toast('Ce code est déjà utilisé.', true);
+      }
+      if (nouveau) adm.users.push({ nom, role: 'serveur', pin: code, badge: '', actif: true });
+      else u.pin = code;
+      closeModal(); render(); toast('Cliquez sur « Enregistrer » pour appliquer.');
+    };
+    afficher();
+  },
   badge(i) {
     const u = adm.users[i];
     modal(mh('Badge de ' + esc(u.nom || 'la personne')) + `<div class="scanme">💳</div><p style="text-align:center;font-size:18px">Passez maintenant la carte sur le lecteur…</p>
