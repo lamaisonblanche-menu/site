@@ -790,6 +790,8 @@ function admQr() {
   <div class="cols"><div class="panel"><h3>Activation</h3>
     <p>${c.actif ? (enLigne ? '🟢 En ligne : les clients peuvent commander' : '🟠 Activé mais relais injoignable' + (Q.sync.erreur ? ' : ' + esc(Q.sync.erreur) : '')) : '⚪ Désactivé : les clients voient seulement la carte'}</p>
     <label class="chk"><input type="checkbox" ${c.actif ? 'checked' : ''} onchange="adm.qrCfg.actif=this.checked"> Accepter les commandes des clients</label>
+    ${Q.retoursEssais?.length ? `<div class="panel"><h3>Retours de dégustation</h3>${Q.retoursEssais.map(r => `<p><b>${esc(r.nom)}</b> · Table ${esc(r.table)}<br>${esc(r.texte)}</p>`).join('')}</div>` : ''}
+    <label class="chk"><input type="checkbox" ${c.essais ? 'checked' : ''} onchange="adm.qrCfg.essais=this.checked"> Activer les deux avant-premières QR · une portion par plat</label>
     <label class="chk"><input type="checkbox" ${c.son !== false ? 'checked' : ''} onchange="adm.qrCfg.son=this.checked"> Son à chaque nouvelle commande</label>
     <div class="field"><label>Adresse du relais (fournie par Claude)</label><input value="${esc(c.relais)}" placeholder="https://…" onchange="adm.qrCfg.relais=this.value.trim()"></div>
     <div class="field"><label>Clé secrète du relais</label><input type="password" value="${esc(c.secret)}" onchange="adm.qrCfg.secret=this.value"></div>
