@@ -78,7 +78,7 @@ function dbInitiale() {
       fondCaisse: 15000, tablePatron: '18',
       imprimantes: IMPRIMANTES(),
       largeur: 48, pageCode: 16, sansAccents: false, tiroirAuto: true,
-      deconnexionServeurSec: 60, raseAuto: { actif: false, heure: '02:00', extinction: true },
+      deconnexionServeurSec: 60, raseAuto: { actif: false, heure: '02:00', extinction: false },
       salles: sallesInitiales(),
       societes: [],
       motifsSortie: ['Influenceuse', 'Dépense du restaurant', 'Achat marché', 'Avance sur salaire', 'Autre'],
@@ -271,7 +271,10 @@ if (!db.boissons10) {
 }
 // Réservations (version 3.5.0)
 db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
-db.config.raseAuto = db.config.raseAuto || { actif: false, heure: '02:00', extinction: true };
+db.config.raseAuto = db.config.raseAuto || { actif: false, heure: '02:00', extinction: false };
+// Décision du gérant (24/11/2026) : la caisse ne doit jamais arrêter Windows.
+// Neutralise aussi l'ancien réglage conservé dans les données des installations existantes.
+db.config.raseAuto.extinction = false;
 db.seq.resa = db.seq.resa || 0;
 // Article autonome de supplément : migration idempotente, sans modifier les anciennes ventes.
 if (!db.supplementArticle) {
@@ -326,7 +329,7 @@ if (!db.supp3) {
   db.config.societes = db.config.societes || [];
   for (const soc of ['SPA SGS QUALITEST ALGERIE', 'ALGERIENNE VIE', 'SPA FRERES RAHMOUNE DISMAC', 'SPA SARPI'])
     if (!db.config.societes.some(x => x.trim().toUpperCase() === soc)) db.config.societes.push(soc);
-  db.config.raseAuto = { ...(db.config.raseAuto || {}), actif: true, heure: (db.config.raseAuto || {}).heure || '02:00', extinction: true };
+  db.config.raseAuto = { ...(db.config.raseAuto || {}), actif: true, heure: (db.config.raseAuto || {}).heure || '02:00', extinction: false };
   db.supp3 = true;
   setTimeout(() => saveNow(), 0);
 }
@@ -946,8 +949,7 @@ async function verifierRaseAuto() {
     db.extinctionNuit = dateLocale(now());
     journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
     saveNow();
-    if (cfg.extinction && process.platform === 'win32' && process.env.CAISSE_TEST_SHUTDOWN !== '1')
-      require('child_process').spawn('shutdown.exe', ['/s', '/t', '60'], { detached: true, stdio: 'ignore' }).unref();
+    // Aucun arrêt de Windows après la rase automatique.
   } catch (e) {
     journal(null, 'erreur rase automatique', String(e.message || e));
     try { saveNow(); } catch (_) {}
@@ -958,25 +960,9 @@ setInterval(() => { verifierRaseAuto().catch(e => console.error(e)); }, 15000);
 // Une seule fois par nuit, dans l'heure qui suit l'heure réglée, si aucune table n'est ouverte et si personne
 // n'a utilisé la caisse depuis 5 minutes. La rase automatique ci-dessus s'occupe elle-même de l'extinction.
 function extinctionDeNuit() {
-  const cfg = db.config.raseAuto || {};
-  if (!cfg.actif || !cfg.extinction || raseAutoBusy || !/^([01]\d|2[0-3]):[0-5]\d$/.test(cfg.heure || '')) return;
-  const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
-  const debut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
-  if (now() < debut || now() > debut + 3600000) return;
-  const cle = dateLocale(debut);
-  if (db.extinctionNuit === cle) return;
-  const j = jourCourant(false);
-  if (j && !j.clos && !j.rase && j.ouvert <= debut) return;           // rase automatique encore à faire : elle éteindra
-  if (now() - derniereActivite < 5 * 60000) return;                    // quelqu'un travaille encore sur la caisse
-  if (Object.values(db.commandes).some(c => c.statut === 'ouverte' && (c.lignes || []).some(l => !l.annule && !l.paye))) return;
-  db.extinctionNuit = cle;
-  journal(null, 'extinction de nuit', 'Rase déjà faite, extinction du PC');
-  saveNow();
-  envoyerAttente();
-  if (process.platform === 'win32' && process.env.CAISSE_APP && process.env.CAISSE_TEST_SHUTDOWN !== '1')
-    setTimeout(() => require('child_process').spawn('shutdown.exe', ['/s', '/t', '60'], { detached: true, stdio: 'ignore' }).unref(), 20000);
-  else console.log('extinction de nuit simulée');
+  // Désactivée définitivement : la rase automatique reste indépendante de l'alimentation du PC.
 }
+
 setInterval(() => { try { extinctionDeNuit(); } catch (e) { console.error(e); } }, 30000);
 
 function verifierResa(b) {
