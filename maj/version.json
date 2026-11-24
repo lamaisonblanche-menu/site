@@ -1,11 +1,11 @@
 {
- "version": "3.6.8",
- "date": "2026-11-24T09:59:09.857Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.0",
+ "date": "2026-11-24T10:13:51.835Z",
+ "notes": "Rapports du bureau en lecture seule, activables depuis la caisse",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "e5a79df29353a75840b4fee9eb53f9b4d18927eca3791fe963c6d5b40ba872c3"
+   "sha256": "84746b20a3a72f6ff85a629706e50507c1bd200907456b76dd808a2a5ca0efba"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "ab7de445f00159bd5ed77d183c379bdba223924052e755e3b920816e41b94088"
+   "sha256": "467e53aa868cc7624bd0a9c834e3e78961c138fa12b63d60ea4b8a4ffa44a0cb"
   },
   {
    "chemin": "public/index.html",
@@ -36,6 +36,18 @@
    "sha256": "5b72012dac77518acaf0995960de149e7aa490d4f4d362eeba67682751d0c1ad"
   },
   {
+   "chemin": "public/suivi-client.js",
+   "sha256": "2cadfcb98f9043afbce6f71ac54ce6072e33e6956d1877a208de57ebac93c2b4"
+  },
+  {
+   "chemin": "public/suivi.css",
+   "sha256": "17b60d387c9beacc64b5af6c19e29d10cafca65e1d884ce5a9be68e50b81faea"
+  },
+  {
+   "chemin": "public/suivi.html",
+   "sha256": "e24ac6f818069aa52dbd3fff8d6b03f8f635d6f7df3f4f041ce4bd84a1f09531"
+  },
+  {
    "chemin": "qr.js",
    "sha256": "ca9421d397bdf6575328abb3a2a684c7749b8a7f5998f51d659102d7b25dfec7"
   },
@@ -45,7 +57,11 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "8baa42af96563a428c1ba7f215133c136917feefbb3b8b1f35ea75cfd243465e"
+   "sha256": "1b5c64416658f4e0f6f7095c3e3aa44320bbf861ee2505dadabead1d8b910163"
+  },
+  {
+   "chemin": "suivi.js",
+   "sha256": "81f9138a270ad962064af64bc84223e23676ed45dd70a17ca441e559e8b34f3b"
   }
  ]
 }
