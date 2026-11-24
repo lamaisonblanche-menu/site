@@ -15,3 +15,7 @@ Les recettes sont définies dans le cœur de caisse et restent hors de la carte 
 4. Vérifier la validation caissier, les bons cuisine, les montants et la réception du retour. En cas de problème, décocher immédiatement les avant-premières.
 
 Vérification locale avec Node.js 22 ou ultérieur : `node --test tests-qr/essais-e2e.cjs`. Le test lance une caisse isolée, simule le stockage Durable Object et écrit les bons dans un dossier temporaire.
+
+## Mesure des suggestions
+
+Une suggestion est proposée au moment de la validation du panier. Le suivi pilote conserve jusqu'à 200 paniers pendant 14 jours. Il distingue les suggestions affichées, ouvertes, ajoutées et conservées par le caissier. Une relance n'augmente pas les compteurs. Une ligne retirée ou une commande refusée ne compte pas comme acceptée. Les chiffres sont regroupés par salle et article dans Gestion → Commandes QR. Ils mesurent la conversion observée, sans établir à eux seuls un gain de ventes.
