@@ -101,6 +101,25 @@ export class Relais {
     if (!this.enLigne()) return json({ erreur: 'La commande en ligne est indisponible pour le moment. Un serveur prendra votre commande.' }, 503);
     const type = b.type === 'addition' ? 'addition' : 'commande';
     if (type === 'commande' && e.service && !e.service.ouvert) return json({ erreur: e.service.message || 'Les commandes sont fermées pour le moment.' }, 409);
+    // La vérification se fait au relais, pas seulement dans le navigateur.
+    // GEO_LAT et GEO_LON doivent être configurés avec les coordonnées vérifiées du restaurant.
+    // Les coordonnées envoyées par le téléphone restent falsifiables : validation caissier maintenue.
+    if (type === 'commande') {
+      const lat0 = Number(this.env.GEO_LAT), lon0 = Number(this.env.GEO_LON);
+      if (!this.env.GEO_LAT || !this.env.GEO_LON || !Number.isFinite(lat0) || !Number.isFinite(lon0))
+        return json({ erreur: 'Commande indisponible : géolocalisation du restaurant non configurée.' }, 503);
+      const p = b.position || {}, lat = Number(p.latitude), lon = Number(p.longitude);
+      const precision = Number(p.precision), horodatage = Number(p.horodatage);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(precision) ||
+          !Number.isFinite(horodatage) || lat < -90 || lat > 90 || lon < -180 || lon > 180 ||
+          precision <= 0 || precision > 100 || Math.abs(Date.now() - horodatage) > 60000)
+        return json({ erreur: 'La localisation est nécessaire pour pouvoir commander. Activez la localisation précise et réessayez.' }, 403);
+      const rad = Math.PI / 180, dLat = (lat - lat0) * rad, dLon = (lon - lon0) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat0 * rad) * Math.cos(lat * rad) * Math.sin(dLon / 2) ** 2;
+      const distance = 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+      if (distance > 100)
+        return json({ erreur: 'Vous devez vous trouver à 100 mètres maximum de La Maison Blanche pour commander.' }, 403);
+    }
     const maint = Date.now();
     let lignes = [];
     if (type === 'commande') {
