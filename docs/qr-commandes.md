@@ -47,12 +47,26 @@ Réponse : `{ commandes:[{id, sid, type, jeton, lignes, note, appareil, client, 
 - `GET /api/commande?id=…&a=APPAREIL` → `{ statut, motif, retirees, total }`
 - Limites : 1 commande / 20 s et 6 / 10 min par table, 10 / 10 min par adresse IP, 40 lignes, 20 par article, montant estimé ≤ montantMax, table en pause refusée.
 
-## Reste à faire (ordre)
-1. Interface caisse (app.js) : bouton flottant + panneau latéral, son, accepter / refuser / retirer une ligne, addition, échecs d'impression ; Gestion → Réglages : section Commandes QR.
-2. Relais `relais/` (Worker + Durable Object) et test local avec un faux relais.
-3. Page client `commande/` pour la branche `main` (PR séparée, jamais fusionner caisse ↔ main).
-4. Tests : commandes simples et multiples, options/cuissons, ruptures, refus, multi-postes, coupure, redémarrage, doublons, paiement, rase.
-5. Rapport à Manil, puis publication seulement avec son accord (VERSION 3.6.0 + `node outils/publier.js`).
+## État au 24/11 01:30 (Claude)
+Fait et testé (rien de publié) :
+- Caisse : `qr.js`, envoi commun, migration prix, panneau 📱 (bouton flottant + panneau latéral), onglet Gestion → Commandes QR (activation, relais, clé, horaires, pause par table, impression des QR, historique). Envoi direct en cuisine par défaut (`config.qr.suites = 'direct'`).
+- Relais : `relais/worker.js` + `relais/wrangler.toml` (Worker + Durable Object SQLite). Testé avec `wrangler dev`.
+- Page client : branche `claude/qr-page-commande` (base `main`), fichier `commande/index.html`. Constante `RELAIS` à remplacer par l'adresse réelle du Worker.
+- QR des 66 tables : `docs/QR-tables-La-Maison-Blanche.pdf` (jetons = `QR_INITIAUX` de qr.js).
+- Tests : `tests-qr/qr-e2e.js` (faux relais, 24 contrôles) et `tests-qr/relais-e2e.js` (vrai relais local, 15 contrôles), tous OK.
+
+## Mise en ligne (seulement avec l'accord de Manil)
+1. Relais : `cd relais && npx wrangler login` (ou `CLOUDFLARE_API_TOKEN`), `npx wrangler deploy`, puis `npx wrangler secret put CAISSE_SECRET` (longue clé aléatoire). Noter l'adresse `https://mb-commandes.<compte>.workers.dev`.
+2. Page : remplacer `RELAIS` dans `commande/index.html` (branche `claude/qr-page-commande`), PR vers `main`, fusion par Manil.
+3. Caisse : VERSION 3.6.0, `cd app && node outils/publier.js "Commandes QR des clients (désactivées tant que le relais n'est pas réglé) et prix alignés sur le site"`, PR vers `caisse`, fusion par Manil.
+4. Au restaurant : Gestion → Commandes QR : adresse du relais + clé, cocher « Accepter les commandes », Enregistrer. Vérifier 🟢.
+5. Test réel sur une table, puis imprimer et poser les QR.
+
+## Reste à faire / idées
+- Plan de salle : faire clignoter la table qui a une commande QR en attente.
+- Réimpression ciblée des seuls bons en échec (aujourd'hui « Réimprimer les bons » réimprime toute la table).
+- Turnstile (anti-robots Cloudflare) sur la page si des abus apparaissent.
 
 ## Journal
 - 24/11 01:20 (Claude) : refactor envoi, migration prix, qr.js, ce document.
+- 24/11 01:30 (Claude) : interface caisse, relais, page client, PDF des QR, tests.
