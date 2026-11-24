@@ -102,8 +102,8 @@ function sauverFavoris(valeur) {
   rendre();
 }
 
-try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.sid = sv.sid; S.sidSig = sv.sidSig; S.noteCmd = sv.noteCmd; S.sidAddition = sv.sidAddition; S.suggestionVue = !!sv.suggestionVue; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
-function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes, sid: S.sid, sidSig: S.sidSig, noteCmd: S.noteCmd, sidAddition: S.sidAddition, suggestionVue: S.suggestionVue })); } catch (e) {} }
+try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.sid = sv.sid; S.sidSig = sv.sidSig; S.noteCmd = sv.noteCmd; S.sidAddition = sv.sidAddition; S.suggestionVue = !!sv.suggestionVue; S.suggestionId = sv.suggestionId; S.suggestionsAjoutees = sv.suggestionsAjoutees || []; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
+function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes, sid: S.sid, sidSig: S.sidSig, noteCmd: S.noteCmd, sidAddition: S.sidAddition, suggestionVue: S.suggestionVue, suggestionId: S.suggestionId, suggestionsAjoutees: S.suggestionsAjoutees })); } catch (e) {} }
 
 var $ = function (s) { return document.querySelector(s); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -278,15 +278,19 @@ function suggestions() {
   });
   return out;
 }
+function mesurerSuggestion(action, ids) {
+  if (!S.carte.suiviSuggestions || !S.suggestionId) return;
+  appel('/api/suggestions', { t: JETON, id: S.suggestionId, action: action, produits: ids }).catch(function () {});
+}
 function vueSugg() {
   var s = suggestions(); if (!s.length) return '';
-  var h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille"><h3>Ajouté au panier ✓</h3>';
+  var h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille"><h3>Avant d’envoyer votre commande</h3>';
   s.forEach(function (g) {
     h += '<div class="grp"><div class="gt">' + g.titre + '</div><div class="sug">';
     g.ps.forEach(function (p) { var ph = photo(p); h += '<button class="c" onclick="A.ouvrir(\'' + p.id + '\')">' + (ph ? '<img src="' + ph + '" alt="">' : '') + '<div>' + esc(p.nom) + '</div><b>' + da(p.prix) + '</b></button>'; });
     h += '</div></div>';
   });
-  return h + '<button class="btn2" onclick="A.fermer()">Continuer</button><button class="btn2" style="background:var(--ink);color:#fff" onclick="A.panier()">Voir le panier · ' + da(total()) + '</button></div></div>';
+  return h + '<button class="btn2" onclick="A.panier()">Revenir au panier</button><button class="btn2" style="background:var(--ink);color:#fff" onclick="A.envoyer()">Envoyer sans ajout · ' + da(total()) + '</button></div></div>';
 }
 /* ---------- panier ---------- */
 function vuePanier() {
@@ -351,7 +355,9 @@ var A = window.A = {
   univers: function (u) { S.univers = u; rendre(); window.scrollTo(0, 0); },
   ouvrir: function (pid) {
     var p = prod(pid); if (!p || dispo(p)) return;
-    S.feuille = { pid: pid, qte: 1, opts: [], note: '' }; rendre();
+    var suggere = S.feuille === 'sugg';
+    if (suggere) mesurerSuggestion('clic', [pid]);
+    S.feuille = { pid: pid, qte: 1, opts: [], note: '', depuisSuggestion: suggere }; rendre();
   },
   choix: function (gid, i) {
     var f = S.feuille, g = opt(gid), on = f.opts.some(function (o) { return o.g === gid && o.i === i; });
@@ -373,10 +379,11 @@ var A = window.A = {
     var ex = S.panier.find(function (l) { return JSON.stringify([l.pid, l.opts, l.note]) === cle; });
     if (ex) ex.qte = Math.min(20, ex.qte + f.qte); else S.panier.push({ pid: f.pid, qte: f.qte, opts: f.opts, note: note });
     garder();
-    var u = universDe(p);
-    var proposer = !S.suggestionVue && u !== 'Desserts' && u !== 'Boissons' && suggestions().length;
-    S.feuille = proposer ? 'sugg' : null;
-    if (proposer) { S.suggestionVue = true; garder(); }
+    if (f.depuisSuggestion) {
+      S.suggestionsAjoutees = Array.from(new Set((S.suggestionsAjoutees || []).concat(p.id)));
+      mesurerSuggestion('ajout', [p.id]); garder();
+    }
+    S.feuille = f.depuisSuggestion ? 'panier' : null;
     rendre();
   },
   lq: function (i, d) { if (S.envoi) return; var l = S.panier[i]; l.qte = Math.min(prod(l.pid)?.description ? 1 : 20, l.qte + d); if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
@@ -396,6 +403,15 @@ var A = window.A = {
   envoyer: function () {
     if (S.envoi || !S.panier.length) return;
     if (actualiserPanier()) return rendre();
+    if (!S.suggestionVue && S.panier.some(function (l) {
+      var u = universDe(prod(l.pid)); return u !== 'Desserts' && u !== 'Boissons';
+    }) && suggestions().length) {
+      S.suggestionVue = true;
+      S.suggestionId = uuid();
+      S.suggestionsAjoutees = [];
+      mesurerSuggestion('affichage', suggestions().flatMap(function (g) { return g.ps.map(function (p) { return p.id; }); }));
+      S.feuille = 'sugg'; garder(); return rendre();
+    }
     S.envoi = true; S.errEnvoi = ''; rendre();
     // même identifiant tant que le panier n'a pas changé : un renvoi après coupure ne crée jamais de doublon
     var sig = JSON.stringify(S.panier) + (S.noteCmd || '');
@@ -403,6 +419,10 @@ var A = window.A = {
     garder();
     var resume = S.panier.map(function (l) { return l.qte + ' ' + prod(l.pid).nom; }).join(', ');
     var demande = { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) };
+    if (S.carte.suiviSuggestions && S.suggestionId) {
+      demande.suggestion = S.suggestionId;
+      demande.suggestionsAjoutees = S.suggestionsAjoutees || [];
+    }
     var essai = function (n) {
       return appel('/api/commande', demande)
         .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1); }); throw e; });
@@ -413,7 +433,7 @@ var A = window.A = {
     }).then(function (r) {
       S.commandes.push({ id: r.id, type: 'commande', statut: r.statut === 'acceptee' ? 'recue' : (r.statut || 'envoyee'), ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
       S.essais = (S.essais || []).filter(function (p) { return !demande.lignes.some(function (l) { return l.pid === p.id; }); });
-      S.panier = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
+      S.panier = []; S.suggestionVue = false; S.suggestionId = null; S.suggestionsAjoutees = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
     }).catch(function (e) {
       S.envoi = false;
       S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.';
