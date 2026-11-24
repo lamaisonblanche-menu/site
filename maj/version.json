@@ -1,11 +1,11 @@
 {
- "version": "3.6.3",
- "date": "2026-11-24T09:20:31.764Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.4",
+ "date": "2026-11-24T09:29:21.959Z",
+ "notes": "Correctif : un champ en cours de saisie (ex. clé du relais) ne s'efface plus",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "3ad143a7bbc464452fea79e6f5614ab6a2d63e32a990a6880710d4f8cadeeb2c"
+   "sha256": "9a989ebd95efe334f4248db1d63432eaa07e6fbe0e1234e47c91e5fc88906ca1"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "ad89dc67e152eaafd626a5fd8cf2495895129e749e6616413e65a9ddc82aa7d1"
+   "sha256": "36de13cb79c245ef7769bbb6346090cc8023e589cca89eea04e8fd95663b61d6"
   },
   {
    "chemin": "public/index.html",

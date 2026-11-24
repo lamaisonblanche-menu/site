@@ -192,3 +192,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.6.3 (24/11/2026, Claude) — clavier partout + Iced/Hot sur les lattes (demandes de Manil)
 - Clavier à l'écran GLOBAL (`VKB` dans app.js, `#vkb` dans style.css) : s'ouvre seul en bas de l'écran dès qu'un champ texte, mot de passe, e-mail, téléphone ou nombre est touché (pas les champs date/heure/case à cocher ; `data-nokb` pour l'exclure). Pavé numérique pour les nombres et téléphones (bouton ABC/123), Maj, accents, OK (= Entrée + `change`), ⌄ pour fermer. Les touches ne volent pas le focus ; `input` et `change` sont envoyés comme au clavier. Si l'écran est redessiné, le champ est retrouvé par son `id`. L'ancien `clavier(id)` renvoie '' (gardé pour compatibilité).
 - Migration `db.latte7` : groupe d'options obligatoire `iced-hot` (« Iced ou Hot » : Iced / Hot, 0 DA) sur tous les articles de la catégorie Lattes et tout article dont le nom contient « latte ».
+
+### 3.6.4 (24/11/2026, Claude) — correctif saisie
+- BUG corrigé : un champ en cours de saisie était vidé à chaque mise à jour automatique de l'écran (`render()` après un événement SSE, ex. synchro QR toutes les 3 s) : la clé du relais « s'effaçait ». `render()` garde maintenant le champ actif (même id ou même rang, même vue) : valeur, focus et curseur, et le `change` part en quittant le champ.
+- Gestion → Commandes QR : adresse et clé du relais enregistrées dès la frappe (`oninput`), espaces retirés.

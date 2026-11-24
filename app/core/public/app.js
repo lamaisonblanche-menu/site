@@ -794,8 +794,8 @@ function admQr() {
     ${Q.retoursEssais?.length ? `<div class="panel"><h3>Retours de dégustation</h3>${Q.retoursEssais.map(r => `<p><b>${esc(r.nom)}</b> · Table ${esc(r.table)}<br>${esc(r.texte)}</p>`).join('')}</div>` : ''}
     <label class="chk"><input type="checkbox" ${c.essais ? 'checked' : ''} onchange="adm.qrCfg.essais=this.checked"> Activer les deux avant-premières QR · une portion par plat</label>
     <label class="chk"><input type="checkbox" ${c.son !== false ? 'checked' : ''} onchange="adm.qrCfg.son=this.checked"> Son à chaque nouvelle commande</label>
-    <div class="field"><label>Adresse du relais (fournie par Claude)</label><input value="${esc(c.relais)}" placeholder="https://…" onchange="adm.qrCfg.relais=this.value.trim()"></div>
-    <div class="field"><label>Clé secrète du relais</label><input type="password" value="${esc(c.secret)}" onchange="adm.qrCfg.secret=this.value"></div>
+    <div class="field"><label>Adresse du relais (fournie par Claude)</label><input value="${esc(c.relais)}" placeholder="https://…" oninput="adm.qrCfg.relais=this.value.trim()" onchange="adm.qrCfg.relais=this.value.trim()"></div>
+    <div class="field"><label>Clé secrète du relais</label><input type="password" value="${esc(c.secret)}" autocomplete="off" oninput="adm.qrCfg.secret=this.value.trim()" onchange="adm.qrCfg.secret=this.value.trim()"></div>
     <div class="field"><label>Montant maximum sans alerte (DA)</label><input type="number" value="${esc(c.montantMax)}" onchange="adm.qrCfg.montantMax=+this.value"></div></div>
   <div class="panel"><h3>Horaires des commandes</h3>${h('ouverture', 'Ouverture (sauf vendredi)')}${h('ouvertureVendredi', 'Ouverture le vendredi')}${h('derniereCommande', 'Dernière commande')}
     <p class="muted">Par univers de la carte (en dehors, ces plats sont grisés sur le téléphone) :</p>${hor}</div></div>
@@ -1613,6 +1613,13 @@ function render() {
   const cle = S.view + '|' + S.adminTab + '|' + S.cmdId;
   const sc = S._scKey === cle ? sels.map(q => { const e = app.querySelector(q); return e ? e.scrollTop : 0; }) : [];
   const focusSearch = document.activeElement && document.activeElement.id === 'srch';
+  // 3.6.4 : un champ en cours de saisie n'est plus effacé quand l'écran se met à jour tout seul (commandes QR, autres écrans…)
+  const ae = document.activeElement;
+  let garde = null;
+  if (ae && ae.id !== 'srch' && app.contains(ae) && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && S._scKey === cle) {
+    let pos = null; try { pos = ae.selectionStart; } catch (x) {}
+    garde = { i: [...app.querySelectorAll('input,textarea')].indexOf(ae), id: ae.id, type: ae.type, v: ae.value, pos };
+  }
   if (S.etat && S.view !== 'login') h = `<div class="shell">${rail()}<main class="pane">${h}</main></div>`;
   if (S.etat && S.view !== 'login') {
     const z = S.etat.raseAutoEtat;
@@ -1627,6 +1634,16 @@ function render() {
   { const np = app.querySelector('.qr-panel'); if (np) np.scrollTop = qrScroll; }
   S._scKey = cle;
   sels.forEach((q, i) => { const e = app.querySelector(q); if (e && sc[i]) e.scrollTop = sc[i]; });
+  if (garde) {
+    const e = garde.id ? document.getElementById(garde.id) : app.querySelectorAll('input,textarea')[garde.i];
+    if (e && app.contains(e) && e.type === garde.type) {
+      const change = e.value !== garde.v;
+      if (change) e.value = garde.v;
+      e.focus();
+      if (change) VKB.modif = true; // le « change » sera envoyé en quittant le champ
+      try { const p = garde.pos == null ? e.value.length : garde.pos; e.setSelectionRange(p, p); } catch (x) {}
+    }
+  }
   if (focusSearch) { const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   const l = app.querySelector('.fc-lines'); if (l && S.view === 'commande' && S._lastDraft !== S.draft.length) { l.scrollTop = l.scrollHeight; S._lastDraft = S.draft.length; }
   fitPlans();
