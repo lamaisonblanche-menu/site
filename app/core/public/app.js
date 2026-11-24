@@ -23,6 +23,18 @@ const DECO = { bar: 'Bar', caisse: 'Caisse', wc: 'Toilettes', sapin: 'Sapin', pl
 const FONDS = { creme: 'Crème (salle)', damier: 'Damier beige', herbe: 'Terrasse (herbe)' };
 
 // ------------------------------------------------------------ Réseau
+function operationUnique() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), octet => octet.toString(16).padStart(2, '0')).join('');
+}
+function avecOperation(saisie, corps) {
+  const contenu = JSON.stringify(corps);
+  if (saisie.contenu !== contenu) {
+    saisie.contenu = contenu;
+    saisie.operation = operationUnique();
+  }
+  return { ...corps, operation: saisie.operation };
+}
+
 async function api(path, body) {
   const opt = { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Token': S.token } };
   if (body) opt.body = JSON.stringify(body);
@@ -165,7 +177,7 @@ async function login(cred) {
     S.etat = await api('/api/etat');
     closeModal(); S.draft = []; S.sel = null; S.qty = '';
     if (S.view === 'login' || S.view === 'admin' && !peut('admin') || S.view === 'caisse' && !peut('caissier')) S.view = 'tables';
-    if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId)) S.view = 'tables';
+    if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId && !c.occupee)) S.view = 'tables';
     if (r.user.role === 'cuisine') { S.view = 'kds'; await loadKds(); } else if (S.view === 'kds' && !peut('caissier')) S.view = 'tables';
     S.pointage = false; S.pointageAutorisation = null; S.pointeMsg = null;
     toast('Bonjour ' + r.user.nom);
@@ -236,16 +248,19 @@ function planHtml(salle, edit) {
     if (c) {
       cls += ' occ' + (c.additionTs ? ' add' : '') + (c.serveurId === S.etat.user.id ? ' mine' : '');
       const sv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
+      if (c.occupee) inner += '<span class="pd">Occupée</span>';
+      else {
       inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}</span>`;
       if (S.etat.prets.some(p => p.cmdId === c.id)) { cls += ' ring'; inner += '<span class="pb">🔔</span>'; }
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
+      }
     }
     if (!c && !edit) {
       const rs = resaBloquante(salle.id, t.n);
       if (rs) { cls += ' resv bientot'; inner += `<span class="pr">${rs.heure.replace(':', 'h')}</span><span class="pd">${esc(rs.nom.split(' ')[0].slice(0, 9))} · ${rs.couverts}p</span>`; }
     }
     if (edit && adm.selT === i) cls += ' sel';
-    const act = edit ? `data-t="${i}"` : (c ? `onclick="A.voir('${c.id}')"` : `onclick="A.ouvrir('${jsq(t.n)}')"`);
+    const act = edit ? `data-t="${i}"` : (c ? (peut('caissier') || c.serveurId === S.etat.user.id ? `onclick="A.voir('${c.id}')"` : 'disabled') : `onclick="A.ouvrir('${jsq(t.n)}')"`);
     return `<button class="${cls}" ${act} style="left:${t.x}%;top:${t.y}%">${inner}</button>`;
   }).join('');
   const deco = (salle.deco || []).map((d, i) => `<div class="deco d-${d.type}${edit && adm.selD === i ? ' sel' : ''}" ${edit ? `data-d="${i}"` : ''} style="left:${d.x}%;top:${d.y}%"></div>`).join('');
@@ -270,7 +285,9 @@ function viewTables() {
   let body;
   if (S.salle === 'emporter') {
     body = `<div class="main"><div class="row" style="margin-bottom:14px"><button class="btn dark big" onclick="A.nouvelEmporter()">+ Nouvelle commande à emporter</button>${peut('caissier') ? '<button class="btn big" onclick="A.comptoir()">+ Vente rapide au comptoir</button>' : ''}</div>
-      <div class="emps">${emp.map(c => { const pret = S.etat.prets.some(p => p.cmdId === c.id); const retard = c.retrait && c.retrait < Date.now(); return `<button class="empc ${pret ? 'pret' : ''} ${retard ? 'retard' : ''}" onclick="A.voir('${c.id}')">
+      <div class="emps">${emp.map(c => {
+        if (c.occupee) return `<button class="empc" disabled><b>${esc(c.table)}</b> · Occupée</button>`;
+        const pret = S.etat.prets.some(p => p.cmdId === c.id); const retard = c.retrait && c.retrait < Date.now(); return `<button class="empc ${pret ? 'pret' : ''} ${retard ? 'retard' : ''}" onclick="A.voir('${c.id}')">
         <div class="et"><b>${c.salle === 'comptoir' ? 'Comptoir' : esc(c.table)}</b>${pret ? '<span>🔔 prêt</span>' : ''}</div>
         <div class="en">${c.salle === 'emporter' ? esc((c.client && c.client.nom) || 'Client') : 'Vente rapide'}${c.client && c.client.tel ? ' · ' + esc(c.client.tel) : ''}</div>
         <div class="er">${c.salle === 'emporter' ? 'Retrait ' + (c.retrait ? hm(c.retrait) : 'dès que possible') : 'depuis ' + hm(c.ouverte)}</div>
@@ -285,7 +302,7 @@ function viewTables() {
 }
 
 // ------------------------------------------------------------ Commande (écran type FrontCash)
-function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId); }
+function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId && !c.occupee); }
 const prod = id => S.etat.produits.find(x => x.id === id) || {};
 const catDe = p => S.etat.categories.find(k => k.id === p.cat) || {};
 const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x => x.id === o.g); const ch = g && g.choix[o.i]; return ch ? { g: o.g, nom: ch.nom, prix: ch.prix } : null; }).filter(Boolean);
@@ -858,22 +875,33 @@ const A = window.A = {
   async qrVuImpr(id) { await act(() => api('/api/qr/vu-impression', { id })); refresh(); },
   async qrReimprimer(id) { const r = await act(() => api('/api/qr/reimprimer', { id })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Bons manquants réimprimés ✓'); refresh(); } },
   pin(k) {
-    if (k === 'C') pin = ''; else if (k === 'OK') return S.pointage ? pointer({ pin }) : login(); else if (pin.length < 6) pin += k;
-    render();
-    // connexion automatique : dès que le code tapé est bon, on entre sans appuyer sur « Entrer »
     clearTimeout(S._auto);
-    if (pin.length >= 4 && /^\d$/.test(k)) {
-      const essai = pin;
-      S._auto = setTimeout(async () => {
-        if (pin !== essai) return;
-        const r = await fetch('/api/code-valide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: essai }) }).then(x => x.json()).catch(() => ({ erreur: 'Pas de connexion avec la caisse principale' }));
-        if (pin !== essai) return;
-        if (r.ok) { if (S.pointage) pointer({ pin: essai }); else login({ pin: essai }); return; }
-        // 3.7.3 : avant, un code refusé ou un écran bloqué ne montrait RIEN (le serveur croyait que son code ne marchait plus)
-        const msg = r.erreur || (r.impasse ? 'Code incorrect, retapez-le' : '');
-        if (msg) { pin = ''; render(); const d = $('#dots'); if (d) d.classList.add('shake'); const l = $('#lerr'); if (l) l.textContent = msg; }
-      }, 250);
-    }
+    const validation = S._pinValidation = {};
+    if (k === 'C') pin = '';
+    else if (k === 'OK') {
+      if (pin.length < 4) return;
+      return S.pointage ? pointer({ pin }) : login();
+    } else if (pin.length < 6) pin += k;
+    render();
+    if (pin.length < 4 || !/^\d$/.test(k)) return;
+    const essai = pin;
+    const pointage = S.pointage;
+    const autorisation = S.pointageAutorisation;
+    const courant = () => S._pinValidation === validation && S.view === 'login'
+      && pin === essai && S.pointage === pointage && S.pointageAutorisation === autorisation;
+    S._auto = setTimeout(async () => {
+      if (!courant()) return;
+      const r = await fetch('/api/code-valide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: essai }) }).then(x => x.json()).catch(() => ({ erreur: 'Pas de connexion avec la caisse principale' }));
+      if (!courant()) return;
+      if (r.ok) return pointage ? pointer({ pin: essai }) : login({ pin: essai });
+      const l = $('#lerr');
+      if (!l) return;
+      if (r.erreur) l.textContent = r.erreur;
+      else if (r.confirmer) l.textContent = 'Appuyez sur Entrer pour valider ce code, ou continuez la saisie.';
+      else if (r.impasse) {
+        pin = ''; render(); $('#lerr').textContent = 'Code incorrect, retapez-le';
+      }
+    }, 250);
   },
   pinTouch(k) { A.pin(k); },
   reporterRase() { act(async () => { await api('/api/rase-auto/reporter', {}); toast('Rase reportée de 30 minutes'); await refresh(); }); },
@@ -906,7 +934,7 @@ const A = window.A = {
     draw();
   },
   comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },
-  voir(id) { S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
+  voir(id) { if (S.etat.commandes.some(c => c.id === id && c.occupee)) return; S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
   cat(id) { S.cat = id; S.search = ''; render(); },
   search(v) { S.search = v; render(); const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
   nq(k) { if (k === 'C') { S.qty = ''; S.sel = null; } else if (S.qty.length < 2) S.qty = (S.qty + k).replace(/^0+/, ''); render(); },
@@ -988,10 +1016,14 @@ const A = window.A = {
   },
   rr() { render(); },
   async envoyer() {
-    const c = cmd(); if (!c || !S.draft.length) return;
-    const r = await act(() => api('/api/commande/envoyer', { id: c.id, lignes: S.draft.slice() }));
+    const c = cmd(); if (!c || !S.draft.length || S.envoiEnCours) return;
+    S.envoiEnCours = true;
+    let r;
+    const corps = avecOperation(S.envoiOperation ||= {}, { id: c.id, lignes: S.draft.slice() });
+    try { r = await act(() => api('/api/commande/envoyer', corps)); }
+    finally { S.envoiEnCours = false; }
     if (!r) return;
-    S.draft = []; S.sel = null; S.qty = ''; showErrs(r);
+    S.envoiOperation = null; S.draft = []; S.sel = null; S.qty = ''; showErrs(r);
     if (!r.erreurs.length) toast('Commande envoyée ✓');
     if (S.etat.user.role === 'serveur') { S.view = 'tables'; S.cmdId = null; }
     refresh();
@@ -1031,7 +1063,10 @@ const A = window.A = {
       <p class="muted">Les tables en noir sont occupées : si vous en choisissez une, les deux tables sont regroupées.</p>
       <div class="chips">${s.tables.map(t => { const occ = S.etat.commandes.find(k => k.salle === salle && k.table === t.n && k.id !== c.id); return `<button class="chip ${occ ? 'on' : ''}" onclick="A.tt('${jsq(t.n)}')">${esc(t.n)}</button>`; }).join('')}</div>`, true); };
     A.ts = id => { salle = id; draw(); };
-    A.tt = t => act(async () => { const r = await api('/api/commande/modifier', { id: c.id, salle, table: t }); closeModal(); S.cmdId = r.id; S.salle = salle; toast('Table transférée ✓'); refresh(); });
+    A.tt = t => act(async () => {
+      const occupee = S.etat.commandes.some(k => k.salle === salle && k.table === t && k.id !== c.id);
+      if (occupee && !confirm('Regrouper ces deux tables ?')) return;
+      const r = await api('/api/commande/modifier', { id: c.id, salle, table: t, confirmerFusion: occupee }); closeModal(); S.cmdId = r.id; S.salle = salle; toast('Table transférée ✓'); refresh(); });
     draw();
   },
   couverts() { const c = cmd(); let n = c.couverts; const draw = () => modal(mh('Couverts') + `<div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div><div class="mf"><button class="btn dark" onclick="A.ok()">OK</button></div>`); A.cv = d => { n = Math.max(1, n + d); draw(); }; A.ok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, couverts: n }); closeModal(); refresh(); }); draw(); },
@@ -1118,10 +1153,12 @@ const A = window.A = {
       A.rok = () => askPin('Autoriser la remise', p => { st.pin = p; st.remise = { type, valeur: +val }; draw(); });
       npv.rem = ''; dr();
     };
+    const operationPaiement = {};
     A.ego = async () => {
       const go = async () => {
         const paiements = st.mode === 'offert' ? [{ mode: 'offert', montant: 0 }] : projete();
-        const r = await act(() => api('/api/commande/encaisser', { id: c.id, paiements, remise: st.remise, pin: st.pin, imprimer: st.imprimer, motif: st.motif, lignes: partie ? partie.map(l => ({ id: l.id, qte: l.qte })) : null }));
+        const corps = avecOperation(operationPaiement, { id: c.id, paiements, remise: st.remise, pin: st.pin, imprimer: st.imprimer, motif: st.motif, lignes: partie ? partie.map(l => ({ id: l.id, qte: l.qte })) : null });
+        const r = await act(() => api('/api/commande/encaisser', corps));
         if (!r) return;
         closeModal(); showErrs(r);
         const t = r.ticket;
@@ -1440,7 +1477,7 @@ Object.assign(A, {
     const c = cmd(); const caisse = peut('caissier');
     const b = (ic, t, fn, cls = '') => `<button class="gb ${cls}" onclick="A.close();${fn}">${ic}<span>${t}</span></button>`;
     modal(mh(esc(titreCmd(c))) + `<div class="grille">
-      ${b('🧾', 'Addition', 'A.addition()')}${b('⇄', 'Transférer / regrouper', 'A.transfert()')}${b('👥', 'Couverts', 'A.couverts()')}
+      ${b('🧾', 'Addition', 'A.addition()')}${peut('caissier') ? b('⇄', 'Transférer / regrouper', 'A.transfert()') : ''}${b('👥', 'Couverts', 'A.couverts()')}
       ${b('✉', 'Message à la cuisine', 'A.message()')}${b('🖨', 'Réimprimer les bons', 'A.rebons()')}${enAttente(c).length ? b('⏩', 'Tout lancer maintenant', 'A.toutEnvoyer()') : ''}
       ${c.salle === 'emporter' ? b('🥡', 'Client et heure de retrait', 'A.infosEmporter()') : ''}
       ${caisse ? b('✂', 'Séparer l’addition', 'A.separer()') + b('％', 'Remise', 'A.encaisser(\'especes\',null,true)') + b('💳', 'Autres paiements', 'A.encaisser(\'tpe\')') + b('🧑‍🍳', 'Changer de serveur', 'A.chServeur()') + b('⛔', 'Ruptures', 'A.ruptures()') : ''}
@@ -1517,8 +1554,13 @@ Object.assign(A, {
   async payer() {
     let c = cmd();
     if (S.draft.length) {
-      const r = await act(() => api('/api/commande/envoyer', { id: c.id, lignes: S.draft.slice() }));
-      if (!r) return; S.draft = []; showErrs(r); await refresh(); c = cmd(); if (!c) return;
+      if (S.envoiEnCours) return;
+      S.envoiEnCours = true;
+      const corps = avecOperation(S.envoiOperation ||= {}, { id: c.id, lignes: S.draft.slice() });
+      let r;
+      try { r = await act(() => api('/api/commande/envoyer', corps)); }
+      finally { S.envoiEnCours = false; }
+      if (!r) return; S.envoiOperation = null; S.draft = []; showErrs(r); await refresh(); c = cmd(); if (!c) return;
     }
     const n = totalCmd(c);
     let recu = '';
@@ -1548,8 +1590,10 @@ Object.assign(A, {
       npv.cash = recu;
     };
     A.cb = b => { recu = String(b); draw(); };
+    const operationPaiement = {};
     A.cgo = montant => act(async () => {
-      const r = await api('/api/commande/encaisser', { id: c.id, paiements: [{ mode: 'especes', montant }], imprimer: ticket() });
+      const corps = avecOperation(operationPaiement, { id: c.id, paiements: [{ mode: 'especes', montant }], imprimer: ticket() });
+      const r = await api('/api/commande/encaisser', corps);
       closeModal(); showErrs(r);
       const t = r.ticket;
       if (t.rendu > 0) modal(`<div class="rendu-big"><div>Rendre au client</div><b class="num">${da(t.rendu)}</b><button class="btn dark big" onclick="A.close()">OK</button></div>`);
@@ -1578,6 +1622,7 @@ function qrSurveiller() {
   S.qr.vus = ids;
 }
 function qrWidget() {
+  if (!peut('caissier')) return '';
   const q = S.etat && S.etat.qr;
   if (!q || !q.actif || S.view === 'login') return '';
   const att = q.attente.filter(x => x.statut === 'attente' || x.statut === 'traitement');
@@ -1672,7 +1717,7 @@ function render() {
 }
 // clavier : code au clavier sur l'écran de connexion (le badge est géré à part)
 document.addEventListener('keydown', e => {
-  if (S.view === 'login' && !$('#modal').innerHTML) { if (/^\d$/.test(e.key)) A.pin(e.key); else if (e.key === 'Backspace') A.pin('C'); else if (e.key === 'Enter') A.pin('OK'); }
+  if (S.view === 'login' && !$('#modal').innerHTML) { if (/^\d$/.test(e.key)) A.pin(e.key); else if (e.key === 'Backspace') A.pin('C'); else if (e.key === 'Enter') { e.preventDefault(); if (!e.repeat) A.pin('OK'); } }
   else if (e.key === 'Escape') closeModal();
 });
 

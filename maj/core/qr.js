@@ -219,7 +219,7 @@ module.exports = function qrCommandes(K) {
 
   // ------------------------------------------------------------ état pour les écrans (serveurs, maître d'hôtel, caisse)
   function etat(u) {
-    if (!peut(u, 'serveur')) return null;
+    if (!peut(u, 'caissier')) return null;
     const c = cfg(), limite = now() - 12 * 3600000;
     return {
       actif: !!c.actif, configure: !!(c.relais && c.secret), enLigne: !!c.actif && now() - etatSync.ok < 20000, erreur: c.actif ? etatSync.erreur : '', son: c.son !== false,
@@ -234,7 +234,7 @@ module.exports = function qrCommandes(K) {
   const R = K.routes;
   const impressionsEnCours = new Set();
   R['POST /api/qr/accepter'] = async (b, u) => {
-    if (!peut(u, 'serveur')) E('Non autorisé', 403);
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const it = trouver(b.id);
     if (it.statut !== 'attente') E(it.statut === 'traitement' ? 'Déjà en cours d’acceptation sur un autre écran' : 'Déjà traitée' + (it.decision ? ' par ' + it.decision.par : ''));
     if (!it.salle) E('QR code inconnu : refusez cette demande');
@@ -285,7 +285,7 @@ module.exports = function qrCommandes(K) {
     saveNow();
   }
   R['POST /api/qr/reimprimer'] = async (b, u) => {
-    if (!peut(u, 'serveur')) E('Non autorisé', 403);
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const it = trouver(b.id);
     if (it.statut !== 'acceptee' || !it.bonsRestants?.length) E('Aucun bon disponible pour la réimpression ciblée');
     if (impressionsEnCours.has(it.id)) E('Impression déjà en cours');
@@ -303,14 +303,14 @@ module.exports = function qrCommandes(K) {
     } finally { impressionsEnCours.delete(it.id); broadcast(); }
   };
   R['POST /api/qr/refuser'] = (b, u) => {
-    if (!peut(u, 'serveur')) E('Non autorisé', 403);
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const it = trouver(b.id);
     if (it.statut !== 'attente') E('Déjà traitée');
     it.statut = it.type === 'addition' ? 'vue' : 'refusee'; it.motif = String(b.motif || '').slice(0, 120); it.decision = { par: u.nom, ts: now() };
     journal(u, it.type === 'addition' ? 'QR addition vue' : 'QR refusé', (it.salle ? salleNom(it.salle) + ' ' + it.table : '?') + (it.motif ? ' — ' + it.motif : ''));
     save(); return { ok: true };
   };
-  R['POST /api/qr/vu-impression'] = (b, u) => { if (!peut(u, 'serveur')) E('Non autorisé', 403); const it = trouver(b.id); it.echecsVu = true; save(); return { ok: true }; };
+  R['POST /api/qr/vu-impression'] = (b, u) => { if (!peut(u, 'caissier')) E('Non autorisé', 403); const it = trouver(b.id); it.echecsVu = true; save(); return { ok: true }; };
   R['POST /api/qr/pause'] = (b, u) => {
     if (!peut(u, 'caissier')) E('Réservé aux caissiers', 403);
     const j = b.jeton || jetonDe(b.salle, b.table); if (!j || !D().qrTables[j]) E('Table inconnue');
