@@ -218,9 +218,15 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Clé chiffrée par Windows (DPAPI via `safeStorage`) dans `%APPDATA%\Rapports La Maison Blanche\bureau.json` ; journal `rapports.log` à côté.
 - Hors ligne : écran « Caisse principale hors ligne », nouvel essai toutes les 10 s, retour automatique. Clé révoquée/renouvelée : écran « Accès retiré » en 10 s maximum.
 - Construire : `cd bureau && npm ci && npx electron-builder --win --x64 && cd outils && makensis -DVERSION=1.0.0 installeur.nsi`. Tests : `node --test bureau/tests/reseau.test.js` ; essai complet `node bureau/tests/e2e.js captures [exe]`. Le workflow `rapports-bureau-windows.yml` construit et teste l'installateur sur Windows (machine GitHub).
-- Retour arrière : la 3.7.0 déployée est marquée par le commit `e7b63ec` de la branche `caisse`. Pour revenir en arrière, republier ce contenu de `app/core/` sous un numéro plus grand (3.7.2), jamais un numéro plus petit. Le logiciel du bureau fonctionne aussi avec la 3.7.0 (clé saisie à la main).
+- Retour arrière : la 3.7.0 déployée est marquée par le commit `e7b63ec` de la branche `caisse`. Pour revenir en arrière, republier ce contenu de `app/core/` sous un numéro supérieur à celui du manifeste publié, jamais un numéro plus petit. Le logiciel du bureau fonctionne aussi avec la 3.7.0 (clé saisie à la main).
 - Logiciel du bureau 1.1.0 (24/11/2026, Claude) : le bouton d'export de la page produit un **PDF** (A4 paysage : synthèse, ventes par jour et par heure, analyse, toutes les lignes de vente de la période et des filtres affichés, clôtures). Fait par le logiciel du bureau (`bureau/pdf.js`, `printToPDF`), sans changement de la caisse. Le CSV reste dans le menu Rapports. Nouvel installateur à repasser sur SRV MB (l'association est gardée).
 
 ### Rapports du bureau 1.2.0 — historique FrontCash
 - L’import s’effectue avec `python bureau/outils/import-frontcash.py TOUT.pdf frontcash.json` (pdfplumber). Vérifier que le rapport et son total général concordent. Le PDF et le JSON restent hors GitHub.
 - Sur SRV MB, déposer `frontcash.json` dans `%APPDATA%\\Rapports La Maison Blanche`, puis actualiser. La version 1.2.0 ajoute les journées FrontCash antérieures au 23/11/2026 aux rapports et au PDF du bureau. Les lignes de vente et le CSV de la caisse restent limités aux données détaillées de la nouvelle caisse.
+
+### Passation du 24/11/2026, 13 h 30
+- Selon la passation du restaurant, Rapports 1.2.0 est installé sur SRV MB. Les périodes FrontCash, nouvelle caisse et mixte ont été vérifiées sur place, ainsi que l’ouverture du PDF exporté. Le fichier historique reste local et le 23 novembre est exclu de l’affichage FrontCash.
+- La branche caisse publie déjà la 3.7.2. La proposition n° 20 contient une ancienne version du cœur et du paquet : ne pas la fusionner telle quelle. L’association par code doit repartir de la dernière branche caisse et recevoir un numéro supérieur à celui du manifeste publié, sur demande de Manil.
+- En attente de décision : conserver les offerts FrontCash comme dans le rapport d’origine, ou les déduire du chiffre d’affaires affiché. Le renouvellement de la clé de consultation se fait sur la caisse par le gérant.
+- Les deux pâtes sont déjà des articles normaux de la famille « Pâtes fraîches » dans la 3.7.2 publiée. L’installation de cette version sur le poste de caisse est à confirmer.
