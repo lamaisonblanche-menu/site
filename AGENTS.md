@@ -202,3 +202,6 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 
 ### 3.6.6 (24/11/2026, Claude)
 - Commandes QR : champ « Clé secrète du relais » affiché en clair + bouton « 📋 Coller » (l’appui long ne colle pas dans Electron).
+
+### 3.6.7 (24/11/2026, Claude)
+- Youcef (serveur) : code 0110 (`db.equipe6`). Ne touche pas « Youcef D. » (sushiman).

@@ -324,6 +324,15 @@ if (!db.equipe5) {
   db.equipe5 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Code imposé (version 3.6.7) : Youcef, serveur, 0110 (pas « Youcef D. », le sushiman)
+if (!db.equipe6) {
+  let u = db.users.find(x => x.nom.toLowerCase() === 'youcef');
+  if (!u) { u = { id: 'u-youcef', nom: 'Youcef', role: 'serveur', pin: '', badge: '', actif: true }; db.users.push(u); }
+  for (const o of db.users) if (o !== u && o.pin === '0110') { let c; do c = String(1000 + Math.floor(Math.random() * 9000)); while (db.users.some(x => x.pin === c) || ['2000', '1993', '1996', '1515', '1009', '0110'].includes(c)); o.pin = c; }
+  u.pin = '0110'; u.role = 'serveur'; u.actif = true;
+  db.equipe6 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Version 3.5.6 (demandes du gérant) :
 // - suppléments Gruyère et Parmesan (500 DA) dans le groupe d'options « Supplément »
 // - sociétés payées sur facture (mêmes noms que l'appli de gestion)

@@ -1,11 +1,11 @@
 {
- "version": "3.6.6",
- "date": "2026-11-24T09:45:21.529Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.7",
+ "date": "2026-11-24T09:54:02.796Z",
+ "notes": "Youcef (serveur) : code 0110",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "14e0f057c25f7d383ad4f3b04ef946cca611c629e5c0366ad78a7eac8bbd794b"
+   "sha256": "01885e6ae39e17d7a4efd9f1fc0b6eb2f0506c0b51e5622947ae4d56a97ba14a"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -45,7 +45,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "dd7f3684be5ca50234ede2cabef3b5af6a97d9d070143852c7423ab530e4f88d"
+   "sha256": "8baa42af96563a428c1ba7f215133c136917feefbb3b8b1f35ea75cfd243465e"
   }
  ]
 }
