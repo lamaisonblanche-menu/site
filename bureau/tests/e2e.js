@@ -99,12 +99,19 @@ async function capture(page, nom) { await page.screenshot({ path: path.join(CAPT
   await attendre(async () => (await page.textContent('#couverture')).includes('Net'), 8000, 'filtre vendeur');
   await capture(page, '5-filtres');
   ok('Filtres famille et serveur', famille + ' / Mustapha');
-  // 5. export CSV
+  // 5. export PDF (bouton de la page) puis CSV (menu Rapports)
+  if ((await page.textContent('#export')).trim() !== 'Exporter en PDF') throw new Error('bouton PDF absent');
   await page.click('#export');
+  const pdfNom = await attendre(() => { const f = fs.readdirSync(EXPORTS).find(n => n.endsWith('.pdf')); return f && fs.statSync(path.join(EXPORTS, f)).size > 5000 && f; }, 30000, 'export PDF');
+  const pdf = fs.readFileSync(path.join(EXPORTS, pdfNom));
+  if (pdf.subarray(0, 4).toString() !== '%PDF') throw new Error('PDF invalide');
+  fs.copyFileSync(path.join(EXPORTS, pdfNom), path.join(CAPTURES, pdfNom));
+  ok('Export PDF enregistré (filtres famille + serveur appliqués)', pdfNom + ', ' + pdf.length + ' octets');
+  await appli.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('parametres-export', 'csv'));
   const csv = await attendre(() => { const f = fs.readdirSync(EXPORTS).find(n => n.endsWith('.csv')); return f && fs.statSync(path.join(EXPORTS, f)).size > 50 && fs.readFileSync(path.join(EXPORTS, f), 'utf8'); }, 15000, 'export CSV');
   if (!csv.includes(article.nom) || !csv.includes('Marge')) throw new Error('CSV incomplet');
   fs.writeFileSync(path.join(CAPTURES, 'export-ventes.csv'), csv);
-  ok('Export CSV enregistré', fs.readdirSync(EXPORTS).join(', '));
+  ok('Export CSV (menu) toujours possible', fs.readdirSync(EXPORTS).join(', '));
 
   // 6. fermeture puis relance : reconnexion directe sans code
   await appli.close();

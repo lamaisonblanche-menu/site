@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const R = require('./reseau');
+const PDF = require('./pdf');
 
 const NOM = 'Rapports La Maison Blanche';
 app.setAppUserModelId('dz.lamaisonblanche.rapports');
@@ -222,6 +223,53 @@ ipcMain.handle('manuel', async (e, { adresse, cle }) => {
   return { ok: true };
 });
 ipcMain.handle('ouvrirJournal', () => shell.showItemInFolder(LOG));
+// ------------------------------------------------------------------ Exports (PDF par défaut, CSV dans le menu)
+let exportEnCours = false;
+function message(texte, type = 'info') { if (win) dialog.showMessageBox(win, { type, title: NOM, message: texte }); }
+async function enregistrerSous(nom, extension, libelle) {
+  if (process.env.LMB_RAPPORTS_EXPORTS) return path.join(process.env.LMB_RAPPORTS_EXPORTS, nom);
+  const r = await dialog.showSaveDialog(win, { title: 'Enregistrer le rapport', defaultPath: path.join(app.getPath('documents'), nom), filters: [{ name: libelle, extensions: [extension] }] });
+  return r.canceled ? null : r.filePath;
+}
+async function exporterPdf(params) {
+  const donnees = await PDF.lireDonnees(conf.caisse, lireCle(), params);
+  const fichier = await enregistrerSous('rapport-ventes-' + donnees.rapport.du + (donnees.rapport.au !== donnees.rapport.du ? '-au-' + donnees.rapport.au : '') + '.pdf', 'pdf', 'Document PDF');
+  if (!fichier) return;
+  const tmp = path.join(app.getPath('temp'), 'rapport-lmb-' + process.pid + '.html');
+  fs.writeFileSync(tmp, PDF.html(donnees, params, conf.caisse));
+  const cache = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
+  try {
+    await cache.loadFile(tmp);
+    const pdf = await cache.webContents.printToPDF({ landscape: true, pageSize: 'A4', printBackground: true, displayHeaderFooter: true,
+      headerTemplate: '<span></span>', footerTemplate: '<div style="font-size:8px;width:100%;text-align:center;color:#777">La Maison Blanche · page <span class="pageNumber"></span> / <span class="totalPages"></span></div>',
+      margins: { top: 0.4, bottom: 0.5, left: 0.35, right: 0.35 } });
+    fs.writeFileSync(fichier, pdf);
+  } finally { cache.destroy(); try { fs.unlinkSync(tmp); } catch {} }
+  log('export pdf', fichier, donnees.lignes.length + ' lignes');
+  if (!process.env.LMB_RAPPORTS_EXPORTS) shell.openPath(fichier);
+}
+async function exporterCsv(params) {
+  const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
+  const r = await new Promise(fin => {
+    const req = require('http').get({ host: conf.caisse.adresse, port: conf.caisse.port, path: '/suivi/api/export.csv?' + q, headers: { Authorization: 'Bearer ' + lireCle() }, timeout: 20000 }, res => {
+      const morceaux = []; res.on('data', c => morceaux.push(c)); res.on('end', () => fin({ status: res.statusCode, corps: Buffer.concat(morceaux) }));
+    });
+    req.on('timeout', () => req.destroy()); req.on('error', () => fin({ status: 0 }));
+  });
+  if (r.status !== 200) throw new Error(r.status === 401 ? 'Accès retiré par la direction' : 'La caisse ne répond pas');
+  const fichier = await enregistrerSous('ventes-' + (params.du || '') + '.csv', 'csv', 'Fichier CSV (Excel)');
+  if (!fichier) return;
+  fs.writeFileSync(fichier, r.corps);
+  log('export csv', fichier);
+}
+ipcMain.on('exporter', async (e, format, params) => {
+  if (!surRapports || !conf.caisse || exportEnCours || e.sender !== win?.webContents) return;
+  exportEnCours = true;
+  try { await (format === 'csv' ? exporterCsv(params || {}) : exporterPdf(params || {})); }
+  catch (err) { log('export impossible :', err.message); if (/retiré/.test(err.message)) verifierAcces(); else message('Export impossible : ' + err.message, 'warning'); }
+  finally { exportEnCours = false; }
+});
+const demanderExport = format => { if (surRapports && win) win.webContents.send('parametres-export', format); else message('Ouvrez d’abord les rapports.'); };
 // la page des rapports lit la clé au chargement, seulement si elle vient de la caisse associée
 ipcMain.on('cle-rapports', e => {
   const url = e.senderFrame?.url || '';
@@ -233,6 +281,9 @@ function menu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Rapports', submenu: [
       { label: 'Actualiser', accelerator: 'F5', click: () => (surRapports ? win.webContents.reloadIgnoringCache() : relancer()) },
+      { type: 'separator' },
+      { label: 'Exporter en PDF…', accelerator: 'Ctrl+P', click: () => demanderExport('pdf') },
+      { label: 'Exporter en CSV (Excel)…', click: () => demanderExport('csv') },
       { type: 'separator' },
       { label: 'Associer à nouveau la caisse…', click: async () => {
         const r = await dialog.showMessageBox(win, { type: 'question', buttons: ['Associer à nouveau', 'Annuler'], defaultId: 1, cancelId: 1, title: NOM, message: 'Refaire l’association avec la caisse principale ?', detail: 'Ce PC oubliera sa clé de consultation. Il faudra accepter la nouvelle demande sur la caisse (Gestion → Réglages → Rapports du bureau).' });
