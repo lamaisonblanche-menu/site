@@ -1,7 +1,7 @@
 {
  "version": "3.7.0",
- "date": "2026-11-24T10:13:51.835Z",
- "notes": "Rapports du bureau en lecture seule, activables depuis la caisse",
+ "date": "2026-11-24T10:25:46.981Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
