@@ -1,11 +1,11 @@
 {
- "version": "3.7.5",
- "date": "2026-11-24T15:26:18.263Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.6",
+ "date": "2026-11-24T15:27:37.784Z",
+ "notes": "Permet aux caissiers de mettre à jour la caisse et aux serveurs de reprendre toutes les tables.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "56a9fb1e3ee277fa386a0193cd8b39ebd826cfd473ea03e6cba6017cb5833e29"
+   "sha256": "00bf9eb8a692f4af7a002a22d53f83ecd00abc32ff5968d9e81f6ecde6819d98"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "b651d28624b94c0366e91292789b6e32d1da5f97fa48f7a423614a903b9262ee"
+   "sha256": "1065009f663554319f2c60a70c21136a011dac85d6ca4a1f653483697d9ee066"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "8372a5c73fa60ec24479a1cadd2000ef5b42c079209d6611361c50a1b0ef81b7"
+   "sha256": "2b4913407a9402e9de9cd7ce6bd4d75cd597fe9fea3e466aeaa4b88a7c8af983"
   },
   {
    "chemin": "suivi.js",

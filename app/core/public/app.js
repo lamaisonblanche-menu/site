@@ -183,7 +183,7 @@ async function login(cred) {
     S.etat = await api('/api/etat');
     closeModal(); S.draft = []; S.sel = null; S.qty = '';
     if (S.view === 'login' || S.view === 'admin' && !peut('admin') || S.view === 'caisse' && !peut('caissier')) S.view = 'tables';
-    if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId && !c.occupee)) S.view = 'tables';
+    if (S.view === 'commande' && !S.etat.commandes.find(c => c.id === S.cmdId)) S.view = 'tables';
     if (r.user.role === 'cuisine') { S.view = 'kds'; await loadKds(); } else if (S.view === 'kds' && !peut('caissier')) S.view = 'tables';
     S.pointage = false; S.pointageAutorisation = null; S.pointeMsg = null;
     toast('Bonjour ' + r.user.nom);
@@ -263,19 +263,16 @@ function planHtml(salle, edit) {
     if (c) {
       cls += ' occ' + (c.additionTs ? ' add' : '') + (c.serveurId === S.etat.user.id ? ' mine' : '');
       const sv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
-      if (c.occupee) inner += '<span class="pd">Occupée</span>';
-      else {
       inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}</span>`;
       if (S.etat.prets.some(p => p.cmdId === c.id)) { cls += ' ring'; inner += '<span class="pb">🔔</span>'; }
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
-      }
     }
     if (!c && !edit) {
       const rs = resaBloquante(salle.id, t.n);
       if (rs) { cls += ' resv bientot'; inner += `<span class="pr">${rs.heure.replace(':', 'h')}</span><span class="pd">${esc(rs.nom.split(' ')[0].slice(0, 9))} · ${rs.couverts}p</span>`; }
     }
     if (edit && adm.selT === i) cls += ' sel';
-    const act = edit ? `data-t="${i}"` : (c ? (peut('caissier') || c.serveurId === S.etat.user.id ? `onclick="A.voir('${c.id}')"` : 'disabled') : `onclick="A.ouvrir('${jsq(t.n)}')"`);
+    const act = edit ? `data-t="${i}"` : (c ? `onclick="A.voir('${c.id}')"` : `onclick="A.ouvrir('${jsq(t.n)}')"`);
     return `<button class="${cls}" ${act} style="left:${t.x}%;top:${t.y}%">${inner}</button>`;
   }).join('');
   const deco = (salle.deco || []).map((d, i) => `<div class="deco d-${d.type}${edit && adm.selD === i ? ' sel' : ''}" ${edit ? `data-d="${i}"` : ''} style="left:${d.x}%;top:${d.y}%"></div>`).join('');
@@ -301,7 +298,6 @@ function viewTables() {
   if (S.salle === 'emporter') {
     body = `<div class="main"><div class="row" style="margin-bottom:14px"><button class="btn dark big" onclick="A.nouvelEmporter()">+ Nouvelle commande à emporter</button>${peut('caissier') ? '<button class="btn big" onclick="A.comptoir()">+ Vente rapide au comptoir</button>' : ''}</div>
       <div class="emps">${emp.map(c => {
-        if (c.occupee) return `<button class="empc" disabled><b>${esc(c.table)}</b> · Occupée</button>`;
         const pret = S.etat.prets.some(p => p.cmdId === c.id); const retard = c.retrait && c.retrait < Date.now(); return `<button class="empc ${pret ? 'pret' : ''} ${retard ? 'retard' : ''}" onclick="A.voir('${c.id}')">
         <div class="et"><b>${c.salle === 'comptoir' ? 'Comptoir' : esc(c.table)}</b>${pret ? '<span>🔔 prêt</span>' : ''}</div>
         <div class="en">${c.salle === 'emporter' ? esc((c.client && c.client.nom) || 'Client') : 'Vente rapide'}${c.client && c.client.tel ? ' · ' + esc(c.client.tel) : ''}</div>
@@ -317,7 +313,7 @@ function viewTables() {
 }
 
 // ------------------------------------------------------------ Commande (écran type FrontCash)
-function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId && !c.occupee); }
+function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId); }
 const prod = id => S.etat.produits.find(x => x.id === id) || {};
 const catDe = p => S.etat.categories.find(k => k.id === p.cat) || {};
 const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x => x.id === o.g); const ch = g && g.choix[o.i]; return ch ? { g: o.g, nom: ch.nom, prix: ch.prix } : null; }).filter(Boolean);
@@ -532,6 +528,7 @@ function viewCaisse() {
     </div>` : `<div class="panel"><h3>Aucune journée en cours</h3><p class="muted">La journée s’ouvre automatiquement à la première commande.${C.derniereRase ? ' Dernière rase : journée n° ' + C.derniereRase.n + ', le ' + new Date(C.derniereRase.clos).toLocaleString('fr-FR') + '.' : ''}</p></div>`}
     <div class="row" style="margin-bottom:14px">
       <button class="btn dark" onclick="A.comptoir()">+ Vente comptoir</button>
+      <button class="btn" onclick="A.ouvrirMaj()">Mises à jour</button>
       <button class="btn" onclick="A.sortie()">Sortie de caisse</button>
       <button class="btn" onclick="A.tiroir()">Ouvrir le tiroir</button>
       <button class="btn" onclick="A.rapportX()" ${r ? '' : 'disabled'}>Rapport X</button>
@@ -787,23 +784,23 @@ function admReglages() {
   <div class="panel"><h3>Application et mises à jour</h3>${admApp()}</div>
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
-function admApp() {
+function admApp(reglages = true) {
   // les infos de mise à jour n'étaient chargées qu'en passant par l'onglet (après « Enregistrer », l'écran disait à tort
   // « Caisse ouverte hors de l'application Windows ») : on les recharge à l'affichage (version 3.5.6)
-  if (adm.maj === undefined && !adm._majCharge) { adm._majCharge = true; (async () => { adm.maj = await api('/api/maj').catch(() => null); if (window.caisseApp) adm.info = await caisseApp.info().catch(() => null); adm._majCharge = false; render(); })(); }
-  if (adm.maj === undefined || (adm.maj === null && window.caisseApp)) return `<p class="muted">${adm.maj === null ? 'Infos de mise à jour indisponibles pour le moment.' : 'Chargement…'}</p><div class="row"><button class="btn" onclick="A.atab('reglages')">Actualiser</button>${window.caisseApp ? '<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>' : ''}</div>`;
-  const M = adm.maj || {}, E = M.etat || {}, I = adm.info;
+  if (adm.maj === undefined && !adm._majCharge) { adm._majCharge = true; (async () => { adm.maj = await api('/api/maj').catch(() => null); if (reglages && window.caisseApp) adm.info = await caisseApp.info().catch(() => null); adm._majCharge = false; render(); })(); }
+  if (adm.maj === undefined || (adm.maj === null && window.caisseApp)) return `<p class="muted">${adm.maj === null ? 'Infos de mise à jour indisponibles pour le moment.' : 'Chargement…'}</p><div class="row"><button class="btn" onclick="A.actualiserMaj()">Actualiser</button>${reglages && window.caisseApp ? '<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>' : ''}</div>`;
+  const M = adm.maj || {}, E = M.etat || {}, I = reglages ? adm.info : null;
   const quand = ts => ts ? new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'jamais';
   return `<table class="l">
     <tr><td>Version de la caisse</td><td class="r"><b>${esc(M.version || S.etat.version || '')}</b></td></tr>
-    ${M.app ? `<tr><td>Mises à jour automatiques</td><td class="r">${E.erreur ? '<span class="pill bad">pas de connexion internet</span>' : E.prete ? '<span class="pill warn">version ' + esc(E.prete) + ' prête</span>' : '<span class="pill ok">à jour</span>'} <span class="muted" style="font-size:13px">vérifié : ${quand(E.verifie)}</span></td></tr>
+    ${M.app ? `<tr><td>Mises à jour automatiques</td><td class="r">${E.erreur ? '<span class="pill bad">' + esc(E.erreur) + '</span>' : E.prete ? '<span class="pill warn">version ' + esc(E.prete) + ' prête</span>' : '<span class="pill ok">à jour</span>'} <span class="muted" style="font-size:13px">vérifié : ${quand(E.verifie)}</span></td></tr>
     ${E.prete ? `<tr><td colspan="2" class="muted">La nouvelle version s’installe toute seule quand aucune table n’est ouverte (la caisse redémarre en quelques secondes). ${E.notes ? '<br>Nouveautés : ' + esc(E.notes) : ''}</td></tr>` : ''}` : '<tr><td colspan="2" class="muted">Caisse ouverte hors de l’application Windows : pas de mises à jour automatiques.</td></tr>'}
     ${I ? `<tr><td>Ce PC</td><td class="r">${I.mode === 'principale' ? 'Caisse principale' : 'Écran de salle → ' + esc(I.adresse)}</td></tr>
     ${I.mode === 'principale' ? `<tr><td>Adresse à donner aux écrans de salle</td><td class="r"><b>${esc((I.ip || []).join(' ou '))}</b></td></tr>` : ''}` : ''}
   </table>
   <div class="row" style="margin-top:12px">
-    ${M.app ? `<button class="btn" onclick="A.majVerif()">Vérifier les mises à jour</button>${E.prete ? `<button class="btn gold" onclick="A.majInstaller()">Installer maintenant</button>` : ''}` : ''}
-    ${window.caisseApp ? `${I && I.mode === 'principale' ? '<button class="btn" onclick="caisseApp.dossier()">Ouvrir le dossier des données</button>' : ''}<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>` : ''}
+    ${M.app ? `<button class="btn" onclick="A.actualiserMaj()">Actualiser</button><button class="btn" onclick="A.majVerif()">Vérifier les mises à jour</button>${E.prete ? `<button class="btn gold" onclick="A.majInstaller()">Installer maintenant</button>` : ''}` : ''}
+    ${reglages && window.caisseApp ? `${I && I.mode === 'principale' ? '<button class="btn" onclick="caisseApp.dossier()">Ouvrir le dossier des données</button>' : ''}<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>` : ''}
   </div>`;
 }
 function admQr() {
@@ -950,7 +947,6 @@ const A = window.A = {
   },
   comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },
   voir(id) {
-    if (S.etat.commandes.some(c => c.id === id && c.occupee)) return;
     S.cmdId = id; S.draft = []; S.envoiOperation = null; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande';
     const brouillon = brouillonsVerrouilles.get(S.etat.user.id);
     if (brouillon?.table === id) {
@@ -1327,7 +1323,19 @@ const A = window.A = {
         `<div class="field"><label>Clé de consultation</label><input readonly value="${esc(r.cle)}"></div><div class="mf"><button class="btn" onclick="A.suiviBureau('desactiver')">Désactiver</button><button class="btn" onclick="A.suiviBureau('renouveler')">Renouveler la clé</button><button class="btn dark" onclick="A.close()">Fermer</button></div>`);
     });
   },
-  majVerif() { act(async () => { await api('/api/maj/verifier', {}); toast('Vérification en cours…'); setTimeout(() => A.atab('reglages'), 6000); }); },
+  ouvrirMaj() { if (peut('caissier')) { S.view = 'maj'; A.actualiserMaj(); } },
+  async actualiserMaj() {
+    const token = S.token;
+    const maj = await api('/api/maj').catch(() => null);
+    if (token !== S.token) return;
+    adm.maj = maj; render();
+  },
+  majVerif() { act(async () => {
+    await api('/api/maj/verifier', {});
+    toast('Vérification en cours…');
+    const token = S.token;
+    setTimeout(() => { if (token === S.token && (S.view === 'maj' || S.view === 'admin')) A.actualiserMaj(); }, 6000);
+  }); },
   majInstaller() { if (confirm('Installer la nouvelle version maintenant ? La caisse redémarre en quelques secondes. Les tables ouvertes sont gardées.')) act(async () => { await api('/api/maj/installer', {}); toast('Installation… la caisse redémarre'); }); },
   quitterApp() { if (confirm('Fermer la caisse sur ce PC ?')) caisseApp.quitter(); },
   saveCarte() { act(async () => { await api('/api/admin/carte', adm.carte); adm.carte = null; toast('Carte enregistrée ✓'); refresh(); }); },
@@ -1705,6 +1713,7 @@ function render() {
   else if (S.view === 'commande') h = viewCommande();
   else if (S.view === 'caisse') h = viewCaisse();
   else if (S.view === 'admin' && peut('admin')) h = viewAdmin();
+  else if (S.view === 'maj' && peut('caissier')) h = topbar() + `<div class="main"><div class="panel"><h3>Mises à jour</h3>${admApp(false)}</div><button class="btn" onclick="A.go('caisse')">Retour à la caisse</button></div>`;
   else if (S.view === 'resa' && S.etat.user.role !== 'cuisine') h = viewResa();
   else if (S.view === 'kds' || S.etat.user.role === 'cuisine') { S.view = 'kds'; h = viewKds(); }
   else { S.view = 'tables'; h = viewTables(); }
