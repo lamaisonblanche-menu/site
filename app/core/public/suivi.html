@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi des ventes · La Maison Blanche</title>
+<link rel="stylesheet" href="/suivi.css">
+<script defer src="/suivi.js"></script>
+</head>
+<body>
+<main>
+<header><div><p>La Maison Blanche</p><h1>Suivi des ventes</h1></div><button id="deconnexion" hidden>Déconnexion</button></header>
+<form id="connexion"><label>Clé d’accès aux rapports <input name="secret" type="password" required autocomplete="off"></label><button>Se connecter</button></form>
+<p id="etat" role="status"></p>
+<section id="rapports" hidden aria-label="Rapports de ventes">
+<form id="periode">
+<label>Du<input type="date" name="du" required></label>
+<label>Au<input type="date" name="au" required></label>
+<button>Afficher</button><button type="button" id="aujourdhui">Aujourd’hui</button>
+</form>
+<div id="synthese" class="cartes"></div>
+<section class="panneau"><h2>Ventes par jour</h2><div id="jours"></div></section>
+<section class="panneau"><h2>Encaissements par heure</h2><div id="heures"></div></section>
+<section class="panneau"><h2>Analyse des ventes</h2>
+<form id="filtres"></form>
+<p id="couverture"></p>
+<div id="groupes" class="tableau"></div>
+</section>
+<section class="panneau">
+<div class="entete"><h2>Lignes de vente</h2><button type="button" id="export">Exporter en CSV</button></div>
+<div id="lignes" class="tableau"></div>
+<nav aria-label="Pages des lignes de vente"><button id="precedent">Précédent</button><span id="page"></span><button id="suivant">Suivant</button></nav>
+</section>
+<section class="panneau"><h2>Clôtures et écarts</h2><div id="clotures" class="tableau"></div></section>
+</section>
+</main>
+</body>
+</html>
