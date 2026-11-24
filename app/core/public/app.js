@@ -48,6 +48,7 @@ async function refresh() {
   if (S.view === 'caisse') await loadCaisse();
   if (S.view === 'kds') await loadKds();
   if (S.view === 'resa') await loadResa();
+  if (S.view === 'admin' && S.adminTab === 'rapports' && S.periode === 'jour') await chargerRapports().catch(() => {});
   alertesPrets();
   qrSurveiller();
   verifierVersion(S.etat.version);
@@ -233,10 +234,13 @@ function planHtml(salle, edit) {
     const c = cmds.find(k => k.table === t.n);
     const patron = t.n === String(S.etat.config.tablePatron) ? ' patron' : '';
     let cls = 'ptab' + patron, inner = `<span class="pn">${esc(t.n)}</span>`;
-    if (c) {
+    if (c && c.verrouillee) {
+      cls += ' occ';
+      inner += '<span class="pd">' + (c.source === 'qr' ? 'QR code' : 'Occupée') + '</span>';
+    } else if (c) {
       cls += ' occ' + (c.additionTs ? ' add' : '') + (c.serveurId === S.etat.user.id ? ' mine' : '');
       const sv = (S.etat.users.find(u => u.id === c.serveurId) || {}).nom || '';
-      inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}</span>`;
+      inner += `<span class="pm">${fmt(totalCmd(c))}</span><span class="pd">${dureeTxt(c.ouverte)}${sv ? ' · ' + esc(sv.split(' ')[0].slice(0, 7)) : ''}${c.source === 'qr' ? ' · QR code' : ''}</span>`;
       if (S.etat.prets.some(p => p.cmdId === c.id)) { cls += ' ring'; inner += '<span class="pb">🔔</span>'; }
       else if (enAttente(c).length) inner += `<span class="pw" title="Suite en attente">⏸</span>`;
     }
@@ -299,7 +303,7 @@ const SUITE_NOM = s => s === 0 ? 'Direct' : SUITES[s];
 // ------------------------------------------------------------ Prise de commande
 function viewCommande() {
   const c = cmd();
-  if (!c) { S.view = 'tables'; return viewTables(); }
+  if (!c || c.verrouillee) { S.view = 'tables'; S.draft = []; return viewTables(); }
   const caisse = peut('caissier');
   const univs = universListe();
   const top = (S.etat.top || []).filter(id => S.etat.produits.some(p => p.id === id && p.actif));
@@ -545,6 +549,32 @@ function periode(p) {
   if (p === 'moisp') { const a = new Date(d.getFullYear(), d.getMonth() - 1, 1), b = new Date(d.getFullYear(), d.getMonth(), 0); return [ymd(a), ymd(b)]; }
   return [S.du || t, S.au || t];
 }
+async function chargerRapports() {
+  const [du, au] = periode(S.periode);
+  const filtres = S.filtresVentes || {};
+  const params = new URLSearchParams({ du, au, ...filtres });
+  const [rapport, detail] = await Promise.all([
+    api(`/api/rapport?du=${du}&au=${au}`), api('/api/rapport/lignes?' + params),
+  ]);
+  if (periode(S.periode).join('/') !== du + '/' + au || filtres !== (S.filtresVentes || filtres)) return;
+  S.rapport = rapport;
+  S.rapportLignes = detail;
+}
+function blocLignesVentes() {
+  const R = S.rapportLignes;
+  if (!R) return '';
+  const f = S.filtresVentes || {};
+  const titres = { article: 'Article', famille: 'Famille', vendeur: 'Vendeur ou QR', salle: 'Salle', origine: 'Origine', statut: 'Statut', heure: 'Heure', date: 'Date' };
+  const choix = (cle, options, tous) => `<select aria-label="${titres[cle] || 'Regrouper par'}" onchange="A.filtreVentes('${cle}',this.value)">${tous ? '<option value="">' + tous + '</option>' : ''}${options.map(([v, n]) => `<option value="${esc(v)}" ${(f[cle] || (cle === 'grouper' ? 'article' : '')) === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  return `<div class="panel"><h3>Ventes par article, famille et vendeur</h3>
+    <div class="row">${choix('grouper', Object.entries(titres))}${Object.entries(R.filtres).map(([cle, options]) => choix(cle, options.map(v => [v, v]), titres[cle] + ' · Tous')).join('')}</div>
+    <div style="overflow-x:auto"><table class="l"><tr><th>Groupe</th><th>Vendus</th><th>Offerts</th><th>Annulés</th><th>Net</th></tr>
+    ${R.groupes.map(g => `<tr><td>${esc(g.nom)}</td><td>${g.vendus}</td><td>${g.offerts}</td><td>${g.annules}</td><td>${da(g.net)}</td></tr>`).join('')}</table></div>
+    <details ${S.detailVentesOuvert ? 'open' : ''} ontoggle="S.detailVentesOuvert=this.open"><summary>Détail des lignes de ticket · ${R.total}</summary>
+    <div style="overflow-x:auto"><table class="l"><tr><th>Ticket</th><th>Saisie</th><th>Article</th><th>Famille</th><th>Vendeur</th><th>Caissier</th><th>Quantité</th><th>Prix unitaire</th><th>Net</th><th>Statut</th></tr>
+    ${R.lignes.map(l => `<tr><td>${l.ticket ?? '—'} · ${esc(l.date)}</td><td>${l.saisiA ? hm(l.saisiA) : '—'}</td><td>${esc(l.article)}</td><td>${esc(l.famille)}</td><td>${esc(l.vendeur)}</td><td>${esc(l.caissier || '')}</td><td>${l.qte}</td><td>${da(l.prix)}</td><td>${da(l.net)}</td><td>${esc(l.statut)}</td></tr>`).join('')}</table></div>
+    <div class="row"><button class="btn sm" ${R.offset ? '' : 'disabled'} onclick="A.filtreVentes('offset',${Math.max(0, R.offset - 100)})">Précédent</button><button class="btn sm" ${R.offset + 100 < R.total ? '' : 'disabled'} onclick="A.filtreVentes('offset',${R.offset + 100})">Suivant</button></div></details></div>`;
+}
 function admRapports() {
   const R = S.rapport;
   const per = [['jour', 'Aujourd’hui'], ['hier', 'Hier'], ['7j', '7 jours'], ['mois', 'Ce mois'], ['moisp', 'Mois dernier']];
@@ -569,9 +599,10 @@ function admRapports() {
   <div class="cols">
     <div class="panel"><h3>CA par jour</h3>${bars(R.jours, k => new Date(k + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }))}</div>
     <div class="panel"><h3>CA par groupe</h3>${bars(Object.fromEntries(Object.entries(R.categories).sort((a, b) => b[1] - a[1])))}</div>
-    <div class="panel"><h3>CA par serveur</h3>${bars(R.serveurs)}</div>
+    <div class="panel"><h3>CA des tickets par responsable de table</h3>${bars(R.serveurs)}</div>
     <div class="panel"><h3>CA par heure</h3>${bars(R.heures, k => k + ' h')}</div>
   </div>
+  ${blocLignesVentes()}
   <div class="panel"><h3>Plats vendus <a class="btn sm" href="${exp('plats')}">Exporter</a></h3>
     <table class="l"><tr><th>#</th><th>Plat</th><th>Groupe</th><th class="r">Quantité</th><th class="r">Montant</th></tr>
     ${R.plats.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.nom)}</td><td class="muted">${esc(p.cat)}</td><td class="r num">${p.qte}</td><td class="r num">${da(p.montant)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Rien sur la période.</td></tr>'}</table></div>
@@ -899,7 +930,7 @@ const A = window.A = {
     draw();
   },
   comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },
-  voir(id) { S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
+  voir(id) { if (S.etat.commandes.find(c => c.id === id)?.verrouillee) return toast('Cette table est gérée par un autre serveur ou par la caisse.', true); S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
   cat(id) { S.cat = id; S.search = ''; render(); },
   search(v) { S.search = v; render(); const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
   nq(k) { if (k === 'C') { S.qty = ''; S.sel = null; } else if (S.qty.length < 2) S.qty = (S.qty + k).replace(/^0+/, ''); render(); },
@@ -1012,7 +1043,7 @@ const A = window.A = {
   async addition() { const c = cmd(); if (S.draft.length) return toast('Envoyez d’abord la commande.', true); const r = await act(() => api('/api/commande/addition', { id: c.id })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Addition imprimée à la caisse ✓'); refresh(); } },
   plus() {
     modal(mh('Options de la table') + `<div class="mf" style="flex-direction:column">
-      ${peut('caissier') ? `<button class="btn" onclick="A.chServeur()">Changer de serveur</button>` : ''}
+      ${S.etat.user.role === 'caissier' ? `<button class="btn" onclick="A.chServeur()">Changer de serveur</button>` : ''}
       <button class="btn" onclick="A.rebons()">Réimprimer les bons</button>
       ${enAttente(cmd()).length ? '<button class="btn" onclick="A.toutEnvoyer()">Tout lancer maintenant (sans attendre)</button>' : ''}
       <button class="btn bad" onclick="A.fermerVide()">Fermer la table (vide)</button>
@@ -1028,7 +1059,7 @@ const A = window.A = {
     draw();
   },
   couverts() { const c = cmd(); let n = c.couverts; const draw = () => modal(mh('Couverts') + `<div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div><div class="mf"><button class="btn dark" onclick="A.ok()">OK</button></div>`); A.cv = d => { n = Math.max(1, n + d); draw(); }; A.ok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, couverts: n }); closeModal(); refresh(); }); draw(); },
-  chServeur() { const c = cmd(); modal(mh('Serveur de la table') + `<div class="chips">${S.etat.users.filter(u => u.actif).map(u => `<button class="chip ${u.id === c.serveurId ? 'on' : ''}" onclick="A.cs('${u.id}')">${esc(u.nom)}</button>`).join('')}</div>`); A.cs = id => act(async () => { await api('/api/commande/modifier', { id: c.id, serveurId: id }); closeModal(); refresh(); }); },
+  chServeur() { const c = cmd(); if (S.etat.user.role !== 'caissier') return; modal(mh('Serveur de la table') + `<div class="chips">${S.etat.users.filter(u => u.actif && u.role === 'serveur').map(u => `<button class="chip ${u.id === c.serveurId ? 'on' : ''}" onclick="A.cs('${u.id}')">${esc(u.nom)}</button>`).join('')}</div>`); A.cs = id => act(async () => { await api('/api/commande/modifier', { id: c.id, serveurId: id }); closeModal(); refresh(); }); },
   async rebons() { const c = cmd(); const r = await act(() => api('/api/commande/reimprimer-bons', { id: c.id })); if (r) { closeModal(); showErrs(r); if (!r.erreurs.length) toast('Bons réimprimés ✓'); } },
   async toutEnvoyer() { const c = cmd(); closeModal(); while (enAttente(c).length) { const r = await act(() => api('/api/commande/reclamer', { id: c.id })); if (!r) break; showErrs(r); await refresh(); if (!cmd()) break; Object.assign(c, cmd()); } toast('Toutes les suites sont lancées ✓'); },
   fermerVide() { const c = cmd(); act(async () => { await api('/api/commande/fermer-vide', { id: c.id }); closeModal(); S.draft = []; S.view = 'tables'; S.cmdId = null; refresh(); }); },
@@ -1199,7 +1230,7 @@ const A = window.A = {
   // ---------- gestion
   async atab(t) {
     S.adminTab = t; render();
-    if (t === 'rapports') { const [du, au] = periode(S.periode); S.rapport = await act(() => api(`/api/rapport?du=${du}&au=${au}`)); }
+    if (t === 'rapports') await act(chargerRapports);
     if (t === 'equipe' && !adm.users) adm.users = await act(() => api('/api/admin/users'));
     if (t === 'journal') adm.journal = await act(() => api('/api/journal'));
     if (t === 'qr') { adm.qr = await act(() => api('/api/qr/admin')); adm.qrCfg = adm.qr ? JSON.parse(JSON.stringify(adm.qr.config)) : null; }
@@ -1207,7 +1238,8 @@ const A = window.A = {
     if (t === 'pointage') { const [du, au] = periode(S.periode); adm.pointages = await act(() => api(`/api/admin/pointages?du=${du}&au=${au}`)); }
     render();
   },
-  periode(p) { S.periode = p; A.atab('rapports'); },
+  filtreVentes(cle, valeur) { S.filtresVentes = { ...S.filtresVentes, offset: 0, [cle]: valeur }; A.atab('rapports'); },
+  periode(p) { S.filtresVentes = {}; S.periode = p; A.atab('rapports'); },
   perso(k, v, tab) { const [du, au] = periode(S.periode); S.du = du; S.au = au; S[k] = v; S.periode = 'perso'; A.atab(tab || 'rapports'); },
   cset(i, k, v) { adm.carte.categories[i][k] = v; },
   pset(i, k, v) { adm.carte.produits[i][k] = v; if (k === 'actif') render(); },
@@ -1389,7 +1421,7 @@ Object.assign(A, {
       ${b('🧾', 'Addition', 'A.addition()')}${b('⇄', 'Transférer / regrouper', 'A.transfert()')}${b('👥', 'Couverts', 'A.couverts()')}
       ${b('✉', 'Message à la cuisine', 'A.message()')}${b('🖨', 'Réimprimer les bons', 'A.rebons()')}${enAttente(c).length ? b('⏩', 'Tout lancer maintenant', 'A.toutEnvoyer()') : ''}
       ${c.salle === 'emporter' ? b('🥡', 'Client et heure de retrait', 'A.infosEmporter()') : ''}
-      ${caisse ? b('✂', 'Séparer l’addition', 'A.separer()') + b('％', 'Remise', 'A.encaisser(\'especes\',null,true)') + b('💳', 'Autres paiements', 'A.encaisser(\'tpe\')') + b('🧑‍🍳', 'Changer de serveur', 'A.chServeur()') + b('⛔', 'Ruptures', 'A.ruptures()') : ''}
+      ${caisse ? b('✂', 'Séparer l’addition', 'A.separer()') + b('％', 'Remise', 'A.encaisser(\'especes\',null,true)') + b('💳', 'Autres paiements', 'A.encaisser(\'tpe\')') + (S.etat.user.role === 'caissier' ? b('🧑‍🍳', 'Changer de serveur', 'A.chServeur()') : '') + b('⛔', 'Ruptures', 'A.ruptures()') : ''}
       ${b('🗑', 'Fermer la table vide', 'A.fermerVide()', 'bad')}
     </div>`, true);
   },

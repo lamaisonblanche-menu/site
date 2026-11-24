@@ -1,0 +1,27 @@
+:root { font: 16px/1.5 system-ui, sans-serif; color: #152a25; background: #f6f5ef; }
+* { box-sizing: border-box; }
+main { max-width: 1300px; margin: auto; padding: clamp(14px, 4vw, 46px); }
+header, .entete, nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+header { margin-bottom: 22px; }
+header p { margin: 0; color: #405b51; font-weight: 700; }
+h1, h2 { margin: 0 0 10px; line-height: 1.2; }
+h1 { font-size: clamp(28px, 5vw, 45px); }
+h2 { font-size: 1.25rem; }
+form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+label { display: grid; gap: 4px; }
+input, select, button { border: 1px solid #a6b4aa; border-radius: 7px; padding: 8px 10px; font: inherit; min-height: 42px; }
+input, select { background: white; max-width: min(75vw, 230px); }
+button { cursor: pointer; color: white; background: #234e41; border-color: #234e41; }
+button:disabled { cursor: default; opacity: .55; }
+.cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(156px, 1fr)); gap: 12px; margin: 18px 0; }
+.cartes dl, .panneau { background: white; padding: 15px; border: 1px solid #d2dbd4; border-radius: 10px; }
+.cartes dl { margin: 0; }
+dd { font-size: 1.15rem; font-weight: 750; margin: 4px 0 0; }
+.panneau { margin: 16px 0; }
+.tableau { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px; border-bottom: 1px solid #e4e9e6; text-align: left; white-space: nowrap; }
+th { background: #eef4ef; }
+nav { justify-content: flex-start; margin-top: 12px; }
+.barre { display: grid; grid-template-columns: 80px minmax(50px, 1fr) 88px; align-items: center; gap: 7px; }
+.barre meter { width: 100%; }
