@@ -29,6 +29,11 @@ module.exports = function qrCommandes(K) {
   function init() {
     const db = D();
     if (!Array.isArray(db.qrInbox)) db.qrInbox = [];
+    for (const demande of db.qrInbox) {
+      if (demande.statut !== 'traitement') continue;
+      demande.statut = 'attente';
+      demande.alertes = [...(demande.alertes || []), 'Traitement interrompu. Vérifiez le bon papier avant de relancer.'];
+    }
     if (!db.qrTables || typeof db.qrTables !== 'object') db.qrTables = {};
     db.config.qr = {
       actif: false, relais: '', secret: '', montantMax: 40000,
@@ -244,7 +249,6 @@ module.exports = function qrCommandes(K) {
         },
         apresImpression: poste => marquerBonImprime(it, poste),
       });
-      if (r.echecs.length) { it.echecs = r.echecs; save(); }
       journal(u, 'QR accepté', salleNom(it.salle) + ' ' + it.table + ' — ' + it.montantAccepte + ' DA' + (retirer.length ? ' (' + retirer.length + ' article(s) retiré(s))' : ''));
       return { ok: true, erreurs: r.erreurs, cmdId: c.id };
     } catch (e) { if (it.statut === 'traitement') it.statut = 'attente'; throw e; }
