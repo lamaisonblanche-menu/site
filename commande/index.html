@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#111111">
+<title>Commander — La Maison Blanche</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Marcellus&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#111;--paper:#fff;--stone:#f5f3ef;--line:#e6e2da;--muted:#7a776f;--gold:#b8955a;--gold-l:#f3ebdd;--ok:#2f7d4f;--bad:#b3261e;--r:14px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--stone);color:var(--ink);font:16px/1.45 Jost,"Segoe UI",system-ui,sans-serif}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+h1,h2,h3{font-family:Marcellus,Georgia,serif;font-weight:400;margin:0}
+.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 16px 0;padding-top:max(14px,env(safe-area-inset-top))}
+.top .l1{display:flex;align-items:center;gap:10px}
+.top img{height:34px}
+.top .tb{margin-left:auto;text-align:right;font-size:13px;opacity:.85}
+.top .tb b{display:block;font-size:17px;opacity:1}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:12px 0;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap;padding:8px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.35);font-size:15px}
+.tab.on{background:#fff;color:var(--ink)}
+.bandeau{background:var(--gold-l);color:#5b4318;padding:10px 16px;font-size:14px}
+.bandeau.bad{background:#fbe6e4;color:var(--bad)}
+main{padding:8px 14px 120px;max-width:720px;margin:0 auto}
+.sec h2{font-size:22px;margin:22px 4px 10px}
+.it{display:flex;gap:12px;background:var(--paper);border-radius:var(--r);padding:12px;margin-bottom:10px;align-items:center;border:1px solid var(--line);text-align:left;width:100%}
+.it img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex-shrink:0}
+.it .tx{flex:1;min-width:0}
+.it .n{font-weight:500}
+.it .d{font-size:13px;color:var(--muted);margin-top:2px}
+.it .p{font-weight:600;margin-top:4px}
+.it .plus{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.it.off{opacity:.45}
+.it .q{background:var(--gold);color:#fff;border-radius:10px;padding:0 7px;font-size:13px;margin-left:6px}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:12px 14px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--stone) 30%)}
+.cta{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:692px;margin:0 auto;background:var(--ink);color:#fff;border-radius:16px;padding:16px 20px;font-size:17px;font-weight:500}
+.cta.ok{background:var(--ok)}
+.cta:disabled{opacity:.4}
+.voile{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9;display:flex;align-items:flex-end;justify-content:center}
+.feuille{background:var(--paper);width:100%;max-width:720px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px max(18px,env(safe-area-inset-bottom))}
+.feuille h3{font-size:22px}
+.feuille img.grand{width:100%;max-height:230px;object-fit:cover;border-radius:14px;margin-bottom:12px}
+.grp{margin-top:16px}
+.grp .gt{font-weight:600;margin-bottom:6px}
+.grp .gt small{font-weight:400;color:var(--muted)}
+.ch{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;width:100%}
+.ch.on{border-color:var(--ink);background:var(--stone)}
+.ch .rd{width:20px;height:20px;border-radius:50%;border:2px solid var(--ink);flex-shrink:0}
+.ch.on .rd{background:var(--ink);box-shadow:inset 0 0 0 3px #fff}
+.ch .px{margin-left:auto;color:var(--muted)}
+textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;min-height:60px;resize:vertical}
+.qte{display:flex;align-items:center;gap:18px;justify-content:center;margin:18px 0}
+.qte button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);font-size:24px}
+.qte b{font-size:22px;min-width:30px;text-align:center}
+.ln{display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.ln .tx{flex:1}
+.ln small{display:block;color:var(--muted)}
+.mini{display:flex;align-items:center;gap:8px}
+.mini button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);font-size:18px}
+.sug{display:flex;gap:10px;overflow-x:auto;padding:4px 0 8px}
+.sug .c{min-width:150px;max-width:150px;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left}
+.sug .c img{width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px}
+.btn2{width:100%;padding:14px;border-radius:14px;border:1px solid var(--line);margin-top:10px;font-weight:500}
+.etat{text-align:center;padding:40px 10px}
+.etat .ic{font-size:54px}
+.lien{color:var(--muted);text-decoration:underline;font-size:14px;padding:10px;display:block;margin:6px auto}
+.err{color:var(--bad);margin-top:10px}
+</style>
+</head>
+<body>
+<div id="app"><div class="etat"><p>Chargement de la carte…</p></div></div>
+<script>
+'use strict';
+/* ====== Réglage : adresse du relais Cloudflare (remplie après sa mise en ligne) ====== */
+var RELAIS = 'https://mb-commandes.REMPLACER.workers.dev';
+/* descriptions et photos du site (par nom d'article de la caisse) */
+var DESC = {"Œuf Benedict": "Frites allumettes en accompagnement", "Club sandwich saumon fumé": "Frites allumettes en accompagnement", "Club sandwich poulet fumé": "Frites allumettes en accompagnement", "Croissant croque-monsieur": "Poulet fumé artisanal, cheese", "Long toast tunacado": "Crémeux de thon et avocat, carottes frites en accompagnement", "Sandwich La Maison Blanche": "Émincé de bœuf, oignons caramélisés, champignons, frites allumettes", "Sandwich salade César": "Poulet crispy et sauce César", "Burger bœuf": "Sur crème fromagère aux champignons, frites allumettes", "Burger poulet crispy": "Sur crème fromagère aux champignons, frites allumettes", "Granola bowl": "Crumble pommes et beurre de cacahuète", "Côte de bœuf (2 pers.)": "Pour 2 personnes", "Futomaki × 10": "Saumon, avocat, cheese, concombre, salade à la sauce mayo yuzu", "Maki avocat × 12": "Avocat, cheese", "Maki saumon × 12": "Saumon", "Dragon saumon roll × 8": "Tempura de crevettes, top saumon", "Rainbow roll × 8": "Avocat, cheese, crevettes, top poisson du jour et sauce mayo yuzu", "Crunchy saumon roll × 8": "Saumon frit, avocat, cheese, mayo japonaise épicée et oignons frits", "Crunchy poulet roll × 8": "Poulet frit, avocat, cheese, mayo japonaise épicée et oignons frits", "Flamed roll × 8": "Saumon, cheese, sweet soja sauce, top saumon flambé", "Creamy avocado roll × 8": "Légumes frits, cheese, top avocat, sweet soja sauce et mayo yuzu", "Veggie roll × 8": "Avocat, cheese, feuille de salade à la mayo yuzu", "Maki crispy tartare saumon × 6": "Sweet soja sauce", "Crunch tempura × 8": "Tempura de crevettes, avocat, mayo japonaise épicée", "Duo signature × 24": "4 california, 4 crunchy, 6 maki, 5 dragon saumon, 5 futomaki", "Party box × 54": "8 california, 8 crunchy, 6 maki crispy, 10 futomaki, 6 maki avocat, 8 choix du chef, 8 creamy avocat", "Mochis glacés × 2": "Pistache, framboise, mangue", "Exotic passion": "Fruit de la passion, coco", "Exotic mango": "Mangue, pêche", "Exotic fruits rouges": "Framboise, myrtille", "Cocktail Maison Blanche": "Vanille, fruit de la passion, ananas, coco", "Detox ananas pomme menthe": "95 kcal", "Detox orange carotte dattes": "110 kcal", "Detox pomme gingembre coco": "100 kcal"};
+var PHOTOS = {"Saumon à l'orange": "saumon-orange", "Carpaccio de bœuf": "carpaccio-burrata", "Gambas tempura": "gambas-tempura", "Escargots de Bourgogne": "escargots", "Club sandwich saumon fumé": "club-saumon", "Brioche perdue caramel": "brioche-caramel", "Burrata, carpaccio de tomates": "burrata", "Rainbow roll × 8": "rainbow-roll", "Toast avocat saumon": "toast-avocat-saumon", "Exotic mango": "exotic-mango", "Matcha latte fraise": "matcha-fraise-pistache", "Matcha latte pistache": "matcha-fraise-pistache", "Mochis glacés × 2": "mochis", "Maki crispy tartare saumon × 6": "tartare"};
+var ORDRE_UNIVERS = ['Brunch', 'La carte', 'Asiatique', 'Desserts', 'Boissons'];
+
+var Q = new URLSearchParams(location.search), JETON = Q.get('t') || '';
+var S = { table: null, carte: null, univers: null, panier: [], feuille: null, envoi: false, err: '', commandes: [] };
+var APP = (function () { try { var a = localStorage.getItem('mb_appareil'); if (!a) { a = 'a' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('mb_appareil', a); } return a; } catch (e) { return 'a' + Math.random().toString(36).slice(2); } })();
+var CLE = 'mb_cmd_' + JETON;
+try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
+function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes })); } catch (e) {} }
+
+var $ = function (s) { return document.querySelector(s); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function da(n) { return String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' DA'; }
+function photo(p) { return PHOTOS[p.nom] ? '/photos/' + PHOTOS[p.nom] + '.jpg' : ''; }
+function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12)); }
+function appel(chemin, corps) {
+  return fetch(RELAIS + chemin, corps ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) } : {})
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.erreur || 'Erreur ' + r.status); e.code = r.status; throw e; } return j; }); });
+}
+function prod(id) { return S.carte.produits.find(function (p) { return p.id === id; }); }
+function cat(id) { return S.carte.categories.find(function (c) { return c.id === id; }); }
+function opt(id) { return S.carte.options.find(function (o) { return o.id === id; }); }
+function universDe(p) { var c = cat(p.cat); return (c && c.univers) || 'La carte'; }
+function dispo(p) { if (p.epuise) return 'Épuisé'; var sv = S.carte.service; if (sv && sv.univers && sv.univers[universDe(p)] === false) return 'Pas servi à cette heure-ci'; return ''; }
+function prixLigne(l) { var p = prod(l.pid); if (!p) return 0; var x = p.prix; l.opts.forEach(function (o) { var g = opt(o.g); if (g && g.choix[o.i]) x += g.choix[o.i].prix || 0; }); return x * l.qte; }
+function total() { return S.panier.reduce(function (s, l) { return s + prixLigne(l); }, 0); }
+function nb() { return S.panier.reduce(function (s, l) { return s + l.qte; }, 0); }
+
+function charger() {
+  if (!JETON) { S.err = 'QR code incomplet. Demandez à un serveur.'; return rendre(); }
+  Promise.all([appel('/api/table?t=' + encodeURIComponent(JETON)), appel('/api/carte')]).then(function (r) {
+    S.table = r[0]; S.carte = r[1];
+    var u = universListe(); if (!S.univers || u.indexOf(S.univers) < 0) S.univers = u.filter(function (x) { return !S.carte.service || !S.carte.service.univers || S.carte.service.univers[x] !== false; })[0] || u[0];
+    S.panier = S.panier.filter(function (l) { return prod(l.pid); });
+    rendre(); suivre();
+  }).catch(function (e) { S.err = e.message || 'Connexion impossible. Vérifiez votre connexion internet.'; rendre(); });
+}
+function universListe() { var u = []; S.carte.categories.forEach(function (c) { if (u.indexOf(c.univers) < 0) u.push(c.univers); }); return u.sort(function (a, b) { return (ORDRE_UNIVERS.indexOf(a) + 1 || 99) - (ORDRE_UNIVERS.indexOf(b) + 1 || 99); }); }
+
+function bandeau() {
+  var t = S.table, sv = S.carte.service;
+  if (t.pause) return '<div class="bandeau bad">Les commandes depuis cette table sont suspendues. Un serveur va venir vous voir.</div>';
+  if (!S.carte.caisseEnLigne) return '<div class="bandeau bad">La commande en ligne est indisponible pour le moment : vous pouvez consulter la carte, un serveur prendra votre commande.</div>';
+  if (sv && !sv.ouvert) return '<div class="bandeau">' + esc(sv.message || 'Les commandes sont fermées pour le moment.') + '</div>';
+  return '';
+}
+function vueCarte() {
+  var h = '<div class="top"><div class="l1"><img src="/logo-blanc.png" alt="La Maison Blanche"><div class="tb">' + esc(S.table.salleNom) + '<b>Table ' + esc(S.table.table) + '</b></div></div><div class="tabs">';
+  universListe().forEach(function (u) { h += '<button class="tab ' + (u === S.univers ? 'on' : '') + '" onclick="A.univers(\'' + u.replace(/'/g, "\\'") + '\')">' + esc(u) + '</button>'; });
+  h += '</div></div>' + bandeau() + '<main>';
+  S.carte.categories.filter(function (c) { return c.univers === S.univers; }).forEach(function (c) {
+    var ps = S.carte.produits.filter(function (p) { return p.cat === c.id; }); if (!ps.length) return;
+    h += '<section class="sec"><h2>' + esc(c.nom) + '</h2>';
+    ps.forEach(function (p) {
+      var dsp = dispo(p), ph = photo(p), q = S.panier.filter(function (l) { return l.pid === p.id; }).reduce(function (s, l) { return s + l.qte; }, 0);
+      h += '<button class="it ' + (dsp ? 'off' : '') + '" onclick="A.ouvrir(\'' + p.id + '\')">' + (ph ? '<img loading="lazy" src="' + ph + '" alt="">' : '') +
+        '<div class="tx"><div class="n">' + esc(p.nom) + (q ? '<span class="q">' + q + '</span>' : '') + '</div>' + (DESC[p.nom] ? '<div class="d">' + esc(DESC[p.nom]) + '</div>' : '') +
+        '<div class="p">' + (dsp ? '<span style="color:var(--muted);font-weight:400">' + dsp + '</span>' : da(p.prix)) + '</div></div>' + (dsp ? '' : '<span class="plus">+</span>') + '</button>';
+    });
+    h += '</section>';
+  });
+  h += '<button class="lien" onclick="A.addition()">Demander l’addition</button>';
+  if (S.commandes.length) h += '<button class="lien" onclick="A.suivi()">Suivre mes commandes (' + S.commandes.length + ')</button>';
+  h += '</main>';
+  if (nb()) h += '<div class="bar"><button class="cta" onclick="A.panier()"><span>Voir le panier · ' + nb() + '</span><span>' + da(total()) + '</span></button></div>';
+  return h;
+}
+
+/* ---------- fiche d'un plat ---------- */
+function vueFiche(f) {
+  var p = prod(f.pid), ph = photo(p), h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille">';
+  if (ph) h += '<img class="grand" src="' + ph + '" alt="">';
+  h += '<h3>' + esc(p.nom) + '</h3>' + (DESC[p.nom] ? '<p style="color:var(--muted)">' + esc(DESC[p.nom]) + '</p>' : '');
+  (p.options || []).forEach(function (gid) {
+    var g = opt(gid); if (!g) return;
+    h += '<div class="grp"><div class="gt">' + esc(g.nom) + ' <small>' + (g.obligatoire ? '(obligatoire)' : g.multiple ? '(au choix, facultatif)' : '(facultatif)') + '</small></div>';
+    g.choix.forEach(function (ch, i) { var on = f.opts.some(function (o) { return o.g === gid && o.i === i; }); h += '<button class="ch ' + (on ? 'on' : '') + '" onclick="A.choix(\'' + gid + '\',' + i + ')"><span class="rd"></span>' + esc(ch.nom) + (ch.prix ? '<span class="px">+' + da(ch.prix) + '</span>' : '') + '</button>'; });
+    h += '</div>';
+  });
+  h += '<div class="grp"><div class="gt">Une précision ? <small>(facultatif)</small></div><textarea maxlength="120" placeholder="Ex. : sans oignon, sauce à part…" oninput="S.feuille.note=this.value">' + esc(f.note) + '</textarea></div>';
+  h += '<div class="qte"><button onclick="A.fq(-1)">−</button><b>' + f.qte + '</b><button onclick="A.fq(1)">+</button></div>';
+  var l = { pid: f.pid, qte: f.qte, opts: f.opts };
+  h += (f.err ? '<p class="err">' + esc(f.err) + '</p>' : '') + '<button class="cta" onclick="A.ajouter()"><span>Ajouter</span><span>' + da(prixLigne(l)) + '</span></button></div></div>';
+  return h;
+}
+/* ---------- suggestions (dessert, boisson) ---------- */
+function suggestions() {
+  var dans = function (u) { return S.panier.some(function (l) { var p = prod(l.pid); return p && universDe(p) === u; }); };
+  var top = S.carte.top || [], out = [];
+  [['Desserts', 'Une douceur pour finir ?'], ['Boissons', 'Et pour boire ?']].forEach(function (x) {
+    if (dans(x[0])) return;
+    var ps = S.carte.produits.filter(function (p) { return universDe(p) === x[0] && !dispo(p); });
+    ps.sort(function (a, b) { return ((top.indexOf(a.id) + 1) || 99) - ((top.indexOf(b.id) + 1) || 99) || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
+    if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 6) });
+  });
+  return out;
+}
+function vueSugg() {
+  var s = suggestions(); if (!s.length) return '';
+  var h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille"><h3>Ajouté au panier ✓</h3>';
+  s.forEach(function (g) {
+    h += '<div class="grp"><div class="gt">' + g.titre + '</div><div class="sug">';
+    g.ps.forEach(function (p) { var ph = photo(p); h += '<button class="c" onclick="A.ouvrir(\'' + p.id + '\')">' + (ph ? '<img src="' + ph + '" alt="">' : '') + '<div>' + esc(p.nom) + '</div><b>' + da(p.prix) + '</b></button>'; });
+    h += '</div></div>';
+  });
+  return h + '<button class="btn2" onclick="A.fermer()">Continuer</button><button class="btn2" style="background:var(--ink);color:#fff" onclick="A.panier()">Voir le panier · ' + da(total()) + '</button></div></div>';
+}
+/* ---------- panier ---------- */
+function vuePanier() {
+  var h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille"><h3>Votre commande · Table ' + esc(S.table.table) + '</h3>';
+  S.panier.forEach(function (l, i) {
+    var p = prod(l.pid), os = l.opts.map(function (o) { var g = opt(o.g); return g && g.choix[o.i] ? g.choix[o.i].nom : ''; }).filter(Boolean);
+    h += '<div class="ln"><div class="tx">' + esc(p.nom) + (os.length ? '<small>' + esc(os.join(', ')) + '</small>' : '') + (l.note ? '<small>« ' + esc(l.note) + ' »</small>' : '') + '<small>' + da(prixLigne(l)) + '</small></div><div class="mini"><button onclick="A.lq(' + i + ',-1)">−</button><b>' + l.qte + '</b><button onclick="A.lq(' + i + ',1)">+</button></div></div>';
+  });
+  h += '<div class="grp"><div class="gt">Un mot pour la cuisine ? <small>(facultatif)</small></div><textarea maxlength="200" placeholder="Ex. : anniversaire, allergie…" oninput="S.noteCmd=this.value">' + esc(S.noteCmd || '') + '</textarea></div>';
+  h += '<p style="color:var(--muted);font-size:14px">Votre commande sera validée par notre équipe avant d’être préparée. Le paiement se fait à la caisse.</p>';
+  h += (S.errEnvoi ? '<p class="err">' + esc(S.errEnvoi) + '</p>' : '');
+  var bloque = !S.carte.caisseEnLigne || S.table.pause || (S.carte.service && !S.carte.service.ouvert);
+  h += '<button class="cta ok" ' + (S.envoi || bloque || !nb() ? 'disabled' : '') + ' onclick="A.envoyer()"><span>' + (S.envoi ? 'Envoi…' : 'Envoyer la commande') + '</span><span>' + da(total()) + '</span></button>';
+  return h + '<button class="btn2" onclick="A.fermer()">Continuer mes choix</button></div></div>';
+}
+/* ---------- suivi ---------- */
+var LIB = { envoyee: ['⏳', 'Commande envoyée', 'En attente de réception par le restaurant…'], recue: ['👀', 'Commande reçue', 'Notre équipe la vérifie, un instant…'], acceptee: ['✅', 'Commande acceptée', 'Elle est en préparation. Bon appétit !'], refusee: ['⚠️', 'Commande non acceptée', ''], vue: ['✅', 'Demande prise en compte', 'L’addition arrive.'] };
+function vueSuivi() {
+  var h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille"><h3>Mes commandes</h3>';
+  S.commandes.slice().reverse().forEach(function (c) {
+    var L = LIB[c.statut] || LIB.envoyee;
+    h += '<div class="etat" style="padding:16px 0;border-bottom:1px solid var(--line)"><div class="ic">' + L[0] + '</div><h3>' + (c.type === 'addition' ? 'Addition demandée' : L[1]) + '</h3><p style="color:var(--muted)">' +
+      (c.statut === 'refusee' ? esc(c.motif || 'Un serveur va venir vous voir.') : c.type === 'addition' && c.statut !== 'vue' ? 'Un serveur vous l’apporte.' : L[2]) + '</p>' +
+      (c.type !== 'addition' ? '<small style="color:var(--muted)">' + new Date(c.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + c.resume + (c.total ? ' · ' + da(c.total) : '') + '</small>' : '') + '</div>';
+  });
+  return h + '<button class="btn2" style="background:var(--ink);color:#fff" onclick="A.fermer()">Commander autre chose</button></div></div>';
+}
+function rendre() {
+  var app = $('#app');
+  if (S.err) { app.innerHTML = '<div class="etat"><div class="ic">🍽️</div><h3>La Maison Blanche</h3><p>' + esc(S.err) + '</p><button class="btn2" onclick="location.reload()">Réessayer</button></div>'; return; }
+  if (!S.carte) return;
+  var y = window.scrollY, h = vueCarte();
+  if (S.feuille === 'panier') h += vuePanier(); else if (S.feuille === 'sugg') h += vueSugg(); else if (S.feuille === 'suivi') h += vueSuivi(); else if (S.feuille) h += vueFiche(S.feuille);
+  app.innerHTML = h; window.scrollTo(0, y);
+  document.body.style.overflow = S.feuille ? 'hidden' : '';
+}
+/* ---------- suivi des statuts ---------- */
+var suiviT;
+function suivre() {
+  clearTimeout(suiviT);
+  var en = S.commandes.filter(function (c) { return ['envoyee', 'recue'].indexOf(c.statut) >= 0 || (c.type === 'addition' && c.statut !== 'vue'); });
+  if (!en.length) return;
+  Promise.all(en.map(function (c) { return appel('/api/commande?id=' + c.id + '&a=' + APP).then(function (r) { c.statut = r.statut; c.motif = r.motif; if (r.total) c.total = r.total; }).catch(function () {}); }))
+    .then(function () { garder(); if (S.feuille === 'suivi' || !S.feuille) rendre(); suiviT = setTimeout(suivre, 4000); });
+}
+
+var A = window.A = {
+  univers: function (u) { S.univers = u; rendre(); window.scrollTo(0, 0); },
+  ouvrir: function (pid) {
+    var p = prod(pid), d = dispo(p); if (d) return;
+    S.feuille = { pid: pid, qte: 1, opts: [], note: '' }; rendre();
+  },
+  choix: function (gid, i) {
+    var f = S.feuille, g = opt(gid), on = f.opts.some(function (o) { return o.g === gid && o.i === i; });
+    if (g.multiple) f.opts = on ? f.opts.filter(function (o) { return !(o.g === gid && o.i === i); }) : f.opts.concat([{ g: gid, i: i }]);
+    else f.opts = f.opts.filter(function (o) { return o.g !== gid; }).concat(on && !g.obligatoire ? [] : [{ g: gid, i: i }]);
+    f.err = ''; rendre();
+  },
+  fq: function (d) { var f = S.feuille; f.qte = Math.max(1, Math.min(20, f.qte + d)); rendre(); },
+  ajouter: function () {
+    var f = S.feuille, p = prod(f.pid);
+    for (var k = 0; k < (p.options || []).length; k++) { var g = opt(p.options[k]); if (g && g.obligatoire && !f.opts.some(function (o) { return o.g === g.id; })) { f.err = 'Choisissez « ' + g.nom + ' ».'; return rendre(); } }
+    var note = (f.note || '').trim(), cle = JSON.stringify([f.pid, f.opts, note]);
+    var ex = S.panier.find(function (l) { return JSON.stringify([l.pid, l.opts, l.note]) === cle; });
+    if (ex) ex.qte = Math.min(20, ex.qte + f.qte); else S.panier.push({ pid: f.pid, qte: f.qte, opts: f.opts, note: note });
+    garder();
+    var u = universDe(p);
+    S.feuille = (u !== 'Desserts' && u !== 'Boissons' && suggestions().length) ? 'sugg' : null;
+    rendre();
+  },
+  lq: function (i, d) { var l = S.panier[i]; l.qte += d; if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
+  panier: function () { S.errEnvoi = ''; S.feuille = 'panier'; rendre(); },
+  suivi: function () { S.feuille = 'suivi'; rendre(); },
+  fermer: function () { S.feuille = null; rendre(); },
+  envoyer: function () {
+    if (S.envoi || !S.panier.length) return;
+    S.envoi = true; S.errEnvoi = ''; rendre();
+    // même identifiant tant que le panier n'a pas changé : un renvoi après coupure ne crée jamais de doublon
+    var sig = JSON.stringify(S.panier) + (S.noteCmd || '');
+    if (S.sidSig !== sig) { S.sid = uuid(); S.sidSig = sig; }
+    var resume = S.panier.map(function (l) { return l.qte + ' ' + prod(l.pid).nom; }).join(', ');
+    var essai = function (n) {
+      return appel('/api/commande', { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) })
+        .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1); }); throw e; });
+    };
+    essai(0).then(function (r) {
+      S.commandes.push({ id: r.id, type: 'commande', statut: r.statut || 'envoyee', ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
+      S.panier = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
+    }).catch(function (e) { S.envoi = false; S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.'; rendre(); });
+  },
+  addition: function () {
+    if (!confirm('Demander l’addition pour la table ' + S.table.table + ' ?')) return;
+    appel('/api/commande', { t: JETON, sid: uuid(), type: 'addition', appareil: APP }).then(function (r) {
+      S.commandes.push({ id: r.id, type: 'addition', statut: 'envoyee', ts: Date.now(), resume: '' }); garder(); S.feuille = 'suivi'; rendre(); suivre();
+    }).catch(function (e) { alert(e.message || 'Connexion impossible'); });
+  },
+};
+charger();
+setInterval(function () { if (!S.feuille) appel('/api/carte').then(function (c) { S.carte = c; rendre(); }).catch(function () {}); }, 60000);
+</script>
+</body>
+</html>
