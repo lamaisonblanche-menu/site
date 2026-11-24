@@ -8,6 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const R = require('./reseau');
 const PDF = require('./pdf');
+const FrontCash = require('./frontcash');
 
 const NOM = 'Rapports La Maison Blanche';
 app.setAppUserModelId('dz.lamaisonblanche.rapports');
@@ -15,6 +16,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 
 const USER = process.env.LMB_RAPPORTS_DONNEES || app.getPath('userData');
 const CONF = path.join(USER, 'bureau.json');
+const HISTORIQUE = path.join(USER, 'frontcash.json');
 const LOG = path.join(USER, 'rapports.log');
 const ICONE = path.join(__dirname, 'icon.png');
 // réglages de test uniquement (essais automatiques) : port de la caisse et adresses à balayer
@@ -52,6 +54,36 @@ function enregistrerAssociation(caisse, cle) {
 function oublierCle() { delete conf.cleChiffree; delete conf.cleClaire; sauver(); }
 const origine = () => conf.caisse ? 'http://' + conf.caisse.adresse + ':' + (conf.caisse.port || R.PORT_CAISSE) : '';
 
+function lireFrontCash() {
+  try { return FrontCash.valider(JSON.parse(fs.readFileSync(HISTORIQUE, 'utf8'))); }
+  catch (e) { if (e.code !== 'ENOENT') log('historique FrontCash illisible :', e.message); return []; }
+}
+
+async function installerAffichageFrontCash(wc) {
+  const lignes = lireFrontCash();
+  if (!lignes.length || wc.getURL() !== origine() + '/suivi/') return;
+  await wc.executeJavaScript(`(() => {
+    if (typeof afficher !== 'function' || typeof charger !== 'function') return;
+    const fusionner = ${FrontCash.fusionner.toString()};
+    const lignes = ${JSON.stringify(lignes)};
+    const original = afficher;
+    afficher = donnees => {
+      const fusion = fusionner(donnees, lignes);
+      original(fusion);
+      const s = fusion.synthese;
+      const r = fusion.rapport;
+      const mois = Date.parse(r.au) - Date.parse(r.du) >= 31 * 86400000;
+      const historiques = new Set((s.frontcashJours || []).map(j => mois ? j.slice(0, 7) : j.slice(5)));
+      for (const label of document.querySelectorAll('#jours .barre > span:first-child')) {
+        if (historiques.has(label.textContent)) label.textContent += ' · FrontCash';
+      }
+      const precedent = document.querySelector('#synthese dl:nth-child(2) dt');
+      if (precedent && s.frontcashPrecedent) precedent.textContent += ' · FrontCash inclus';
+    };
+    if (typeof secret === 'string' && secret) charger();
+  })()`);
+}
+
 // ------------------------------------------------------------------ Fenêtre
 let win = null, etat = { ecran: 'recherche' }, surRapports = false, dernierContact = 0;
 function fenetre() {
@@ -69,7 +101,10 @@ function fenetre() {
     e.preventDefault();
   });
   wc.on('did-finish-load', () => {
-    if (surRapports) wc.insertCSS('#connexion,#deconnexion{display:none!important}');
+    if (surRapports) {
+      wc.insertCSS('#connexion,#deconnexion{display:none!important}');
+      installerAffichageFrontCash(wc).catch(e => log('affichage FrontCash :', e.message));
+    }
   });
   wc.on('did-fail-load', (e, code, desc, url, principal) => {
     if (principal && surRapports && !url.startsWith('file:')) { log('chargement impossible :', desc); horsLigne(); }
@@ -232,7 +267,7 @@ async function enregistrerSous(nom, extension, libelle) {
   return r.canceled ? null : r.filePath;
 }
 async function exporterPdf(params) {
-  const donnees = await PDF.lireDonnees(conf.caisse, lireCle(), params);
+  const donnees = FrontCash.fusionner(await PDF.lireDonnees(conf.caisse, lireCle(), params), lireFrontCash());
   const fichier = await enregistrerSous('rapport-ventes-' + donnees.rapport.du + (donnees.rapport.au !== donnees.rapport.du ? '-au-' + donnees.rapport.au : '') + '.pdf', 'pdf', 'Document PDF');
   if (!fichier) return;
   const tmp = path.join(app.getPath('temp'), 'rapport-lmb-' + process.pid + '.html');

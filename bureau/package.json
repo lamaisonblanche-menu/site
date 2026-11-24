@@ -1,7 +1,7 @@
 {
   "name": "rapports-maison-blanche",
   "productName": "Rapports La Maison Blanche",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Rapports de ventes de la caisse La Maison Blanche (PC du bureau)",
   "author": "La Maison Blanche",
   "main": "main.js",
@@ -19,6 +19,7 @@
       "main.js",
       "reseau.js",
       "pdf.js",
+      "frontcash.js",
       "preload.js",
       "ecran.html",
       "ecran.js",
@@ -47,6 +48,6 @@
     ]
   },
   "scripts": {
-    "construire": "electron-builder --win --x64 && cd outils && makensis -INPUTCHARSET UTF8 -DVERSION=1.1.0 installeur.nsi"
+    "construire": "electron-builder --win --x64 && cd outils && makensis -INPUTCHARSET UTF8 -DVERSION=1.2.0 installeur.nsi"
   }
 }

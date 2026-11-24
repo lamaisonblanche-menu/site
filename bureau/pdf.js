@@ -40,13 +40,13 @@ function table(colonnes, lignes, classe = '') {
 function html({ rapport: r, synthese: s, ouvert, lignes }, params, caisse) {
   const filtres = Object.entries(AXES).filter(([k]) => params?.[k]).map(([k, n]) => n + ' : ' + params[k]);
   const cartes = [
-    ['CA net', da(s.ca)], ['Période précédente', da(s.precedent)], ['Écart de CA', da(s.ca - s.precedent)],
+    ['CA net', da(s.ca)], [s.frontcashPrecedent ? 'Période précédente · FrontCash inclus' : 'Période précédente', da(s.precedent)], ['Écart de CA', da(s.ca - s.precedent)],
     ['Tickets', s.nbTickets], ['Ticket moyen', da(s.ticketMoyen)], ['Couverts', s.couverts],
     ['Espèces', da(s.especes)], ['Carte', da(s.tpe)], ['Chèques', da(s.cheque)], ['Sur facture', da(s.societe)], ['Sorties de caisse', da(s.sorties)],
   ];
   if (ouvert) cartes.push(['Tables à encaisser', ouvert.tables], ['Reste à encaisser', da(ouvert.montant)]);
   const t = r.totaux;
-  const parJour = Object.entries(s.jours || {}).sort(([a], [b]) => a.localeCompare(b)).map(([j, m]) => [jourFr(j), da(m)]);
+  const parJour = Object.entries(s.jours || {}).sort(([a], [b]) => a.localeCompare(b)).map(([j, m]) => [jourFr(j) + (s.frontcashJours?.includes(j) ? ' · FrontCash' : ''), da(m)]);
   const parHeure = Object.entries(s.heures || {}).map(([h, m]) => [h.padStart(2, '0') + ' h', da(m)]);
   const groupe = AXES[params?.grouper] || 'Article';
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Rapport des ventes</title><style>
