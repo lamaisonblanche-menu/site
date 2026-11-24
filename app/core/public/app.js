@@ -203,19 +203,30 @@ const brouillonsVerrouilles = new Map();
 let lastTouch = Date.now();
 function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
+// 3.7.7 (demande du gérant) : aucun compte ni aucune table ne doit rester ouvert sur un écran laissé seul.
+// - Écrans de salle : TOUT compte (serveur, maître d'hôtel, caissier, responsable ; pas l'écran cuisine) est
+//   déconnecté après 30 s sans toucher l'écran (le réglage peut raccourcir ce délai, jamais l'allonger ni le couper).
+// - Caisse principale : un serveur est déconnecté de la même façon ; un caissier ou le responsable sort de la table
+//   (retour au plan) après 30 s, sauf pendant un encaissement ou une fenêtre ouverte.
+// Les articles pas encore envoyés sont gardés et rendus à la même personne quand elle rouvre la table.
+const VEILLE_SEC = 30;
+function garderBrouillon() {
+  if (S.cmdId && S.draft.length) brouillonsVerrouilles.set(S.etat.user.id, { table: S.cmdId, lignes: S.draft, envoi: S.envoiOperation });
+}
 function verifierInactivite() {
   if (!S.etat) return;
   const role = S.etat.user.role;
   const reg = +S.etat.config.deconnexionServeurSec;
-  const serveurSalle = !CAISSE_PRINCIPALE && role === 'serveur';
-  const sec = serveurSalle ? (reg > 0 ? Math.min(reg, 30) : 30) : (Number.isFinite(reg) ? reg : 60);
-  if (!CAISSE_PRINCIPALE && role !== 'cuisine' && sec > 0 && Date.now() - lastTouch >= sec * 1000) {
-    if (!serveurSalle && S.draft.length) return;
-    if (serveurSalle && S.cmdId && S.draft.length) {
-      brouillonsVerrouilles.set(S.etat.user.id, { table: S.cmdId, lignes: S.draft, envoi: S.envoiOperation });
+  const sec = reg > 0 ? Math.min(reg, VEILLE_SEC) : VEILLE_SEC;
+  const inactif = Date.now() - lastTouch >= sec * 1000;
+  if (inactif && role !== 'cuisine' && !S.envoiEnCours) {
+    if (!CAISSE_PRINCIPALE || role === 'serveur') { garderBrouillon(); logout(); return; }
+    if (S.view === 'commande' && $('#modal').hidden) {
+      garderBrouillon();
+      S.view = 'tables'; S.cmdId = null; S.draft = []; S.sel = null; S.qty = ''; S.envoiOperation = null;
+      render();
+      return;
     }
-    logout();
-    return;
   }
   const c = $('#clock'); if (c) c.textContent = hm(Date.now());
 }
@@ -1048,11 +1059,16 @@ const A = window.A = {
     if (!r) return;
     if (brouillonsVerrouilles.get(utilisateur)?.envoi?.operation === corps.operation) brouillonsVerrouilles.delete(utilisateur);
     if (S.token !== token || S.cmdId !== c.id) return;
-    S.envoiOperation = null; S.draft = []; S.sel = null; S.qty = ''; showErrs(r);
-    if (!r.erreurs.length) {
-      toast('Commande envoyée ✓');
-      closeModal(); S.view = 'tables'; S.cmdId = null;
-      render();
+    // 3.7.7 : la commande est enregistrée → on sort TOUJOURS de la table (demande du gérant).
+    // Si une imprimante n'a pas répondu, une fenêtre le dit clairement avec un bouton pour réimprimer les bons.
+    S.envoiOperation = null; S.draft = []; S.sel = null; S.qty = '';
+    closeModal(); S.view = 'tables'; S.cmdId = null;
+    render();
+    if (!r.erreurs.length) toast('Commande envoyée ✓');
+    else {
+      modal(mh('⚠ Commande enregistrée, mais impression à vérifier') + `<p>${r.erreurs.map(esc).join('<br>')}</p>
+        <p class="muted">La commande de la table ${esc(c.table)} est bien enregistrée. Vérifiez que la cuisine a reçu le bon.</p>
+        <div class="mf"><button class="btn" onclick="A.close()">OK</button><button class="btn dark" onclick="A.rebonsTable('${jsq(c.id)}')">Réimprimer les bons</button></div>`);
     }
     refresh();
   },
@@ -1099,6 +1115,7 @@ const A = window.A = {
   },
   couverts() { const c = cmd(); let n = c.couverts; const draw = () => modal(mh('Couverts') + `<div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div><div class="mf"><button class="btn dark" onclick="A.ok()">OK</button></div>`); A.cv = d => { n = Math.max(1, n + d); draw(); }; A.ok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, couverts: n }); closeModal(); refresh(); }); draw(); },
   chServeur() { const c = cmd(); modal(mh('Serveur de la table') + `<div class="chips">${S.etat.users.filter(u => u.actif).map(u => `<button class="chip ${u.id === c.serveurId ? 'on' : ''}" onclick="A.cs('${u.id}')">${esc(u.nom)}</button>`).join('')}</div>`); A.cs = id => act(async () => { await api('/api/commande/modifier', { id: c.id, serveurId: id }); closeModal(); refresh(); }); },
+  async rebonsTable(id) { const r = await act(() => api('/api/commande/reimprimer-bons', { id })); if (r) { closeModal(); showErrs(r); if (!r.erreurs.length) toast('Bons réimprimés ✓'); } },
   async rebons() { const c = cmd(); const r = await act(() => api('/api/commande/reimprimer-bons', { id: c.id })); if (r) { closeModal(); showErrs(r); if (!r.erreurs.length) toast('Bons réimprimés ✓'); } },
   async toutEnvoyer() { const c = cmd(); closeModal(); while (enAttente(c).length) { const r = await act(() => api('/api/commande/reclamer', { id: c.id })); if (!r) break; showErrs(r); await refresh(); if (!cmd()) break; Object.assign(c, cmd()); } toast('Toutes les suites sont lancées ✓'); },
   fermerVide() { const c = cmd(); act(async () => { await api('/api/commande/fermer-vide', { id: c.id }); closeModal(); S.draft = []; S.view = 'tables'; S.cmdId = null; refresh(); }); },
@@ -1439,7 +1456,8 @@ Object.assign(A, {
     const sel = {}; for (const o of d.opts || []) (sel[o.g] = sel[o.g] || []).push(o.i);
     const parts = d.note ? d.note.split(', ') : [];
     let chips = parts.filter(x => coms.includes(x)), libre = parts.filter(x => !coms.includes(x)).join(', ');
-    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length);
+    // 3.7.7 : le « Supplément » exige le nom du supplément écrit (avant, « Ajouter » restait actif et l'envoi était refusé ensuite)
+    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length) && (p.id !== 'supplement-fixe' || !!String(libre || '').trim());
     const prixU = () => (p.prix || 0) + groupes.reduce((s, g) => s + (sel[g.id] || []).reduce((a, k) => a + (+g.choix[k].prix || 0), 0), 0);
     const draw = () => modal(mh(esc(p.nom) + ` <small class="muted">${fmt(prixU())} DA</small>`) + `<div class="fe">
       <div class="fe-row"><span>Quantité</span><div class="qty sm"><button onclick="A.fq(-1)">−</button><span>${d.qte}</span><button onclick="A.fq(1)">+</button></div></div>
@@ -1470,9 +1488,11 @@ Object.assign(A, {
     A.fdel = () => { S.draft.splice(i, 1); closeModal(); render(); };
     A.fdup = () => { A.fok(true); };
     A.fok = dup => {
-      if (!ok()) return toast('Indiquez quel supplément avant de continuer.', true);
+      if (!ok()) return toast(p.id === 'supplement-fixe' ? 'Écrivez quel supplément (ex. gruyère) avant de continuer.' : 'Choisissez les options obligatoires (*).', true);
       d.opts = []; for (const g of groupes) for (const k of sel[g.id] || []) d.opts.push({ g: g.id, i: k });
       d.note = [...chips, libre.trim()].filter(Boolean).join(', ');
+      // 3.7.7 : un « Supplément » part avec le plat juste avant lui (même suite : plats, entrées…)
+      if (nouveau && p.id === 'supplement-fixe' && d.suite == null && S.draft.length) d.suite = suiteDraft(S.draft[S.draft.length - 1]);
       if (nouveau) S.draft.push(d); else { S.draft[i] = d; if (dup) S.draft.splice(i + 1, 0, { ...d, opts: [...d.opts] }); }
       closeModal(); render();
     };

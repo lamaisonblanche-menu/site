@@ -352,6 +352,13 @@ if (!db.supplementLibreUnique) {
   db.supplementLibreUnique = true;
 }
 
+// Version 3.7.7 : le groupe « Suppléments » part avec les plats (suite « Plats ») et non plus en « Entrées »
+if (!db.supp9) {
+  const cat = db.categories.find(c => c.id === 'supplements');
+  if (cat && cat.suite !== 2) cat.suite = 2;
+  db.supp9 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -978,6 +985,10 @@ async function verifierRaseAuto() {
   const d = new Date(), [h, m] = cfg.heure.split(':').map(Number);
   const debut = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
   if (j.ouvert > debut) return;
+  // 3.7.7 : la rase automatique ne se fait que la nuit (jusqu'à 6 h après l'heure réglée, donc avant l'ouverture).
+  // Avant : si le PC était éteint à 2 h ou si une table restait ouverte, elle se déclenchait en plein service le lendemain
+  // et mélangeait les ventes du matin avec la journée de la veille. Hors de cette fenêtre, la rase se fait à la main.
+  if (now() > debut + 6 * 3600000) return;
   const echeance = debut + raseAutoReport * 1800000;
   if (now() < echeance) {
     if (echeance - now() <= 300000 && raseAutoAverti !== String(echeance)) {
@@ -1210,7 +1221,7 @@ function etatPublic(u) {
       if (!cfg.actif || !j || j.clos || j.rase) return null;
       const d = new Date(), [h, m] = String(cfg.heure || '02:00').split(':').map(Number);
       const base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
-      if (j.ouvert > base) return null;
+      if (j.ouvert > base || now() > base + 6 * 3600000) return null;
       const ts = base + raseAutoReport * 1800000;
       return { ts, dansCinqMinutes: ts - now() <= 300000, report: raseAutoReport };
     })(),
@@ -1555,7 +1566,9 @@ const routes = {
       if (occ) {
         if (b.confirmerFusion !== true) E('La table est occupée. Confirmez le regroupement.', 409);
         // fusion des deux tables
-        occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = [];
+        occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = []; c.fusionDans = occ.id;
+        // 3.7.7 : les bons (écran cuisine, « prêt », réclame) suivent la table regroupée
+        for (const bn of db.bons) if (bn.cmdId === c.id) { bn.cmdId = occ.id; bn.table = occ.table; bn.salle = occ.salle; }
         journal(u, 'fusion tables', c.table + ' -> ' + t);
         save(); return occ;
       }
