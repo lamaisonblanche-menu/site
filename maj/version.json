@@ -1,47 +1,51 @@
 {
-  "version": "3.5.8",
-  "date": "2026-11-24T00:30:00.000Z",
-  "notes": "Suppression de l'extinction automatique du PC à 2 h ; rase et sauvegardes conservées",
-  "fichiers": [
-    {
-      "chemin": "VERSION",
-      "sha256": "11c5470f57b04e1a885c08a6a2303d7353b0748d5db96fe01f90a3cb3cff77bb"
-    },
-    {
-      "chemin": "impression-usb.ps1",
-      "sha256": "b48917204f7aabd603ef27234ac411b941829f9b4c3a89dbc5e55854b32edc33"
-    },
-    {
-      "chemin": "logo-ticket.bin",
-      "sha256": "18c8c4bc4dd3b9b19e17335491d463379b76f83aaf2a1aa3c321789bcdd9d9f3"
-    },
-    {
-      "chemin": "public/app.js",
-      "sha256": "43721c58e89166c157335ca4233dc1aabe3c46e1b4a17d31c9ed97454ca8eaf1"
-    },
-    {
-      "chemin": "public/index.html",
-      "sha256": "17f331810bed2664c28617815fbd9edbabc27a24e573085e7e5a5194179f59bb"
-    },
-    {
-      "chemin": "public/logo.png",
-      "sha256": "8f664de163b58224aea21bd8ecf0b1089b278e2d54a4defcf6af92d635671ab0"
-    },
-    {
-      "chemin": "public/manifest.webmanifest",
-      "sha256": "6d41abe8477ffab0ff3409ac8d79646ae1689aa88a950a344d84ac6b8c6a26b1"
-    },
-    {
-      "chemin": "public/style.css",
-      "sha256": "2816b0eddbb222d7b6a337d2a02dcfd267f02d90dc8a6d6666e71984280ce936"
-    },
-    {
-      "chemin": "seed-menu.json",
-      "sha256": "ea3cb39d55b14f14c2722814e8a28d9af7c64be3c087dfade68e01732d202cfd"
-    },
-    {
-      "chemin": "server.js",
-      "sha256": "f432cd09db11bbec879caefa957250e2d6dd793bf00461a1f7e8f4f6ec6a32c5"
-    }
-  ]
+ "version": "3.6.0",
+ "date": "2026-11-24T00:46:16.332Z",
+ "notes": "Commandes des clients par QR code (à activer dans Gestion → Commandes QR) et prix alignés sur le site",
+ "fichiers": [
+  {
+   "chemin": "VERSION",
+   "sha256": "138203e3f604a08fad0c4d0a297efe2c486219820dcdd053e72b7d843504c7a1"
+  },
+  {
+   "chemin": "impression-usb.ps1",
+   "sha256": "b48917204f7aabd603ef27234ac411b941829f9b4c3a89dbc5e55854b32edc33"
+  },
+  {
+   "chemin": "logo-ticket.bin",
+   "sha256": "18c8c4bc4dd3b9b19e17335491d463379b76f83aaf2a1aa3c321789bcdd9d9f3"
+  },
+  {
+   "chemin": "public/app.js",
+   "sha256": "4f5cf39f9464db72208b0009b6e1cc4e48da88cc14c9eec973e70e54cc1ff335"
+  },
+  {
+   "chemin": "public/index.html",
+   "sha256": "17f331810bed2664c28617815fbd9edbabc27a24e573085e7e5a5194179f59bb"
+  },
+  {
+   "chemin": "public/logo.png",
+   "sha256": "8f664de163b58224aea21bd8ecf0b1089b278e2d54a4defcf6af92d635671ab0"
+  },
+  {
+   "chemin": "public/manifest.webmanifest",
+   "sha256": "6d41abe8477ffab0ff3409ac8d79646ae1689aa88a950a344d84ac6b8c6a26b1"
+  },
+  {
+   "chemin": "public/style.css",
+   "sha256": "2fc600a77d2c980776c120cbc4f82cfb2e23402a062ef77e1dded48097f5a15a"
+  },
+  {
+   "chemin": "qr.js",
+   "sha256": "32ed448ce646656dac4fdf110f260c291c109bf5029ddadbf385307494f2c70e"
+  },
+  {
+   "chemin": "seed-menu.json",
+   "sha256": "ea3cb39d55b14f14c2722814e8a28d9af7c64be3c087dfade68e01732d202cfd"
+  },
+  {
+   "chemin": "server.js",
+   "sha256": "f5d6ebca127b6560f353369e8c4fd6c6bbd1509b98c54f10c6bc96651cde1eb3"
+  }
+ ]
 }

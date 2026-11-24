@@ -180,3 +180,11 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Déconnexion automatique des écrans de salle : le réglage « Déconnexion automatique (secondes) » est de nouveau respecté (3.5.5 l'avait figé à 30 s).
 - Rapports : tableau « Sur facture, par société » (`rapport().parSociete`). Ticket payé sur facture : « Bon pour facture », signature et cachet.
 - Wafi : caissier, code 1009 (`db.equipe5`). Sauvegarde du jour nommée en date locale.
+
+### 3.6.0 (24/11/2026, Claude) — commandes des clients par QR code (validées par Manil)
+- Module `app/core/qr.js` (chargé par server.js), éteint par défaut : Gestion → Commandes QR (adresse du relais, clé secrète, horaires, pause par table, impression des QR). Détails, contrat d'API et passation : `docs/qr-commandes.md`.
+- `server.js` : `verifierLignes()` + `envoyerLignes()` partagés par « Envoyer » et l'acceptation QR (même circuit de bons, mêmes règles). Ne pas recréer un second chemin d'envoi.
+- Migration `db.prixSite6` : prix alignés sur le site (le site fait foi), changements notés au journal.
+- Relais : Cloudflare Worker `relais/` en ligne sur https://mb-commandes.lamaisonblanche.workers.dev (compte Cloudflare de Manil). Page client : `commande/index.html` sur la branche `main`.
+- Interface : bouton 📱 flottant + panneau latéral (rôle serveur et plus), son, accepter / refuser / retirer un article, addition, alerte si bons non imprimés.
+- QR des 66 tables : `docs/QR-tables-La-Maison-Blanche.pdf` (jetons fixes `QR_INITIAUX`).
