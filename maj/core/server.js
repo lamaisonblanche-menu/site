@@ -310,6 +310,11 @@ if (!db.supp4) {
   db.supp4 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Les lignes déjà vendues conservent leurs options. Les nouvelles utilisent l'article libre.
+function retirerOptionsSupplement() {
+  db.options = db.options.filter(g => g.id !== 'supplements');
+  for (const p of db.produits) p.options = (p.options || []).filter(g => g !== 'supplements');
+}
 // Code imposé (version 3.5.7) : Wafi, caissier, 1009
 if (!db.equipe5) {
   let u = db.users.find(x => x.nom.toLowerCase() === 'wafi');
@@ -333,6 +338,11 @@ if (!db.supp3) {
   db.supp3 = true;
   setTimeout(() => saveNow(), 0);
 }
+if (!db.supplementLibreUnique) {
+  retirerOptionsSupplement();
+  db.supplementLibreUnique = true;
+}
+
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -1223,10 +1233,7 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
   if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
   if (opt.couverts) c.couverts = +opt.couverts;
   creerBons(c, nouvelles);
-  if (opt.avantImpression) opt.avantImpression(nouvelles);
-  save();
-  if (opt.durable) saveNow();
-  const erreurs = [], echecs = [];
+  const bonsAImprimer = [];
   // commande commune : l'asiatique voit aussi la partie cuisine (gastro/brunch) et inversement
   const CUISINES = ['cuisine', 'cuisine2', 'asiatique'];
   const dePoste = k => nouvelles.filter(l => postesDe(l.pid).includes(k));
@@ -1240,8 +1247,16 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
       infos = {};
       for (const k of CUISINES) if (k !== poste && !(poste !== 'asiatique' && k !== 'asiatique')) { const autres = dePoste(k).filter(l => !ls.includes(l)); if (autres.length) infos[k] = autres; }
     }
-    const r = await imprimer(poste, bon(poste, c, ls, titre, infos));
-    if (!r.ok) { erreurs.push(r.erreur); echecs.push(poste); }
+    bonsAImprimer.push({ poste, doc: bon(poste, c, ls, titre, infos) });
+  }
+  if (opt.avantImpression) opt.avantImpression(nouvelles, bonsAImprimer);
+  save();
+  if (opt.durable) saveNow();
+  const erreurs = [], echecs = [];
+  for (const { poste, doc } of bonsAImprimer) {
+    const r = await imprimer(poste, doc);
+    if (r.ok) opt.apresImpression?.(poste);
+    else { erreurs.push(r.erreur); echecs.push(poste); }
   }
   journal(u, 'envoi', (opt.source === 'qr' ? '[QR] ' : '') + 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
   return { nouvelles, erreurs, echecs };
@@ -1809,6 +1824,7 @@ const routes = {
       const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
       if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
     }
+    retirerOptionsSupplement();
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');
     save(); return {};

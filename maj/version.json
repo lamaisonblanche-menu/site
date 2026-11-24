@@ -1,11 +1,11 @@
 {
- "version": "3.6.0",
- "date": "2026-11-24T00:46:40.795Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.1",
+ "date": "2026-11-24T01:04:55.729Z",
+ "notes": "Supplément unique à 500 DA, réimpression QR ciblée et reprise des additions",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "138203e3f604a08fad0c4d0a297efe2c486219820dcdd053e72b7d843504c7a1"
+   "sha256": "de58d841bd709aa85a66ecc500dfbb48e7c207e84c399e30e751e8ccad6e8c9b"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "4f5cf39f9464db72208b0009b6e1cc4e48da88cc14c9eec973e70e54cc1ff335"
+   "sha256": "71cffde1eea2efc0211fcfc2caba5194651725e3ffdaf89521aaff90d91abcee"
   },
   {
    "chemin": "public/index.html",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "32ed448ce646656dac4fdf110f260c291c109bf5029ddadbf385307494f2c70e"
+   "sha256": "50189233722eb86ae6bd3084742f7b569c071909960cd695d3c66957f95f6b98"
   },
   {
    "chemin": "seed-menu.json",
@@ -45,7 +45,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "f5d6ebca127b6560f353369e8c4fd6c6bbd1509b98c54f10c6bc96651cde1eb3"
+   "sha256": "711831324750f3d93bd54eb868a3505c64c63d6a3026778ac8e92c54455780fe"
   }
  ]
 }

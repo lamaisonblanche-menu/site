@@ -8,6 +8,25 @@ const CAISSE_HORS_LIGNE_MS = 120000;   // au-delà, plus de nouvelles commandes 
 const GARDE_MS = 3 * 864e5;            // commandes gardées 3 jours
 const LIM = { tableCourt: 20000, tableLong: 6, ipLong: 10, fenetre: 600000, lignes: 40, qte: 20 };
 
+// Coordonnées du restaurant publiées dans les données du site.
+const RESTAURANT = { latitude: 36.7401258, longitude: 3.0481449 };
+const RAYON_M = 100;
+function verifierPosition(position) {
+  const { latitude, longitude, accuracy } = position || {};
+  if (!Number.isFinite(latitude) || Math.abs(latitude) > 90 ||
+      !Number.isFinite(longitude) || Math.abs(longitude) > 180 ||
+      !Number.isFinite(accuracy) || accuracy <= 0) {
+    return 'Autorisez la localisation pour envoyer votre demande.';
+  }
+  if (accuracy > RAYON_M) return 'Position trop imprécise. Activez la localisation précise et réessayez.';
+  const rad = degrees => degrees * Math.PI / 180;
+  const a = Math.sin(rad(latitude - RESTAURANT.latitude) / 2) ** 2 +
+    Math.cos(rad(latitude)) * Math.cos(rad(RESTAURANT.latitude)) *
+    Math.sin(rad(longitude - RESTAURANT.longitude) / 2) ** 2;
+  return 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(a))) > RAYON_M
+    ? 'Vous devez être à moins de 100 m du restaurant pour envoyer votre demande.' : '';
+}
+
 const json = (o, st = 200, h = {}) => new Response(JSON.stringify(o), { status: st, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...h } });
 
 export default {
@@ -94,14 +113,25 @@ export class Relais {
     if (!/^[A-Za-z0-9-]{8,60}$/.test(sid)) return json({ erreur: 'Demande invalide' }, 400);
     // même envoi (double clic, réseau coupé puis renvoi) : même réponse, jamais deux commandes
     const deja = await this.st.get('s:' + sid);
-    if (deja) { const c = await this.st.get('c:' + deja); return json({ id: deja, statut: c ? (c.statut || 'envoyee') : 'envoyee' }); }
+    if (deja) {
+      const c = await this.st.get('c:' + deja);
+      if (c && c.jeton === b.t && c.appareil === String(b.appareil || '').slice(0, 40)) {
+        return json({ id: deja, statut: c.statut || 'envoyee' });
+      }
+      return json({ erreur: 'Identifiant de demande invalide' }, 409);
+    }
     const t = e.tables[b.t || ''];
     if (!t) return json({ erreur: 'Ce QR code n’est pas reconnu. Demandez à un serveur.' }, 404);
     if (t.pause) return json({ erreur: 'Les commandes depuis cette table sont suspendues. Un serveur va venir vous voir.' }, 409);
     if (!this.enLigne()) return json({ erreur: 'La commande en ligne est indisponible pour le moment. Un serveur prendra votre commande.' }, 503);
     const type = b.type === 'addition' ? 'addition' : 'commande';
     if (type === 'commande' && e.service && !e.service.ouvert) return json({ erreur: e.service.message || 'Les commandes sont fermées pour le moment.' }, 409);
+    const erreurPosition = verifierPosition(b.position);
+    if (erreurPosition) return json({ erreur: erreurPosition }, 403);
     const maint = Date.now();
+    if (type === 'addition' && e.additions?.[b.t] && maint - e.additions[b.t] < 60000) {
+      return json({ erreur: 'Une addition a déjà été demandée pour cette table. Patientez une minute.' }, 429);
+    }
     let lignes = [];
     if (type === 'commande') {
       if (!Array.isArray(b.lignes) || !b.lignes.length || b.lignes.length > LIM.lignes) return json({ erreur: 'Panier vide ou trop grand' }, 400);
@@ -132,9 +162,13 @@ export class Relais {
     }
     const id = 'Q' + maint.toString(36) + Math.random().toString(36).slice(2, 6);
     const c = { id, sid, type, jeton: b.t, lignes, note: String(b.note || '').slice(0, 200), appareil: String(b.appareil || '').slice(0, 40), client: String(b.client || '').slice(0, 40), ts: maint, recu: 0, statut: 'envoyee' };
+    if (type === 'addition') {
+      e.additions = Object.fromEntries(Object.entries(e.additions || {}).filter(([, ts]) => maint - ts < 60000));
+      e.additions[b.t] = maint;
+    }
     e.attente = [...(e.attente || []), id];
     await this.st.put({ ['c:' + id]: c, ['s:' + sid]: id, etat: e });
-    hT.push(maint); hI.push(maint); this.tab.set(b.t, hT); this.ip.set(ip, hI);
+    if (type === 'commande') { hT.push(maint); hI.push(maint); this.tab.set(b.t, hT); this.ip.set(ip, hI); }
     return json({ id, statut: 'envoyee' });
   }
   async statut(url) {

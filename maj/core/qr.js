@@ -29,6 +29,11 @@ module.exports = function qrCommandes(K) {
   function init() {
     const db = D();
     if (!Array.isArray(db.qrInbox)) db.qrInbox = [];
+    for (const demande of db.qrInbox) {
+      if (demande.statut !== 'traitement') continue;
+      demande.statut = 'attente';
+      demande.alertes = [...(demande.alertes || []), 'Traitement interrompu. Vérifiez le bon papier avant de relancer.'];
+    }
     if (!db.qrTables || typeof db.qrTables !== 'object') db.qrTables = {};
     db.config.qr = {
       actif: false, relais: '', secret: '', montantMax: 40000,
@@ -193,7 +198,7 @@ module.exports = function qrCommandes(K) {
     const c = cfg(), limite = now() - 12 * 3600000;
     return {
       actif: !!c.actif, configure: !!(c.relais && c.secret), enLigne: !!c.actif && now() - etatSync.ok < 20000, erreur: c.actif ? etatSync.erreur : '', son: c.son !== false,
-      attente: D().qrInbox.filter(x => x.recu > limite && (x.statut === 'attente' || x.statut === 'traitement' || (x.statut === 'acceptee' && x.echecs && x.echecs.length && !x.echecsVu)))
+      attente: D().qrInbox.filter(x => x.recu > limite && (x.statut === 'attente' || x.statut === 'traitement' || (x.statut === 'acceptee' && !impressionsEnCours.has(x.id) && x.echecs && x.echecs.length && !x.echecsVu)))
         .slice(-40).map(x => ({ id: x.id, type: x.type, salle: x.salle, salleNom: x.salle ? salleNom(x.salle) : '?', table: x.table, recu: x.recu, statut: x.statut, detail: x.detail || [], note: x.note, montant: x.montant || 0, alertes: x.alertes || [], premiere: !!x.premiere, invalide: !!x.invalide, echecs: x.echecs || [], client: x.client || '' })),
       pauses: c.pauses || {},
     };
@@ -202,6 +207,7 @@ module.exports = function qrCommandes(K) {
   const ouverteDe = it => Object.values(D().commandes).find(x => x.statut === 'ouverte' && x.salle === it.salle && x.table === it.table);
 
   const R = K.routes;
+  const impressionsEnCours = new Set();
   R['POST /api/qr/accepter'] = async (b, u) => {
     if (!peut(u, 'serveur')) E('Non autorisé', 403);
     const it = trouver(b.id);
@@ -212,6 +218,13 @@ module.exports = function qrCommandes(K) {
       it.statut = 'traitement';
       try {
         const r = await R['POST /api/commande/addition']({ id: c.id }, u);
+        if (r.erreurs.length) {
+          it.statut = 'attente';
+          it.alertes = r.erreurs;
+          saveNow();
+          broadcast();
+          return { ok: false, erreurs: r.erreurs };
+        }
         it.statut = 'vue'; it.decision = { par: u.nom, ts: now() }; it.cmdId = c.id; save();
         return { ok: true, erreurs: (r && r.erreurs) || [] };
       } catch (e) { it.statut = 'attente'; throw e; }
@@ -222,18 +235,47 @@ module.exports = function qrCommandes(K) {
     if (cfg().suites !== 'normal') for (const l of lignes) l.suite = 0;
     K.verifierLignes({ salle: it.salle }, lignes); // contrôle complet AVANT de toucher à la table (stock, options, cuissons)
     it.statut = 'traitement';
+    impressionsEnCours.add(it.id);
     try {
       let c = ouverteDe(it);
       if (!c) c = R['POST /api/commande/ouvrir']({ salle: it.salle, table: it.table, couverts: 1, pin: b.pin }, u);
       if (it.note && !c.note) c.note = 'Client : ' + it.note.slice(0, 100);
       const r = await K.envoyerLignes(c, lignes, u, {
         source: 'qr', entete: ENTETE_BON, durable: true,
-        avantImpression: ls => { it.statut = 'acceptee'; it.cmdId = c.id; it.decision = { par: u.nom, ts: now() }; it.retirees = retirer; it.montantAccepte = ls.reduce((s, l) => s + l.prix * l.qte, 0); },
+        avantImpression: (ls, bons) => {
+          it.bonsRestants = bons.map(({ poste, doc }) => ({ poste, texte: doc.texte(), base64: doc.buf().toString('base64') }));
+          it.echecs = it.bonsRestants.map(bon => bon.poste);
+          it.statut = 'acceptee'; it.cmdId = c.id; it.decision = { par: u.nom, ts: now() }; it.retirees = retirer; it.montantAccepte = ls.reduce((s, l) => s + l.prix * l.qte, 0);
+        },
+        apresImpression: poste => marquerBonImprime(it, poste),
       });
-      if (r.echecs.length) { it.echecs = r.echecs; save(); }
       journal(u, 'QR accepté', salleNom(it.salle) + ' ' + it.table + ' — ' + it.montantAccepte + ' DA' + (retirer.length ? ' (' + retirer.length + ' article(s) retiré(s))' : ''));
       return { ok: true, erreurs: r.erreurs, cmdId: c.id };
     } catch (e) { if (it.statut === 'traitement') it.statut = 'attente'; throw e; }
+    finally { impressionsEnCours.delete(it.id); broadcast(); }
+  };
+  function marquerBonImprime(it, poste) {
+    it.bonsRestants = it.bonsRestants.filter(bon => bon.poste !== poste);
+    it.echecs = it.bonsRestants.map(bon => bon.poste);
+    saveNow();
+  }
+  R['POST /api/qr/reimprimer'] = async (b, u) => {
+    if (!peut(u, 'serveur')) E('Non autorisé', 403);
+    const it = trouver(b.id);
+    if (it.statut !== 'acceptee' || !it.bonsRestants?.length) E('Aucun bon disponible pour la réimpression ciblée');
+    if (impressionsEnCours.has(it.id)) E('Impression déjà en cours');
+    const erreurs = [];
+    impressionsEnCours.add(it.id);
+    try {
+      for (const bon of it.bonsRestants) {
+        const r = await K.imprimer(bon.poste, { buf: () => Buffer.from(bon.base64, 'base64'), texte: () => bon.texte });
+        if (r.ok) marquerBonImprime(it, bon.poste);
+        else erreurs.push(r.erreur);
+      }
+      journal(u, 'QR réimpression', salleNom(it.salle) + ' ' + it.table);
+      save();
+      return { erreurs };
+    } finally { impressionsEnCours.delete(it.id); broadcast(); }
   };
   R['POST /api/qr/refuser'] = (b, u) => {
     if (!peut(u, 'serveur')) E('Non autorisé', 403);
