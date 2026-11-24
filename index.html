@@ -1132,6 +1132,19 @@ html[lang="ar"] .statement { line-height: 1.6; }
 
   var tabs = document.getElementById("menu-tabs"), panel = document.getElementById("menu-panel");
   var menuCur = "brunch";
+  function articlesParPrix(id, section) {
+    var chaude = id === "carte" && section.t === "Entrées chaudes";
+    function priorite(article) {
+      if (!chaude) return 2;
+      var nom = article[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (/\b(soupes?|veloutes?)\b/.test(nom)) return 0;
+      if (/\b(boureks?|bouraks?|borks?)\b/.test(nom)) return 1;
+      return 2;
+    }
+    return section.items.slice().sort(function (a, b) {
+      return priorite(a) - priorite(b) || b[1] - a[1];
+    });
+  }
   function showMenu(id) {
     menuCur = id;
     Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.id === id ? "true" : "false"); });
@@ -1141,7 +1154,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
     sections.forEach(function (s) {
       var c = el("div", "course"); c.appendChild(el("h3", null, MB.tr(s.t)));
       var ul = el("ul");
-      s.items.forEach(function (it) {
+      articlesParPrix(id, s).forEach(function (it) {
         var li = el("li", "dish"), line = el("span", "line"), n = el("span", "n", MB.tr(it[0]));
         if (it[2]) n.appendChild(el("small", null, MB.tr(it[2])));
         if (PHOTOS[it[0]]) { var th = el("img", "thumb"); th.src = "photos/mini/" + PHOTOS[it[0]] + ".jpg"; th.alt = ""; th.loading = "lazy"; li.appendChild(th); }
@@ -1193,7 +1206,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
       if (id === "brunch") lpanel.appendChild(el("p", "asie-note", MB.T("liv_brunch")));
       m.sections.forEach(function (s) {
         var c = el("div", "course"); c.appendChild(el("h3", null, MB.tr(s.t))); var ul = el("ul");
-        s.items.forEach(function (it) {
+        articlesParPrix(id, s).forEach(function (it) {
           var li = el("li", "liv-dish"), n = el("span", "n", MB.tr(it[0]));
           if (it[2]) n.appendChild(el("small", null, MB.tr(it[2])));
           li.appendChild(n); li.appendChild(el("span", "p", MB.da(it[1]))); li.appendChild(qtyCtl(id, it)); ul.appendChild(li);
