@@ -99,6 +99,32 @@ function appel(chemin, corps) {
   return fetch(RELAIS + chemin, corps ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) } : {})
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.erreur || 'Erreur ' + r.status); e.code = r.status; throw e; } return j; }); });
 }
+/* Localisation obligatoire au moment de l'envoi : jamais conservée dans le navigateur. */
+function positionPourCommande() {
+  return new Promise(function (resolve, reject) {
+    if (!navigator.geolocation || !window.isSecureContext) {
+      return reject(new Error('La localisation est nécessaire pour commander. Ouvrez cette page en HTTPS et activez la localisation de votre téléphone.'));
+    }
+    navigator.geolocation.getCurrentPosition(
+      function (p) {
+        if (!Number.isFinite(p.coords.latitude) || !Number.isFinite(p.coords.longitude) || !Number.isFinite(p.coords.accuracy))
+          return reject(new Error('Position indisponible. Réessayez avec la localisation activée.'));
+        if (p.coords.accuracy > 100)
+          return reject(new Error('Votre position est trop imprécise pour vérifier la limite de 100 mètres. Activez la localisation précise et réessayez près du restaurant.'));
+        resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, precision: p.coords.accuracy, horodatage: p.timestamp });
+      },
+      function (e) {
+        var msg = e.code === 1
+          ? 'La localisation est nécessaire pour pouvoir commander. Autorisez l’accès à votre position dans les réglages du navigateur, puis réessayez.'
+          : e.code === 3
+            ? 'La localisation a pris trop de temps. Activez le GPS et réessayez.'
+            : 'Votre position est indisponible. Activez la localisation pour pouvoir commander.';
+        reject(new Error(msg));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
 function prod(id) { return S.carte.produits.find(function (p) { return p.id === id; }); }
 function cat(id) { return S.carte.categories.find(function (c) { return c.id === id; }); }
 function opt(id) { return S.carte.options.find(function (o) { return o.id === id; }); }
@@ -195,7 +221,7 @@ function vuePanier() {
     h += '<div class="ln"><div class="tx">' + esc(p.nom) + (os.length ? '<small>' + esc(os.join(', ')) + '</small>' : '') + (l.note ? '<small>« ' + esc(l.note) + ' »</small>' : '') + '<small>' + da(prixLigne(l)) + '</small></div><div class="mini"><button onclick="A.lq(' + i + ',-1)">−</button><b>' + l.qte + '</b><button onclick="A.lq(' + i + ',1)">+</button></div></div>';
   });
   h += '<div class="grp"><div class="gt">Un mot pour la cuisine ? <small>(facultatif)</small></div><textarea maxlength="200" placeholder="Ex. : anniversaire, allergie…" oninput="S.noteCmd=this.value">' + esc(S.noteCmd || '') + '</textarea></div>';
-  h += '<p style="color:var(--muted);font-size:14px">Votre commande sera validée par notre équipe avant d’être préparée. Le paiement se fait à la caisse.</p>';
+  h += '<p style="color:var(--muted);font-size:14px">Pour commander, vous devez autoriser la localisation. Les commandes sont acceptées uniquement à 100 mètres maximum du restaurant, puis validées par le caissier. Paiement à la caisse.</p>';
   h += (S.errEnvoi ? '<p class="err">' + esc(S.errEnvoi) + '</p>' : '');
   var bloque = !S.carte.caisseEnLigne || S.table.pause || (S.carte.service && !S.carte.service.ouvert);
   h += '<button class="cta ok" ' + (S.envoi || bloque || !nb() ? 'disabled' : '') + ' onclick="A.envoyer()"><span>' + (S.envoi ? 'Envoi…' : 'Envoyer la commande') + '</span><span>' + da(total()) + '</span></button>';
@@ -267,11 +293,11 @@ var A = window.A = {
     var sig = JSON.stringify(S.panier) + (S.noteCmd || '');
     if (S.sidSig !== sig) { S.sid = uuid(); S.sidSig = sig; }
     var resume = S.panier.map(function (l) { return l.qte + ' ' + prod(l.pid).nom; }).join(', ');
-    var essai = function (n) {
-      return appel('/api/commande', { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) })
-        .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1); }); throw e; });
+    var essai = function (n, position) {
+      return appel('/api/commande', { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', position: position, lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) })
+        .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1, position); }); throw e; });
     };
-    essai(0).then(function (r) {
+    positionPourCommande().then(function (position) { return essai(0, position); }).then(function (r) {
       S.commandes.push({ id: r.id, type: 'commande', statut: r.statut || 'envoyee', ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
       S.panier = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
     }).catch(function (e) { S.envoi = false; S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.'; rendre(); });
