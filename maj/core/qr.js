@@ -19,6 +19,11 @@ const jetonAleatoire = () => [...crypto.randomBytes(8)].map(x => ALPHA[x % ALPHA
 const URL_COMMANDE = 'https://lamaisonblanchehydra.com/commande/?t=';
 const ENTETE_BON = '*** COMMANDE CLIENT (QR) ***';
 
+// Une portion en avant-première par recette pendant ce premier essai.
+const PLATS_ESSAI = Object.freeze([
+  { id: 'essai-spaghettis-burrata-1', nom: 'Spaghettis pesto burrata', prix: 2300, cat: 'pates-fraiches', description: 'Spaghettis au pesto, servis avec une burrata.' },
+  { id: 'essai-linguine-crevettes-1', nom: 'Linguine aux crevettes', prix: 2800, cat: 'pates-fraiches', description: 'Linguine aux crevettes et sauce rose.' },
+]);
 module.exports = function qrCommandes(K) {
   const D = () => K.db();
   const { E, now, save, saveNow, journal, peut, broadcast, salleNom } = K;
@@ -26,6 +31,13 @@ module.exports = function qrCommandes(K) {
   const etatSync = { ok: 0, erreur: '', essai: 0, carteHash: '', carteTs: 0, busy: false };
 
   function cfg() { return D().config.qr; }
+  function estEssai(id) { return PLATS_ESSAI.some(p => p.id === id); }
+  function produitsEssai() {
+    const db = D();
+    for (const p of PLATS_ESSAI) {
+      if (!db.produits.some(x => x.id === p.id)) db.produits.push({ ...p, actif: false, stock: 1, options: [] });
+    }
+  }
   function init() {
     const db = D();
     if (!Array.isArray(db.qrInbox)) db.qrInbox = [];
@@ -39,11 +51,12 @@ module.exports = function qrCommandes(K) {
       actif: false, relais: '', secret: '', montantMax: 40000,
       ouverture: '09:00', ouvertureVendredi: '16:00', derniereCommande: '22:45',
       horaires: { Brunch: ['09:00', '18:00'], Asiatique: ['11:00', '22:45'] },
-      pauses: {}, son: true,
+      pauses: {}, son: true, essais: false,
       // 'direct' : tout part en cuisine dès l'acceptation (le client commande lui-même ses desserts plus tard) ; 'normal' : suites comme au poste du serveur
       suites: 'direct',
       ...(db.config.qr || {}),
     };
+    produitsEssai();
     tablesQr();
   }
   const cle = (s, t) => s + '|' + t;
@@ -85,7 +98,7 @@ module.exports = function qrCommandes(K) {
   // ------------------------------------------------------------ carte envoyée au relais (lue par le téléphone)
   function carte() {
     const db = D();
-    const visible = p => p.actif !== false && p.id !== 'supplement-fixe' && !p.horsQr;
+    const visible = p => p.actif !== false && !estEssai(p.id) && p.id !== 'supplement-fixe' && !p.horsQr;
     const cats = db.categories.filter(c => db.produits.some(p => p.cat === c.id && visible(p))).sort((a, b) => a.ordre - b.ordre);
     const ids = new Set(cats.map(c => c.id));
     return {
@@ -94,6 +107,8 @@ module.exports = function qrCommandes(K) {
       options: db.options.map(o => ({ id: o.id, nom: o.nom, obligatoire: !!o.obligatoire, multiple: !!o.multiple, choix: o.choix.map(ch => ({ nom: ch.nom, prix: Math.round(+ch.prix || 0) })) })),
       top: (K.topVentes() || []).slice(0, 12),
       montantMax: cfg().montantMax,
+      essais: cfg().essais ? PLATS_ESSAI.filter(p => db.categories.some(c => c.id === p.cat) &&
+        db.produits.find(x => x.id === p.id)?.stock === 1) : [],
     };
   }
   function tablesPourRelais() {
@@ -122,7 +137,7 @@ module.exports = function qrCommandes(K) {
     const srv = service(new Date(it.recu));
     if (!srv.ouvert) al.push('Commande reçue hors des horaires');
     for (const l of it.lignes) if (horsHoraire(l.pid, srv)) { const p = db.produits.find(x => x.id === l.pid); al.push((p ? p.nom : 'Article') + ' : hors horaires (' + universDe(l.pid) + ')'); }
-    try { const ls = K.verifierLignes({ salle: it.salle }, it.lignes); it.montant = ls.reduce((s, l) => s + l.prix * l.qte, 0); it.detail = ls.map(l => ({ nom: l.nom, qte: l.qte, prix: l.prix, opts: l.opts.map(o => o.nom), note: l.note })); }
+    try { const ls = K.verifierLignes({ salle: it.salle }, it.lignes, { source: 'qr' }); it.montant = ls.reduce((s, l) => s + l.prix * l.qte, 0); it.detail = ls.map(l => ({ nom: l.nom, qte: l.qte, prix: l.prix, opts: l.opts.map(o => o.nom), note: l.note })); }
     catch (e) { al.push(e.message); it.invalide = true; it.detail = it.lignes.map(l => { const p = db.produits.find(x => x.id === l.pid); return { nom: p ? p.nom : '(article supprimé)', qte: l.qte, prix: p ? p.prix : 0, opts: [], note: l.note }; }); it.montant = it.detail.reduce((s, l) => s + l.prix * l.qte, 0); }
     if (it.montant > (+c.montantMax || 40000)) al.push('Montant élevé : ' + it.montant + ' DA');
     const ouverte = Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.salle === it.salle && x.table === it.table);
@@ -186,6 +201,10 @@ module.exports = function qrCommandes(K) {
       for (const id of r.statutsOk || []) { const x = db.qrInbox.find(y => y.id === id); if (x && !x.statutOk) { x.statutOk = true; change = true; } }
       let nv = 0;
       for (const cmd of r.commandes || []) if (recevoir(cmd)) nv++;
+      if (Array.isArray(r.retoursEssais) && JSON.stringify(db.retoursEssaisQr || []) !== JSON.stringify(r.retoursEssais)) {
+        db.retoursEssaisQr = r.retoursEssais;
+        change = true;
+      }
       if (nv) { saveNow(); broadcast(); } else if (change) save();
       etatSync.ok = now(); etatSync.erreur = '';
     } catch (e) { etatSync.erreur = e.message; }
@@ -233,7 +252,7 @@ module.exports = function qrCommandes(K) {
     const lignes = it.lignes.filter((_, i) => !retirer.includes(i));
     if (!lignes.length) E('Aucun article à accepter : refusez la commande');
     if (cfg().suites !== 'normal') for (const l of lignes) l.suite = 0;
-    K.verifierLignes({ salle: it.salle }, lignes); // contrôle complet AVANT de toucher à la table (stock, options, cuissons)
+    K.verifierLignes({ salle: it.salle }, lignes, { source: 'qr' }); // contrôle complet AVANT de toucher à la table (stock, options, cuissons)
     it.statut = 'traitement';
     impressionsEnCours.add(it.id);
     try {
@@ -302,6 +321,7 @@ module.exports = function qrCommandes(K) {
     return {
       config: { ...c, secret: c.secret ? '••••••••' : '' }, sync: { ok: etatSync.ok, erreur: etatSync.erreur, essai: etatSync.essai }, service: service(),
       tables: Object.entries(D().qrTables).map(([j, t]) => ({ jeton: j, salle: t.salle, salleNom: salleNom(t.salle), table: t.table, retire: !!t.retire, pause: !!(c.pauses || {})[j], url: URL_COMMANDE + j })),
+      retoursEssais: D().retoursEssaisQr || [],
       historique: D().qrInbox.slice(-60).reverse().map(x => ({ id: x.id, type: x.type, salle: x.salle ? salleNom(x.salle) : '?', table: x.table, recu: x.recu, statut: x.statut, montant: x.montantAccepte || x.montant || 0, par: x.decision ? x.decision.par : '', motif: x.motif || '', alertes: x.alertes || [] })),
     };
   };
@@ -313,6 +333,7 @@ module.exports = function qrCommandes(K) {
     if (b.secret !== undefined && !/^•+$/.test(b.secret)) c.secret = String(b.secret || '').trim();
     if (b.actif !== undefined) c.actif = !!b.actif;
     if (b.son !== undefined) c.son = !!b.son;
+    if (typeof b.essais === 'boolean') c.essais = b.essais;
     if (b.suites !== undefined) c.suites = b.suites === 'normal' ? 'normal' : 'direct';
     if (b.montantMax !== undefined) c.montantMax = Math.max(1000, Math.round(+b.montantMax || 40000));
     for (const k of ['ouverture', 'ouvertureVendredi', 'derniereCommande']) if (b[k] !== undefined) { if (!h(b[k])) E('Heure invalide : ' + b[k]); c[k] = b[k]; }
@@ -345,5 +366,5 @@ module.exports = function qrCommandes(K) {
   init();
   setInterval(() => { sync().catch(() => {}); }, 3000);
   setInterval(() => { try { tablesQr(); } catch (e) {} }, 60000);
-  return { etat, sync, service, carte, tablesQr, recevoir, _etatSync: etatSync };
+  return { etat, sync, service, carte, tablesQr, recevoir, estEssai, _etatSync: etatSync };
 };
