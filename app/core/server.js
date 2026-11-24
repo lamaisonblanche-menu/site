@@ -770,6 +770,50 @@ function rapport(du, au) {
     rases: db.jours.filter(j => j.rase && j.date >= du && j.date <= au).map(j => ({ n: j.n, date: j.date, ...j.rase })),
   };
 }
+function rapportLignes(q) {
+  const aujourdHui = dateLocale(now());
+  const dateValide = d => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const du = q.du || aujourdHui, au = q.au || aujourdHui;
+  if (!dateValide(du) || !dateValide(au) || du > au) E('Période invalide');
+  const vendeurs = new Map(db.users.map(u => [u.id, u.nom]));
+  const lignes = [], totaux = new Map();
+  const filtres = { article: q.article, famille: q.famille, vendeur: q.vendeur };
+  const valeurs = { article: new Set(), famille: new Set(), vendeur: new Set() };
+  const groupement = Object.hasOwn(filtres, q.grouper) ? q.grouper : 'article';
+  for (const t of db.tickets.slice().reverse()) {
+    if (t.date < du || t.date > au) continue;
+    const eligible = l => !l.offert && !l.annule;
+    const base = t.lignes.reduce((n, l) => n + (eligible(l) ? l.prix * l.qte : 0), 0);
+    let cumul = 0, reparti = 0;
+    for (const l of t.lignes) {
+      if (eligible(l)) cumul += l.prix * l.qte;
+      const part = base && !t.annule && t.mode !== 'offert' ? Math.round(t.net * cumul / base) : 0;
+      const ligne = {
+        ticket: t.num, date: t.date, table: t.table, saisiA: l.envoye || null, encaisseA: t.ts,
+        article: l.nom, famille: l.catNom || 'Sans famille',
+        vendeur: l.source === 'qr' ? 'QR code' : (l.saisiPar || vendeurs.get(l.par) || 'Non renseigné'),
+        caissier: t.caissier, qte: l.qte, prix: l.prix, net: part - reparti,
+        statut: t.annule || l.annule ? 'Annulé' : (l.offert || t.mode === 'offert') ? 'Offert' : 'Vendu',
+      };
+      reparti = part;
+      for (const cle of Object.keys(valeurs)) valeurs[cle].add(ligne[cle]);
+      if (Object.entries(filtres).some(([cle, v]) => v && v !== ligne[cle])) continue;
+      lignes.push(ligne);
+      const nom = ligne[groupement];
+      const groupe = totaux.get(nom) || { nom, vendus: 0, offerts: 0, annules: 0, net: 0 };
+      const quantite = { Vendu: 'vendus', Offert: 'offerts', Annulé: 'annules' }[ligne.statut];
+      groupe[quantite] += ligne.qte;
+      groupe.net += ligne.net;
+      totaux.set(nom, groupe);
+    }
+  }
+  const offset = Math.max(0, Number.parseInt(q.offset, 10) || 0);
+  return {
+    total: lignes.length, offset, lignes: lignes.slice(offset, offset + 100),
+    filtres: Object.fromEntries(Object.entries(valeurs).map(([cle, v]) => [cle, [...v].sort((a, b) => a.localeCompare(b, 'fr'))])),
+    groupes: [...totaux.values()].sort((a, b) => b.net - a.net),
+  };
+}
 // ---- envoi de mails (Gmail, avec un mot de passe d'application), sans module externe
 function envoyerMail(dest, sujet, texte) {
   const m = db.config.mail || {};
@@ -1146,6 +1190,7 @@ function etatPublic(u) {
   const c = { ...db.config };
   // le mot de passe du mail ne quitte jamais la caisse principale
   if (c.mail) c.mail = { ...c.mail, pass: c.mail.pass ? '••••••••' : '' };
+  if (c.qr) { const { secret, ...qrPublic } = c.qr; c.qr = qrPublic; }
   return {
     user: { id: u.id, nom: u.nom, role: u.role },
     config: c,
@@ -1161,11 +1206,13 @@ function etatPublic(u) {
     categories: db.categories.slice().sort((a, b) => a.ordre - b.ordre),
     produits: db.produits,
     users: db.users.map(x => ({ id: x.id, nom: x.nom, role: x.role, actif: x.actif })),
-    commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte'),
+    commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte').map(x =>
+      u.role !== 'serveur' || peutOuvrirCommande(x, u) ? x :
+        { id: x.id, salle: x.salle, table: x.table, serveurId: x.serveurId, source: x.source, verrouillee: true, lignes: [] }),
     jour: jourCourant(false) || null,
     options: db.options, top: topVentes(), version: VERSION, qr: QR.etat(u),
     reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
-    prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
+    prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte' && (u.role !== 'serveur' || peutOuvrirCommande(db.commandes[b.cmdId], u))).map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
 }
 let topCache = { ts: 0, ids: [] };
@@ -1181,7 +1228,20 @@ function bonsKds(poste) {
   return db.bons.filter(b => (poste === 'tous' || b.poste === poste) && (b.etat === 'a_faire' || b.etat === 'attente' || (b.etat === 'pret' && b.pretTs > lim)))
     .map(b => { const c = db.commandes[b.cmdId] || {}; return { ...b, table: c.table || b.table, emporter: (c.salle || b.salle) === 'emporter', client: c.client || null, retrait: c.retrait || null, note: c.note || '', salle: salleNom(c.salle || b.salle), serveur: nomUser(b.serveurId), couverts: c.couverts || '' }; });
 }
-function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
+function peutOuvrirCommande(c, u) {
+  return peut(u, 'caissier') || (u.role === 'serveur' && c.serveurId === u.id);
+}
+function verifierAccesCommande(c, u) {
+  if (!peutOuvrirCommande(c, u)) E('Cette table est sous la responsabilité d’un autre serveur ou de la caisse.', 403);
+}
+function getCmd(id, u) {
+  const c = db.commandes[id];
+  if (!c) E('Commande introuvable', 404);
+  verifierAccesCommande(c, u);
+  if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.');
+  return c;
+}
+
 
 // Envoi d'articles sur une commande (3.6.0) : utilisé par « Envoyer » et par l'acceptation d'une commande QR.
 // verifierLignes ne modifie rien (lève une erreur lisible si un article est invalide, épuisé ou incomplet).
@@ -1224,7 +1284,7 @@ function verifierLignes(c, lignes) {
 }
 async function envoyerLignes(c, lignes, u, opt = {}) {
   const prets = verifierLignes(c, lignes);
-  const nouvelles = prets.map(l => { db.seq.ligne++; return { id: 'L' + db.seq.ligne, ...l, envoye: now(), par: u.id, annule: null, offert: false, ...(opt.source ? { source: opt.source } : {}) }; });
+  const nouvelles = prets.map(l => { db.seq.ligne++; return { id: 'L' + db.seq.ligne, ...l, envoye: now(), par: opt.source === 'qr' ? null : u.id, saisiPar: opt.source === 'qr' ? null : u.nom, annule: null, offert: false, ...(opt.source ? { source: opt.source } : {}) }; });
   for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
   const suiteAvant = c.lignes.some(l => l.envoye);
   c.lignes.push(...nouvelles);
@@ -1318,7 +1378,7 @@ const routes = {
   'POST /api/reservations/site': async (b, u) => { if (!peut(u, 'caissier')) E('Non autorisé', 403); return await lireSite(); },
   'POST /api/logout': (b, u, req) => { sessions.delete(req.headers['x-token']); return {}; },
 
-  'POST /api/commande/ouvrir': (b, u) => {
+  'POST /api/commande/ouvrir': (b, u, _req, _query, estQr = false) => {
     if (u.role === 'cuisine') E('Non autorisé', 403);
     const salle = b.salle;
     let table = String(b.table || '');
@@ -1326,7 +1386,7 @@ const routes = {
     if (salle === 'emporter') { const jj = jourCourant(true); table = 'E' + (Object.values(db.commandes).filter(x => x.salle === 'emporter' && x.jour === jj.id).length + 1); }
     if (!table) E('Table manquante');
     const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
-    if (ex) return ex;
+    if (ex) { verifierAccesCommande(ex, u); return ex; }
     // table réservée (bloquée 30 min avant) : seul un caissier peut l'ouvrir
     if (salle !== 'emporter' && salle !== 'comptoir' && !peut(u, 'caissier')) {
       const h = new Date(), mn = h.getHours() * 60 + h.getMinutes(), auj = dateLocale(now());
@@ -1339,7 +1399,7 @@ const routes = {
     }
     const j = jourCourant(true);
     db.seq.cmd++;
-    const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: u.id, ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };
+    const c = { id: 'C' + db.seq.cmd, salle, table, couverts: +b.couverts || 1, serveurId: estQr ? null : u.id, ...(estQr ? { source: 'qr' } : {}), ouverte: now(), lignes: [], statut: 'ouverte', jour: j.id, additionTs: null, note: '' };
     if (salle === 'emporter') { c.client = { nom: String(b.client && b.client.nom || '').slice(0, 40), tel: String(b.client && b.client.tel || '').slice(0, 20) }; c.retrait = +b.retrait || null; }
     db.commandes[c.id] = c;
     if (salle !== 'emporter' && salle !== 'comptoir') arriveeAuto(c);
@@ -1349,12 +1409,12 @@ const routes = {
   },
   'POST /api/commande/envoyer': async (b, u) => {
     if (u.role === 'cuisine') E('Non autorisé', 403);
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const r = await envoyerLignes(c, b.lignes, u, { couverts: b.couverts });
     return { commande: c, erreurs: r.erreurs };
   },
   'POST /api/commande/reclamer': async (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const att = c.lignes.filter(l => !l.annule && !l.paye && l.suite > (c.suite || 0));
     if (!att.length) E('Rien en attente pour cette table');
     const s = Math.min(...att.map(l => l.suite));
@@ -1378,7 +1438,7 @@ const routes = {
     return { commande: c, suite: SUITES[s], erreurs };
   },
   'POST /api/commande/message': async (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const texte = String(b.texte || '').trim().slice(0, 140);
     if (!texte) E('Message vide');
     const postes = b.poste === 'tous' ? postesBons() : [b.poste].filter(p => postesBons().includes(p));
@@ -1402,13 +1462,18 @@ const routes = {
     save(); return {};
   },
   // ---- écran cuisine
-  'GET /api/kds': (b, u, req, q) => ({ bons: bonsKds(q.poste || 'tous'), produits: db.produits.filter(p => p.actif).map(p => ({ id: p.id, nom: p.nom, stock: p.stock, poste: posteDe(p.id) })) }),
+  'GET /api/kds': (b, u, req, q) => {
+    if (u.role === 'serveur') E('Non autorisé', 403);
+    return { bons: bonsKds(q.poste || 'tous'), produits: db.produits.filter(p => p.actif).map(p => ({ id: p.id, nom: p.nom, stock: p.stock, poste: posteDe(p.id) })) };
+  },
   'POST /api/kds/pret': (b, u) => {
+    if (u.role === 'serveur') E('Non autorisé', 403);
     const bn = db.bons.find(x => x.id === b.id); if (!bn) E('Bon introuvable');
     if (bn.type === 'commande') { bn.etat = 'pret'; bn.pretTs = now(); bn.pretPar = u.nom; } else { bn.etat = 'servi'; bn.pretTs = now(); }
     save(); return {};
   },
   'POST /api/kds/rappel': (b, u) => {
+    if (u.role === 'serveur') E('Non autorisé', 403);
     const bn = db.bons.find(x => x.id === b.id); if (!bn) E('Bon introuvable');
     bn.etat = 'a_faire'; bn.pretTs = null; save(); return {};
   },
@@ -1420,7 +1485,7 @@ const routes = {
     save(); return { pid: p.id, stock: p.stock };
   },
   'POST /api/commande/reimprimer-bons': async (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const erreurs = [];
     for (const poste of postesBons()) {
       const ls = c.lignes.filter(l => !l.annule && postesDe(l.pid).includes(poste));
@@ -1431,7 +1496,7 @@ const routes = {
     return { erreurs };
   },
   'POST /api/commande/annuler-ligne': async (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const l = c.lignes.find(x => x.id === b.ligne);
     if (!l || l.annule) E('Ligne introuvable');
     if (l.paye) E('Cet article est déjà payé');
@@ -1455,7 +1520,7 @@ const routes = {
     return { commande: c, erreurs };
   },
   'POST /api/commande/offrir-ligne': (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const l = c.lignes.find(x => x.id === b.ligne);
     if (!l || l.annule) E('Ligne introuvable');
     if (l.paye) E('Cet article est déjà payé');
@@ -1467,36 +1532,45 @@ const routes = {
     return c;
   },
   'POST /api/commande/modifier': (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
+    let destinataire;
+    if (b.serveurId !== undefined) {
+      if (u.role !== 'caissier') E('Seul le caissier peut attribuer une table', 403);
+      destinataire = db.users.find(x => x.actif && x.role === 'serveur' && x.id === b.serveurId);
+      if (!destinataire) E('Serveur actif introuvable');
+    }
+    const deplace = b.salle && b.table;
+    const t = deplace ? String(b.table) : null;
+    const occ = deplace && Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.id !== c.id && x.salle === b.salle && x.table === t);
+    if (occ) verifierAccesCommande(occ, u);
     if (b.couverts) c.couverts = Math.max(1, +b.couverts);
-    if (b.salle && b.table) {
-      const t = String(b.table);
-      const occ = Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.id !== c.id && x.salle === b.salle && x.table === t);
-      if (occ) {
-        // fusion des deux tables
-        occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = [];
-        journal(u, 'fusion tables', c.table + ' -> ' + t);
-        save(); return occ;
-      }
-      journal(u, 'transfert table', salleNom(c.salle) + ' ' + c.table + ' -> ' + salleNom(b.salle) + ' ' + t);
+    if (occ) {
+      occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = [];
+      journal(u, 'fusion tables', c.table + ' -> ' + t);
+    } else if (deplace) {
+      journal(u, 'déplacement table', salleNom(c.salle) + ' ' + c.table + ' -> ' + salleNom(b.salle) + ' ' + t);
       c.salle = b.salle; c.table = t;
     }
-    if (b.serveurId && peut(u, 'caissier')) c.serveurId = b.serveurId;
-    if (b.note !== undefined) c.note = String(b.note).slice(0, 160);
-    if (b.client) c.client = { nom: String(b.client.nom || '').slice(0, 40), tel: String(b.client.tel || '').slice(0, 20) };
-    if (b.retrait !== undefined) c.retrait = +b.retrait || null;
+    const cible = occ || c;
+    if (destinataire) {
+      cible.serveurId = destinataire.id;
+      journal(u, 'attribution table', salleNom(cible.salle) + ' ' + cible.table + ' → ' + destinataire.nom);
+    }
+    if (b.note !== undefined) cible.note = String(b.note).slice(0, 160);
+    if (b.client) cible.client = { nom: String(b.client.nom || '').slice(0, 40), tel: String(b.client.tel || '').slice(0, 20) };
+    if (b.retrait !== undefined) cible.retrait = +b.retrait || null;
     save();
-    return c;
+    return cible;
   },
   'POST /api/commande/fermer-vide': (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     if (c.lignes.some(l => !l.annule && !l.paye)) E('La table a encore des articles : il faut les annuler ou encaisser.');
     c.statut = 'annulee'; c.ferme = now();
     journal(u, 'fermeture table vide', 'Table ' + c.table);
     save(); return {};
   },
   'POST /api/commande/addition': async (b, u) => {
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     if (!c.lignes.some(l => !l.annule && !l.paye)) E('La table est vide');
     c.additionTs = now(); save();
     const r = await imprimer('ticket', additionDoc(c));
@@ -1505,7 +1579,7 @@ const routes = {
   },
   'POST /api/commande/encaisser': async (b, u) => {
     if (!peut(u, 'caissier')) E('Seule la caisse peut encaisser', 403);
-    const c = getCmd(b.id);
+    const c = getCmd(b.id, u);
     const restantes = () => c.lignes.filter(l => !l.annule && !l.paye);
     if (!restantes().length) E('La table est vide');
     // Préparer la séparation sans modifier la commande avant validation du paiement.
@@ -1611,6 +1685,7 @@ const routes = {
     return { erreurs: r.ok ? [] : [r.erreur] };
   },
   'POST /api/ticket/annuler': (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const chef = pinAdmin(b.pin);
     if (!chef) E('Code du responsable obligatoire', 403);
     const tk = db.tickets.find(t => t.num === +b.num);
@@ -1788,6 +1863,10 @@ const routes = {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     const t = dateLocale(now());
     return rapport(q.du || t, q.au || t);
+  },
+  'GET /api/rapport/lignes': (b, u, req, q) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    return rapportLignes(q);
   },
   'GET /api/journal': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return db.journal.slice(-500).reverse(); },
   'GET /api/admin/users': (b, u) => { if (!peut(u, 'admin')) E('Réservé au responsable', 403); return db.users; },
