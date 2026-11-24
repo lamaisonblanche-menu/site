@@ -751,7 +751,7 @@ function admReglages() {
     <div class="field grow"><label>Mot de passe d’application</label><input type="password" value="${esc((c.mail || {}).pass || '')}" placeholder="16 lettres" onchange="A.mset('pass',this.value)"></div></div>
     <div class="field"><label>Envoyer à</label><input value="${esc((c.mail || {}).dest || 'maisonblanchehydra@gmail.com')}" onchange="A.mset('dest',this.value)"></div>
     <div class="row"><button class="btn dark" onclick="A.saveCfg()">Enregistrer</button><button class="btn" onclick="A.mtest()">Envoyer un mail d’essai</button></div></div>
-  <div class="panel"><h3>Rapports du bureau</h3><button class="btn" onclick="A.suiviBureau()">Afficher le lien et la clé</button></div>
+  <div class="panel"><h3>Rapports du bureau</h3><p class="muted">Logiciel « Rapports La Maison Blanche » du PC du bureau : consultation des ventes seulement, sans aucun droit de caisse.</p><button class="btn" onclick="A.suiviBureau()">Associer le PC du bureau / gérer l’accès</button></div>
   <div class="panel"><h3>Application et mises à jour</h3>${admApp()}</div>
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
@@ -1244,15 +1244,28 @@ const A = window.A = {
   mset(k, v) { adm.cfg.mail = adm.cfg.mail || { actif: false, user: 'maisonblanchehydra@gmail.com', dest: 'maisonblanchehydra@gmail.com', pass: '' }; if (!adm.cfg.mail.user) adm.cfg.mail.user = 'maisonblanchehydra@gmail.com'; if (!adm.cfg.mail.dest) adm.cfg.mail.dest = 'maisonblanchehydra@gmail.com'; adm.cfg.mail[k] = v; },
   mtest() { act(async () => { if (adm.cfg) await api('/api/admin/config', adm.cfg); toast('Envoi du mail d’essai…'); const r = await api('/api/admin/mail-test', {}); toast(r.ok ? 'Mail d’essai envoyé ✓ — regardez la boîte de réception' : r.erreur, !r.ok, 7000); }); },
   remail(jour) { act(async () => { toast('Envoi…'); const r = await api('/api/rase/renvoyer-mail', { jour }); toast(r.ok ? 'Rase envoyée ✓' : r.erreur, !r.ok, 6000); await loadCaisse(); render(); }); },
-  suiviBureau(action) {
+  suiviBureau(action, id) {
     act(async () => {
-      if (action === 'renouveler' && !confirm('Remplacer la clé de lecture des rapports ?')) return;
+      if (action === 'renouveler' && !confirm('Remplacer la clé de lecture des rapports ? Le PC du bureau devra être associé à nouveau.')) return;
       if (action === 'desactiver' && !confirm('Couper l’accès aux rapports depuis le bureau ?')) return;
-      const r = await api('/api/admin/suivi-bureau', { [action || 'activer']: true });
+      const r = await api('/api/admin/suivi-bureau', { [action || 'activer']: id || true });
+      clearInterval(window.__suiviT);
       if (!r.actif) { closeModal(); toast('Accès bureau désactivé'); return; }
-      modal(mh('Rapports du bureau') + '<p>Ouvrez cette adresse depuis le PC du bureau, sur le réseau du restaurant.</p>' +
+      if (action === 'accepter') toast('PC du bureau associé ✓ — les rapports s’ouvrent sur ce PC', false, 6000);
+      const demandes = r.demandes || [];
+      modal(mh('Rapports du bureau') + '<div id="suivi-bureau"></div>' +
+        (demandes.length ? '<div class="panel"><h3>Demande d’accès en attente</h3><p>Vérifiez que le code est le même que celui affiché sur l’écran du PC du bureau.</p>' +
+          demandes.map(d => `<div class="row" style="align-items:center;gap:12px"><div class="grow"><b>${esc(d.poste)}</b><br>Code <b style="font-size:26px;letter-spacing:4px">${esc(d.code.slice(0, 3) + ' ' + d.code.slice(3))}</b></div><button class="btn" onclick="A.suiviBureau('refuser','${esc(d.id)}')">Refuser</button><button class="btn dark" onclick="A.suiviBureau('accepter','${esc(d.id)}')">Accepter</button></div>`).join('') + '</div>'
+          : '<p>Sur le PC du bureau, ouvrez « Rapports La Maison Blanche » : la demande d’accès apparaîtra ici avec un code à vérifier.</p>') +
+        '<details><summary>Association manuelle (si la demande n’apparaît pas)</summary><p>Dans le logiciel du bureau, choisissez « Saisir la clé à la main » et indiquez :</p>' +
         (r.adresses.length ? r.adresses.map(a => `<div class="field"><input aria-label="Adresse" readonly value="${esc(a)}"></div>`).join('') : '<p>Adresse réseau locale indisponible.</p>') +
-        `<div class="field"><label>Clé de consultation</label><input readonly value="${esc(r.cle)}"></div><div class="mf"><button class="btn" onclick="A.suiviBureau('desactiver')">Désactiver</button><button class="btn" onclick="A.suiviBureau('renouveler')">Renouveler la clé</button><button class="btn dark" onclick="A.close()">Fermer</button></div>`);
+        `<div class="field"><label>Clé de consultation (lecture seule)</label><input readonly data-nokb value="${esc(r.cle)}"></div></details><div class="mf"><button class="btn" onclick="A.suiviBureau('desactiver')">Désactiver l’accès</button><button class="btn" onclick="A.suiviBureau('renouveler')">Renouveler la clé</button><button class="btn dark" onclick="A.close()">Fermer</button></div>`);
+      // la demande du PC du bureau arrive pendant que la fenêtre est ouverte : on la montre sans recharger
+      const vues = demandes.map(d => d.id).join();
+      window.__suiviT = setInterval(async () => {
+        if (!document.getElementById('suivi-bureau')) return clearInterval(window.__suiviT);
+        try { const n = await api('/api/admin/suivi-bureau', { activer: true }); if ((n.demandes || []).map(d => d.id).join() !== vues && document.getElementById('suivi-bureau')) A.suiviBureau(); } catch (e) {}
+      }, 3000);
     });
   },
   majVerif() { act(async () => { await api('/api/maj/verifier', {}); toast('Vérification en cours…'); setTimeout(() => A.atab('reglages'), 6000); }); },

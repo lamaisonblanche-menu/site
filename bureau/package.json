@@ -1,0 +1,51 @@
+{
+  "name": "rapports-maison-blanche",
+  "productName": "Rapports La Maison Blanche",
+  "version": "1.0.0",
+  "description": "Rapports de ventes de la caisse La Maison Blanche (PC du bureau)",
+  "author": "La Maison Blanche",
+  "main": "main.js",
+  "private": true,
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "playwright-core": "^1.49.1",
+    "resedit": "^2.0.3"
+  },
+  "build": {
+    "appId": "dz.lamaisonblanche.rapports",
+    "productName": "Rapports La Maison Blanche",
+    "files": [
+      "main.js",
+      "reseau.js",
+      "preload.js",
+      "ecran.html",
+      "ecran.js",
+      "icon.png",
+      "logo.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "afterPack": "./outils/icone-exe.js",
+    "directories": {
+      "output": "dist"
+    },
+    "electronLanguages": [
+      "fr",
+      "en-US",
+      "ar"
+    ]
+  },
+  "scripts": {
+    "construire": "electron-builder --win --x64 && cd outils && makensis -DVERSION=1.0.0 installeur.nsi"
+  }
+}

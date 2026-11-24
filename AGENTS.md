@@ -209,3 +209,13 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.6.8 (24/11/2026, Claude) — alerte QR plus grosse (demande de Manil)
 - Nouvelle commande QR / addition : grande bannière rouge en haut (`qrAlerte`, `#qralerte`) au lieu du petit toast ; reste 12 s, un appui ouvre le panneau QR.
 - Bouton 📱 en alerte : plus grand, rouge, texte « Commande(s) QR » + nombre. Panneau remonté (bottom 112px).
+
+### 3.7.1 (24/11/2026, Claude) — application Windows « Rapports La Maison Blanche » pour le PC du bureau (SRV MB)
+- Nouveau dossier `bureau/` : application Electron **séparée** de la caisse (autre appId, autre installateur, installation par utilisateur sans droits administrateur dans `%LOCALAPPDATA%\Programs`). Elle affiche dans sa propre fenêtre la page `/suivi/` de la caisse principale, en lecture seule. Elle ne reçoit QUE la clé de consultation (`db.suiviBureau.cle`) : aucun code, aucun droit de caisse.
+- Recherche de la caisse (`bureau/reseau.js`) : dernière adresse connue, puis balayage TCP du port 8080 sur le réseau local (`/api/version`) + diffusion UDP `MB-CAISSE?` (port 41234, même réponse que pour les écrans de salle). Si l'adresse de la caisse change, elle est retrouvée car c'est la clé qui fait foi.
+- Appairage par code (cœur 3.7.1, `suivi.appairage()` dans `suivi.js`) : `GET /suivi/api/identite`, `POST /suivi/api/appairage` (6 chiffres, 10 min, 5 demandes max, en mémoire seulement), `GET /suivi/api/appairage?demande=`. Le responsable accepte dans Gestion → Réglages → Rapports du bureau (`POST /api/admin/suivi-bureau` `{accepter|refuser: id}`). La clé n'est remise qu'une fois. « Désactiver » refuse aussi les demandes en attente.
+- Avec une caisse 3.7.0 (sans appairage par code), le logiciel propose de recopier la clé à la main (adresse déjà trouvée).
+- Clé chiffrée par Windows (DPAPI via `safeStorage`) dans `%APPDATA%\Rapports La Maison Blanche\bureau.json` ; journal `rapports.log` à côté.
+- Hors ligne : écran « Caisse principale hors ligne », nouvel essai toutes les 10 s, retour automatique. Clé révoquée/renouvelée : écran « Accès retiré » en 10 s maximum.
+- Construire : `cd bureau && npm ci && npx electron-builder --win --x64 && cd outils && makensis -DVERSION=1.0.0 installeur.nsi`. Tests : `node --test bureau/tests/reseau.test.js` ; essai complet `node bureau/tests/e2e.js captures [exe]`. Le workflow `rapports-bureau-windows.yml` construit et teste l'installateur sur Windows (machine GitHub).
+- Retour arrière : la 3.7.0 déployée est marquée par l'étiquette git `caisse-3.7.0-deployee` (e7b63ec). Pour revenir en arrière, republier ce contenu de `app/core/` sous un numéro plus grand (3.7.2), jamais un numéro plus petit. Le logiciel du bureau fonctionne aussi avec la 3.7.0 (clé saisie à la main).

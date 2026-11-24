@@ -205,3 +205,55 @@ test('serveur réel, accès aux seuls rapports, ventes en direct et CSV', async 
     assert.equal(rapport.synthese.ca, 2 * article.prix);
   });
 });
+
+test('appairage du PC du bureau : code, acceptation par le responsable, refus, révocation (3.7.1)', async t => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'appairage-'));
+  const port = await portLibre(), caisse = 'http://127.0.0.1:' + port;
+  const enfant = spawn(process.execPath, [path.join(__dirname, '../app/core/server.js')], {
+    env: { ...process.env, PORT: String(port), CAISSE_DATA: dir }, stdio: 'ignore',
+  });
+  t.after(async () => {
+    if (enfant.exitCode == null && enfant.signalCode == null) { const fin = new Promise(r => enfant.once('exit', r)); enfant.kill(); await fin; }
+    rmSync(dir, { recursive: true, force: true });
+  });
+  let id;
+  for (let i = 0; i < 60 && !id; i++) {
+    id = await fetch(caisse + '/suivi/api/identite').then(r => r.json()).catch(() => null);
+    if (!id) await new Promise(r => setTimeout(r, 100));
+  }
+  assert.equal(id.logiciel, 'caisse-la-maison-blanche');
+  assert.equal(id.appairage, true);
+  assert.equal(id.bureauActif, false);
+  const post = (route, data, token) => fetch(caisse + route, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Token': token || '' }, body: JSON.stringify(data) }).then(r => r.json());
+  const demander = () => post('/suivi/api/appairage', { poste: 'SRV-MB <script>' });
+  const etat = d => fetch(caisse + '/suivi/api/appairage?demande=' + d).then(r => r.json());
+  const d1 = await demander();
+  assert.match(d1.code, /^\d{6}$/);
+  assert.equal((await etat(d1.demande)).etat, 'attente');
+  assert.equal((await etat('inconnue')).etat, 'expire');
+  // un serveur ou un caissier ne peut pas accepter
+  const caissier = (await post('/api/login', { pin: '1009' })).token;
+  assert.match((await post('/api/admin/suivi-bureau', { accepter: d1.demande }, caissier)).erreur, /responsable/);
+  const admin = (await post('/api/login', { pin: '1234' })).token;
+  const liste = await post('/api/admin/suivi-bureau', { activer: true }, admin);
+  assert.deepEqual(liste.demandes.map(d => [d.poste, d.code]), [['SRV-MB script', d1.code]]);
+  await post('/api/admin/suivi-bureau', { accepter: d1.demande }, admin);
+  const ok = await etat(d1.demande);
+  assert.equal(ok.etat, 'accepte');
+  assert.equal(ok.cle, liste.cle);
+  assert.equal((await etat(d1.demande)).etat, 'expire', 'la clé n’est donnée qu’une fois');
+  const lecture = { Authorization: 'Bearer ' + ok.cle };
+  assert.equal((await fetch(caisse + '/suivi/api/rapports', { headers: lecture })).status, 200);
+  assert.equal((await fetch(caisse + '/api/etat', { headers: { 'X-Token': ok.cle } })).status, 401, 'aucun droit de caisse');
+  // refus
+  const d2 = await demander();
+  await post('/api/admin/suivi-bureau', { refuser: d2.demande }, admin);
+  assert.equal((await etat(d2.demande)).etat, 'refuse');
+  // limite de demandes en attente
+  for (let i = 0; i < 5; i++) await demander();
+  assert.match((await demander()).erreur, /Trop de demandes/);
+  // révocation : la clé ne marche plus, les demandes en attente sont refusées
+  assert.equal((await post('/api/admin/suivi-bureau', { desactiver: true }, admin)).actif, false);
+  assert.equal((await fetch(caisse + '/suivi/api/rapports', { headers: lecture })).status, 401);
+  assert.equal((await post('/api/admin/suivi-bureau', { activer: true }, admin)).demandes.length, 0);
+});

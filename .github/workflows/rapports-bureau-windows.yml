@@ -1,0 +1,68 @@
+name: Rapports du bureau — installateur et essais Windows
+# Construit l'installateur de « Rapports La Maison Blanche » et le teste sur un vrai Windows (machine GitHub),
+# contre une caisse de test lancée sur la même machine. Ne publie rien vers la caisse du restaurant.
+on:
+  push:
+    branches: ['claude/rapports-bureau-windows']
+    paths: ['bureau/**', 'app/core/**', '.github/workflows/rapports-bureau-windows.yml']
+  pull_request:
+    branches: [caisse]
+    paths: ['bureau/**', '.github/workflows/rapports-bureau-windows.yml']
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependances
+        working-directory: bureau
+        run: npm ci --no-audit --no-fund
+      - name: Tests reseau et appairage
+        working-directory: bureau
+        run: node --test tests/reseau.test.js
+      - name: Tests rapports de la caisse
+        run: node --test tests-suivi/suivi.test.js
+      - name: Construire l application
+        working-directory: bureau
+        run: npx electron-builder --win --x64
+      - name: Construire l installateur
+        working-directory: bureau/outils
+        run: '& "${env:ProgramFiles(x86)}\NSIS\makensis.exe" -DVERSION=1.0.0 installeur.nsi'
+      - name: Installation silencieuse sans droits administrateur
+        run: |
+          $p = Start-Process -FilePath "bureau\dist\Installer-Rapports-La-Maison-Blanche.exe" -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installateur : code $($p.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\Rapports La Maison Blanche\Rapports La Maison Blanche.exe'
+          if (-not (Test-Path $exe)) { throw "exe absent : $exe" }
+          "EXE=$exe" | Out-File -Append $env:GITHUB_ENV -Encoding utf8
+      - name: Raccourci Rapports La Maison Blanche sur le bureau
+        run: |
+          $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Rapports La Maison Blanche.lnk'
+          if (-not (Test-Path $lnk)) { throw "raccourci absent : $lnk" }
+          $cible = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).TargetPath
+          if ($cible -ne $env:EXE) { throw "raccourci vers $cible" }
+          Write-Host "Raccourci OK -> $cible"
+      - name: Essai complet de l application installee (appairage, vente, filtres, CSV, relance, hors ligne, revocation)
+        working-directory: bureau
+        run: node tests/e2e.js "$env:RUNNER_TEMP\captures" "$env:EXE"
+      - name: Desinstallation
+        if: always()
+        run: |
+          $u = Join-Path $env:LOCALAPPDATA 'Programs\Rapports La Maison Blanche\Desinstaller.exe'
+          if (Test-Path $u) { Start-Process $u -ArgumentList '/S' -Wait; Start-Sleep 3 }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Rapports La Maison Blanche.lnk')) { throw 'raccourci non supprime' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-windows
+          path: ${{ runner.temp }}/captures
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installateur-rapports
+          path: bureau/dist/Installer-Rapports-La-Maison-Blanche.exe

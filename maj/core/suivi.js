@@ -165,6 +165,74 @@ function gestionnaire(K) {
   };
 }
 
+// ---------------------------------------------------------------- Appairage du PC du bureau (3.7.1)
+// Le logiciel « Rapports La Maison Blanche » demande l'accès ; le responsable accepte sur la caisse
+// (Gestion → Réglages → Rapports du bureau) après avoir vérifié le code à 6 chiffres affiché sur le PC du bureau.
+// Seule la clé de LECTURE des rapports est transmise : aucun code ni droit de caisse.
+const DUREE_DEMANDE = 10 * 60000, DEMANDES_MAX = 5;
+function appairage({ cle, creerCle, nomCaisse, version, signaler, now = Date.now }) {
+  const demandes = new Map();
+  const purger = () => { for (const [id, d] of demandes) if (now() - d.ts > DUREE_DEMANDE) demandes.delete(id); };
+  const envoyer = (res, code, obj) => {
+    res.statusCode = code;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(obj));
+  };
+  function lire(req) {
+    return new Promise(ok => {
+      let s = '';
+      req.on('data', c => { s += c; if (s.length > 2048) { s = ''; req.destroy(); } });
+      req.on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch { ok({}); } });
+      req.on('error', () => ok({}));
+    });
+  }
+  // Renvoie true si la requête a été traitée.
+  function traiter(req, res, route, url) {
+    if (route === '/api/identite' && req.method === 'GET') {
+      envoyer(res, 200, { logiciel: 'caisse-la-maison-blanche', nom: nomCaisse(), version: version(), appairage: true, bureauActif: !!cle() });
+      return true;
+    }
+    if (route !== '/api/appairage') return false;
+    purger();
+    if (req.method === 'POST') {
+      lire(req).then(b => {
+        const poste = String(b.poste || 'PC du bureau').replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 40) || 'PC du bureau';
+        const enAttente = [...demandes.values()].filter(d => d.etat === 'attente');
+        if (enAttente.length >= DEMANDES_MAX) return envoyer(res, 429, { erreur: 'Trop de demandes en attente, réessayez dans quelques minutes' });
+        const id = crypto.randomBytes(24).toString('hex');
+        const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+        demandes.set(id, { id, poste, code, ts: now(), etat: 'attente' });
+        signaler(poste, code);
+        envoyer(res, 200, { demande: id, code, caisse: nomCaisse(), expire: DUREE_DEMANDE / 1000 });
+      });
+      return true;
+    }
+    if (req.method === 'GET') {
+      const d = demandes.get(url.searchParams.get('demande') || '');
+      if (!d) { envoyer(res, 200, { etat: 'expire' }); return true; }
+      if (d.etat === 'accepte') {
+        demandes.delete(d.id);
+        const c = cle();
+        envoyer(res, 200, c ? { etat: 'accepte', cle: c } : { etat: 'refuse' });
+        return true;
+      }
+      if (d.etat === 'refuse') demandes.delete(d.id);
+      envoyer(res, 200, { etat: d.etat });
+      return true;
+    }
+    envoyer(res, 405, { erreur: 'Méthode refusée' });
+    return true;
+  }
+  return {
+    traiter,
+    liste() { purger(); return [...demandes.values()].filter(d => d.etat === 'attente').map(({ id, poste, code, ts }) => ({ id, poste, code, ts })); },
+    accepter(id) { purger(); const d = demandes.get(id); if (!d || d.etat !== 'attente') return false; if (!cle()) creerCle(); d.etat = 'accepte'; return true; },
+    refuser(id) { const d = demandes.get(id); if (!d || d.etat !== 'attente') return false; d.etat = 'refuse'; return true; },
+    toutRefuser() { for (const d of demandes.values()) if (d.etat === 'attente') d.etat = 'refuse'; },
+  };
+}
+
 function demarrer(K) {
   let cfg;
   try {
@@ -181,4 +249,4 @@ function demarrer(K) {
   serveur.listen(cfg.port, cfg.hote);
 }
 
-module.exports = { demarrer, gestionnaire, lignesVentes, lireCouts };
+module.exports = { demarrer, gestionnaire, lignesVentes, lireCouts, appairage };

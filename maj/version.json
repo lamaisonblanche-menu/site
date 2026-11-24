@@ -1,11 +1,11 @@
 {
- "version": "3.7.0",
- "date": "2026-11-24T10:25:46.981Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.1",
+ "date": "2026-11-24T10:56:03.158Z",
+ "notes": "Rapports du bureau : le PC du bureau s'associe par un code à accepter dans Gestion → Réglages",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "84746b20a3a72f6ff85a629706e50507c1bd200907456b76dd808a2a5ca0efba"
+   "sha256": "4e99e7eac21c2b71a97139cacca695d98c93fbd7dd26505f04f5271809ac4b94"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "467e53aa868cc7624bd0a9c834e3e78961c138fa12b63d60ea4b8a4ffa44a0cb"
+   "sha256": "cabdd282668a9417702fafa186765a0035185a8afd525dfe8886d8321a718a47"
   },
   {
    "chemin": "public/index.html",
@@ -57,11 +57,11 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1b5c64416658f4e0f6f7095c3e3aa44320bbf861ee2505dadabead1d8b910163"
+   "sha256": "f23f79f627ce18453ace9b65dc7f0c56760acee410f7023447ba1f6fecdde399"
   },
   {
    "chemin": "suivi.js",
-   "sha256": "81f9138a270ad962064af64bc84223e23676ed45dd70a17ca441e559e8b34f3b"
+   "sha256": "0b53bfb36aef32501fcf9bef3f1fe9f815e63611d5307af23faef1ff2327bffe"
   }
  ]
 }

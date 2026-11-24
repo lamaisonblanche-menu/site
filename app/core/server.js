@@ -1805,7 +1805,12 @@ const routes = {
   // ---------------- Administration
   'POST /api/admin/suivi-bureau': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
-    if (b.desactiver === true) { delete db.suiviBureau; saveNow(); return { actif: false }; }
+    if (b.desactiver === true) { delete db.suiviBureau; appairageBureau.toutRefuser(); saveNow(); journal(u, 'rapports du bureau : accès désactivé'); return { actif: false }; }
+    if (b.desactiver !== true && typeof b.accepter === 'string') {
+      if (!appairageBureau.accepter(b.accepter)) E('Demande expirée : relancez l’appairage sur le PC du bureau');
+      journal(u, 'rapports du bureau : accès accordé', b.accepter.slice(0, 8));
+    }
+    if (typeof b.refuser === 'string') appairageBureau.refuser(b.refuser);
     if (!db.suiviBureau?.cle || b.renouveler === true) {
       db.suiviBureau = { cle: crypto.randomBytes(32).toString('hex') };
       saveNow();
@@ -1814,7 +1819,7 @@ const routes = {
     try { reseaux = os.networkInterfaces(); } catch {}
     const adresses = Object.values(reseaux).flat().filter(x => x && x.family === 'IPv4' && !x.internal)
       .map(x => 'http://' + x.address + ':' + PORT + '/suivi/');
-    return { actif: true, cle: db.suiviBureau.cle, adresses: [...new Set(adresses)] };
+    return { actif: true, cle: db.suiviBureau.cle, adresses: [...new Set(adresses)], demandes: appairageBureau.liste() };
   },
   'GET /api/rapport': (b, u, req, q) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
@@ -1929,6 +1934,12 @@ const outilsSuivi = {
   }),
 };
 const rapportsBureau = suivi.gestionnaire(outilsSuivi);
+const appairageBureau = suivi.appairage({
+  cle: () => db.suiviBureau?.cle || '',
+  creerCle: () => { db.suiviBureau = { cle: crypto.randomBytes(32).toString('hex') }; saveNow(); },
+  nomCaisse: () => os.hostname(), version: () => VERSION,
+  signaler: (poste, code) => { journal(null, 'rapports du bureau : demande d’accès', poste + ' (code ' + code + ')'); broadcast(); },
+});
 suivi.demarrer(outilsSuivi);
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -1937,6 +1948,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/suivi' && req.method === 'GET') {
       res.writeHead(302, { Location: '/suivi/' }); return res.end();
     }
+    if (url.pathname.startsWith('/suivi/') && appairageBureau.traiter(req, res, url.pathname.slice(6), url)) return;
     if (url.pathname.startsWith('/suivi/')) return rapportsBureau(req, res, db.suiviBureau?.cle, '/suivi');
     if (url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
