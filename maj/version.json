@@ -1,7 +1,7 @@
 {
  "version": "3.7.5",
- "date": "2026-11-24T15:18:56.502Z",
- "notes": "Verrouille les écrans de salle après inactivité et revient au plan après un envoi réussi.",
+ "date": "2026-11-24T15:26:18.263Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
