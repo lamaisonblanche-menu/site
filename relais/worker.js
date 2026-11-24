@@ -45,17 +45,24 @@ export default {
 };
 
 export class Relais {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.st = ctx.storage; this.ip = new Map(); this.tab = new Map(); this.etat = null; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.st = ctx.storage; this.ip = new Map(); this.tab = new Map(); this.etat = null; this.file = Promise.resolve(); }
 
   async charger() { if (!this.etat) this.etat = (await this.st.get('etat')) || { service: null, tables: {}, carte: null, attente: [] }; return this.etat; }
 
+  enSerie(traiter) {
+    const demande = this.file.then(traiter);
+    this.file = demande.catch(() => {});
+    return demande;
+  }
   async fetch(req) {
     const url = new URL(req.url);
     try {
-      if (url.pathname === '/caisse/sync' && req.method === 'POST') return await this.sync(req);
+      if (url.pathname === '/caisse/sync' && req.method === 'POST') return await this.enSerie(() => this.sync(req));
       if (url.pathname === '/api/table' && req.method === 'GET') return await this.table(url);
       if (url.pathname === '/api/carte' && req.method === 'GET') return await this.carte();
-      if (url.pathname === '/api/commande' && req.method === 'POST') return await this.commande(req);
+      if (url.pathname === '/api/commande' && req.method === 'POST') return await this.enSerie(() => this.commande(req));
+      if (url.pathname === '/api/essais' && req.method === 'GET') return await this.essais(url);
+      if (url.pathname === '/api/essais/retour' && req.method === 'POST') return await this.enSerie(() => this.retourEssai(req));
       if (url.pathname === '/api/commande' && req.method === 'GET') return await this.statut(url);
       return json({ erreur: 'Inconnu' }, 404);
     } catch (e) { return json({ erreur: 'Erreur du relais' }, 500); }
@@ -91,7 +98,7 @@ export class Relais {
     // commandes pas encore reçues par la caisse (la caisse les dédoublonne par id)
     const commandes = [];
     if (e.attente.length) { const m = await this.st.get(e.attente.map(id => 'c:' + id)); for (const c of m.values()) if (!c.recu) commandes.push({ id: c.id, sid: c.sid, type: c.type, jeton: c.jeton, lignes: c.lignes, note: c.note, appareil: c.appareil, client: c.client, ts: c.ts }); }
-    return json({ commandes, acksOk, statutsOk });
+    return json({ commandes, acksOk, statutsOk, retoursEssais: e.retoursEssais || [] });
   }
 
   // ---------------------------------------------------------- téléphone
@@ -104,7 +111,35 @@ export class Relais {
   async carte() {
     const e = await this.charger();
     if (!e.carte) return json({ erreur: 'Carte indisponible pour le moment' }, 503);
-    return json({ ...e.carte, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
+    const { essais, ...carte } = e.carte;
+    return json({ ...carte, positionRequise: true, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
+  }
+  offresDisponibles(e) {
+    return (e.carte?.essais || []).filter(p => !e.essaisPris?.[p.id]);
+  }
+  async essais(url) {
+    const e = await this.charger(), t = e.tables[url.searchParams.get('t') || ''];
+    if (!t || t.pause || !this.enLigne() || !e.service?.ouvert) return json({ produits: [] });
+    return json({ produits: this.offresDisponibles(e) });
+  }
+  essaisAcceptes(c) {
+    if (c.statut !== 'acceptee') return [];
+    return (c.essais || []).filter(e => !(c.retirees || []).includes(e.index));
+  }
+  async retourEssai(req) {
+    const b = await req.json().catch(() => ({}));
+    const e = await this.charger(), c = await this.st.get('c:' + String(b.id || '').slice(0, 40));
+    if (!c || c.appareil !== b.appareil) return json({ erreur: 'Commande introuvable' }, 404);
+    const plat = this.essaisAcceptes(c).find(p => p.id === b.pid);
+    if (!plat) return json({ erreur: 'Plat d’essai introuvable' }, 404);
+    const texte = typeof b.texte === 'string' ? b.texte.trim().slice(0, 500) : '';
+    if (!texte) return json({ erreur: 'Écrivez un court retour.' }, 400);
+    if ((e.retoursEssais || []).some(r => r.pid === plat.id && r.commande === c.id)) return json({ ok: true });
+    const retoursEssais = [...(e.retoursEssais || []), { pid: plat.id, commande: c.id, nom: plat.nom, table: c.tableEssai, texte }];
+    const etat = { ...e, retoursEssais };
+    await this.st.put('etat', etat);
+    this.etat = etat;
+    return json({ ok: true });
   }
   async commande(req) {
     const b = await req.json().catch(() => ({}));
@@ -132,20 +167,28 @@ export class Relais {
     if (type === 'addition' && e.additions?.[b.t] && maint - e.additions[b.t] < 60000) {
       return json({ erreur: 'Une addition a déjà été demandée pour cette table. Patientez une minute.' }, 429);
     }
-    let lignes = [];
+    const lignes = [], essaisChoisis = new Map();
     if (type === 'commande') {
       if (!Array.isArray(b.lignes) || !b.lignes.length || b.lignes.length > LIM.lignes) return json({ erreur: 'Panier vide ou trop grand' }, 400);
       const carte = e.carte || { produits: [], options: [], categories: [] };
       let total = 0;
       for (const l of b.lignes) {
-        const p = carte.produits.find(x => x.id === l.pid);
+        const essai = this.offresDisponibles(e).find(x => x.id === l.pid);
+        if (!essai && (e.essaisPris?.[l.pid] || (carte.essais || []).some(x => x.id === l.pid))) {
+          return json({ erreur: 'Cette portion d’essai vient d’être réservée.' }, 409);
+        }
+        const p = essai || carte.produits.find(x => x.id === l.pid);
         if (!p) return json({ erreur: 'Un article n’est plus à la carte. Rechargez la page.' }, 409);
         if (p.epuise) return json({ erreur: p.nom + ' est épuisé.' }, 409);
         const cat = carte.categories.find(c => c.id === p.cat);
         if (cat && e.service && e.service.univers && e.service.univers[cat.univers] === false) return json({ erreur: p.nom + ' n’est pas servi à cette heure-ci.' }, 409);
         const qte = parseInt(l.qte, 10);
         if (!(qte >= 1 && qte <= LIM.qte)) return json({ erreur: 'Quantité invalide' }, 400);
-        const opts = Array.isArray(l.opts) ? l.opts.slice(0, 12).map(o => ({ g: String(o.g || '').slice(0, 40), i: parseInt(o.i, 10) })) : [];
+        if (essai) {
+          if (qte !== 1 || essaisChoisis.has(essai.id)) return json({ erreur: 'Une seule portion par plat d’essai.' }, 409);
+          essaisChoisis.set(essai.id, { id: essai.id, nom: essai.nom, index: lignes.length });
+        }
+        const opts = !essai && Array.isArray(l.opts) ? l.opts.slice(0, 12).map(o => ({ g: String(o.g || '').slice(0, 40), i: parseInt(o.i, 10) })) : [];
         let prix = p.prix;
         for (const o of opts) { const g = carte.options.find(x => x.id === o.g); if (g && g.choix[o.i]) prix += g.choix[o.i].prix || 0; }
         total += prix * qte;
@@ -161,13 +204,15 @@ export class Relais {
       if (hT.length >= LIM.tableLong || hI.length >= LIM.ipLong) return json({ erreur: 'Trop de commandes en peu de temps. Un serveur va venir vous voir.' }, 429);
     }
     const id = 'Q' + maint.toString(36) + Math.random().toString(36).slice(2, 6);
-    const c = { id, sid, type, jeton: b.t, lignes, note: String(b.note || '').slice(0, 200), appareil: String(b.appareil || '').slice(0, 40), client: String(b.client || '').slice(0, 40), ts: maint, recu: 0, statut: 'envoyee' };
+    const c = { id, sid, type, jeton: b.t, lignes, note: String(b.note || '').slice(0, 200), appareil: String(b.appareil || '').slice(0, 40), client: String(b.client || '').slice(0, 40), ts: maint, recu: 0, statut: 'envoyee', ...(essaisChoisis.size ? { essais: [...essaisChoisis.values()], tableEssai: t.table } : {}) };
     if (type === 'addition') {
       e.additions = Object.fromEntries(Object.entries(e.additions || {}).filter(([, ts]) => maint - ts < 60000));
       e.additions[b.t] = maint;
     }
-    e.attente = [...(e.attente || []), id];
-    await this.st.put({ ['c:' + id]: c, ['s:' + sid]: id, etat: e });
+    const etat = { ...e, attente: [...(e.attente || []), id] };
+    if (essaisChoisis.size) etat.essaisPris = { ...e.essaisPris, ...Object.fromEntries([...essaisChoisis.keys()].map(pid => [pid, id])) };
+    await this.st.put({ ['c:' + id]: c, ['s:' + sid]: id, etat });
+    this.etat = etat;
     if (type === 'commande') { hT.push(maint); hI.push(maint); this.tab.set(b.t, hT); this.ip.set(ip, hI); }
     return json({ id, statut: 'envoyee' });
   }
@@ -175,7 +220,7 @@ export class Relais {
     const c = await this.st.get('c:' + (url.searchParams.get('id') || ''));
     if (!c || c.appareil !== (url.searchParams.get('a') || '')) return json({ erreur: 'Commande introuvable' }, 404);
     const statut = c.statut === 'envoyee' ? (c.recu ? 'recue' : 'envoyee') : c.statut;
-    return json({ statut, motif: c.motif || '', retirees: c.retirees || [], total: c.total || 0, type: c.type });
+    return json({ statut, motif: c.motif || '', retirees: c.retirees || [], total: c.total || 0, type: c.type, essais: this.essaisAcceptes(c).map(p => ({ id: p.id, nom: p.nom, retour: (this.etat?.retoursEssais || []).some(r => r.pid === p.id && r.commande === c.id) })) });
   }
 }
 
