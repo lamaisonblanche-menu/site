@@ -73,7 +73,14 @@ function afficher({ rapport: r, synthese: s, ouvert }) {
     }));
     if (!donnees.length) el(id).append(noeud('p', 'Aucune vente sur la période.'));
   }
-  barres('jours', Object.entries(s.jours).sort(([a], [b]) => a.localeCompare(b)).slice(-31), jour => jour.slice(5));
+  const periodeLongue = Date.parse(r.au) - Date.parse(r.du) >= 31 * 86400000;
+  const points = {};
+  for (const [jour, montant] of Object.entries(s.jours)) {
+    const cle = periodeLongue ? jour.slice(0, 7) : jour;
+    points[cle] = (points[cle] || 0) + montant;
+  }
+  el('titre-periode').textContent = periodeLongue ? 'Ventes par mois' : 'Ventes par jour';
+  barres('jours', Object.entries(points).sort(([a], [b]) => a.localeCompare(b)), jour => periodeLongue ? jour : jour.slice(5));
   barres('heures', Object.entries(s.heures), h => h.padStart(2, '0') + ' h');
   filtresDisponibles(r);
   const t = r.totaux;
@@ -82,8 +89,8 @@ function afficher({ rapport: r, synthese: s, ouvert }) {
     ' · Marge matière calculée sur ' + t.qteAvecCout + ' unité(s) · ' + t.qteSansCout + ' sans coût.';
   tableau('groupes', ['Groupe', 'Vendus', 'Offerts', 'Annulés', 'Net', 'Remises', 'Coût matière connu', 'Marge matière connue', 'Sans coût'],
     r.groupes.map(g => [g.nom, g.vendus, g.offerts, g.annules, dinars(g.net), dinars(g.remises), centimes(g.qteAvecCout ? g.coutCentimes : null), centimes(g.margeCentimes), g.qteSansCout]));
-  tableau('lignes', ['Ticket', 'Jour', 'Saisie', 'Encaissement', 'Salle', 'Table', 'Article', 'Famille', 'Origine', 'Vendeur', 'Caissier', 'Qté', 'Prix unitaire', 'Net', 'Statut', 'Coût matière', 'Marge'],
-    r.lignes.map(l => [l.ticket ?? '—', l.date, heure(l.saisiA), heure(l.encaisseA), l.salle, l.table, l.article, l.famille, l.origine, l.vendeur, l.caissier || '—', l.qte, dinars(l.prix), dinars(l.net), l.statut, centimes(l.coutCentimes), centimes(l.margeCentimes)]));
+  tableau('lignes', ['Ticket', 'Jour', 'Saisie', 'Encaissement', 'Salle', 'Table', 'Article', 'Options', 'Famille', 'Origine', 'Vendeur', 'Caissier', 'Qté', 'Prix unitaire', 'Net', 'Statut', 'Coût matière', 'Marge'],
+    r.lignes.map(l => [l.ticket ?? '—', l.date, heure(l.saisiA), heure(l.encaisseA), l.salle, l.table, l.article, l.options || '—', l.famille, l.origine, l.vendeur, l.caissier || '—', l.qte, dinars(l.prix), dinars(l.net), l.statut, centimes(l.coutCentimes), centimes(l.margeCentimes)]));
   tableau('clotures', ['Clôture', 'Jour', 'CA', 'Attendu', 'Compté', 'Écart'], s.rases.map(c => [c.n, c.date, dinars(c.ca), dinars(c.attendu), dinars(c.compte), dinars(c.ecart)]));
   el('page').textContent = r.total ? (r.offset + 1) + '–' + Math.min(r.offset + 100, r.total) + ' sur ' + r.total : '0 ligne';
   el('precedent').disabled = !r.offset;
