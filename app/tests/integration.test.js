@@ -50,6 +50,26 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     const ouvert = await api('/api/commande/ouvrir', { salle: 'gastro', table: '1', couverts: 2 });
     assert.equal(ouvert.status, 200);
     const id = ouvert.data.id;
+    const responsable = token;
+    const equipe = (await api('/api/admin/users')).data;
+    equipe.push({ id: 'serveur-test', nom: 'Serveur test', pin: '0712', role: 'serveur', actif: true },
+      { id: 'serveur-test-long', nom: 'Serveur test long', pin: '071234', role: 'serveur', actif: true });
+    assert.equal((await api('/api/admin/users', { users: equipe })).status, 200);
+    const ambigu = await api('/api/code-valide', { pin: '0712' }, false);
+    assert.equal(ambigu.data.confirmer, true);
+    assert.equal(ambigu.data.ok, false);
+    const long = await api('/api/code-valide', { pin: '071234' }, false);
+    assert.equal(long.data.ok, true);
+    const serveur = await api('/api/login', { pin: '0712' }, false);
+    assert.equal(serveur.data.user.id, 'serveur-test');
+    token = serveur.data.token;
+    const occupee = (await api('/api/etat')).data.commandes.find(c => c.id === id);
+    assert.equal(occupee.occupee, true);
+    assert.equal((await api('/api/commande/ouvrir', { salle: 'gastro', table: '1' })).status, 403);
+    assert.equal((await api('/api/commande/modifier', { id, note: 'Test' })).status, 403);
+    assert.equal((await api('/api/qr/accepter', { id: 'exemple' })).status, 403);
+    assert.equal((await api('/api/qr/refuser', { id: 'exemple' })).status, 403);
+    token = responsable;
     const badQty = await api('/api/commande/envoyer', { id, lignes: [{ pid: product.id, qte: 100 }] });
     assert.equal(badQty.status, 400);
     const sansNom = await api('/api/commande/envoyer', { id, lignes: [{ pid: supplement.id, qte: 1 }] });
@@ -76,13 +96,19 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     const open2 = await api('/api/commande/ouvrir', { salle: 'gastro', table: '2', couverts: 1 });
     assert.equal(open2.status, 200);
     const id2 = open2.data.id;
-    const sent2 = await api('/api/commande/envoyer', { id: id2, lignes: [{ pid: product.id, qte: 2 }] });
+    const envoi = { id: id2, operation: 'a'.repeat(32), lignes: [{ pid: product.id, qte: 2 }] };
+    const [sent2, envoiRepete] = await Promise.all([api('/api/commande/envoyer', envoi), api('/api/commande/envoyer', envoi)]);
     assert.equal(sent2.status, 200);
+    assert.equal(envoiRepete.status, 200);
+    assert.equal(envoiRepete.data.commande.lignes.length, 1);
     const state2 = await api('/api/etat');
     const line2 = state2.data.commandes.find(c => c.id === id2).lignes[0];
-    const partial = await api('/api/commande/encaisser', { id: id2, lignes: [{ id: line2.id, qte: 1 }], mode: 'tpe', imprimer: false });
+    const paiement = { id: id2, operation: 'b'.repeat(32), lignes: [{ id: line2.id, qte: 1 }], mode: 'tpe', imprimer: false };
+    const partial = await api('/api/commande/encaisser', paiement);
     assert.equal(partial.status, 200, JSON.stringify(partial.data));
     assert.equal(partial.data.partiel, true);
+    const paiementRepete = await api('/api/commande/encaisser', paiement);
+    assert.equal(paiementRepete.data.ticket.num, partial.data.ticket.num);
     const unit = product.prix;
     const mixed = await api('/api/commande/encaisser', { id: id2, paiements: [{ mode: 'especes', montant: 100 }, { mode: 'tpe', montant: unit - 100 }], imprimer: false });
     assert.equal(mixed.status, 200, JSON.stringify(mixed.data));
@@ -97,7 +123,7 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     const invalidHour = await api('/api/reservation', { date: '2026-12-01', heure: '29:00', nom: 'Test', couverts: 2 });
     assert.equal(invalidHour.status, 400);
     // Limitation des tentatives de connexion.
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       const failed = await api('/api/login', { pin: '0000' }, false);
       assert.equal(failed.status, 401);
     }

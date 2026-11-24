@@ -1,11 +1,11 @@
 {
- "version": "3.7.3",
- "date": "2026-11-24T13:38:28.559Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.4",
+ "date": "2026-11-24T13:47:08.486Z",
+ "notes": "Fiabilise la saisie des codes, protège les tables et la validation QR, évite les doublons de commande et de paiement.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "c5c590b00cd6c1d7a69736ea08aa29cdd07d75eae430122c5b6651d299368c49"
+   "sha256": "ca55f5e83e89fc12dca7a46e705a708a050d83ec4a0567fab5e647bc39236b79"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "88909a0fef7f55d2ab0fcb83d4620a19cafb8f976b28d8a1eb3c896e04757f99"
+   "sha256": "91a08f19a4641f478f4c1dd7bd6686ce382bd6459cfb15edb1e0f5184e45478b"
   },
   {
    "chemin": "public/index.html",
@@ -49,7 +49,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "ca9421d397bdf6575328abb3a2a684c7749b8a7f5998f51d659102d7b25dfec7"
+   "sha256": "f39c64c8f018891d323df6b055e43bcd7fb0e6fb240525d7c45e675f9f6342af"
   },
   {
    "chemin": "seed-menu.json",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "f632683167a5b394627e0dda2e846c1c67b5912ec8a462e299eb2294ca7a5ccc"
+   "sha256": "6c5b085a76695d16eea1de71165989e5f9f9cebb71b4beffd56024519470966b"
   },
   {
    "chemin": "suivi.js",
