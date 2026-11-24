@@ -177,6 +177,18 @@ function bandeau() {
   if (sv && !sv.ouvert) return '<div class="bandeau">' + esc(sv.message || 'Les commandes sont fermées pour le moment.') + '</div>';
   return '';
 }
+function ordrePrixFamille(produits, entreesChaudesGastro) {
+  function priorite(p) {
+    if (!entreesChaudesGastro) return 2;
+    var nom = normaliserNom(p.nom);
+    if (/\b(soupes?|veloutes?)\b/.test(nom)) return 0;
+    if (/\b(boureks?|bouraks?|borks?)\b/.test(nom)) return 1;
+    return 2;
+  }
+  return produits.slice().sort(function (a, b) {
+    return priorite(a) - priorite(b) || b.prix - a.prix;
+  });
+}
 function vueCarte() {
   var h = '<div class="top"><div class="l1"><img src="/logo-blanc.png" alt="La Maison Blanche"><div class="tb">' + esc(S.table.salleNom) + '<b>Table ' + esc(S.table.table) + '</b></div></div><div class="tabs">';
   universListe().forEach(function (u) { h += '<button class="tab ' + (u === S.univers ? 'on' : '') + '" onclick="A.univers(\'' + u.replace(/'/g, "\\'") + '\')">' + esc(u) + '</button>'; });
@@ -189,7 +201,9 @@ function vueCarte() {
       '</div></div><span class="plus">+</span></button></section>';
   }
   S.carte.categories.filter(function (c) { return c.univers === S.univers; }).forEach(function (c) {
-    var ps = S.carte.produits.filter(function (p) { return p.cat === c.id; }); if (!ps.length) return;
+    var chaude = c.univers === 'La carte' && (c.id === 'entrees-chaudes' || normaliserNom(c.nom) === 'entrees chaudes');
+    var ps = ordrePrixFamille(S.carte.produits.filter(function (p) { return p.cat === c.id; }), chaude);
+    if (!ps.length) return;
     h += '<section class="sec"><h2>' + esc(c.nom) + '</h2>';
     ps.forEach(function (p) {
       var dsp = dispo(p), ph = photo(p), q = S.panier.filter(function (l) { return l.pid === p.id; }).reduce(function (s, l) { return s + l.qte; }, 0);
