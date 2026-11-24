@@ -156,7 +156,7 @@ function normaliserNom(nom) {
 }
 function miseEnAvant(univers) {
   var choix = {
-    'La carte': { titre: 'À découvrir', noms: [/\brossini\b/, /coeur de filet|cœur de filet/] },
+    'La carte': { titre: 'À découvrir', noms: [/coeur de filet|cœur de filet/] },
     'Brunch': { titre: 'À découvrir', noms: [/\btunacado\b/] },
     'Asiatique': { titre: 'À partager', noms: [/duo signature/] },
   };
@@ -237,9 +237,14 @@ function vueFiche(f) {
 function suggestions() {
   var dans = function (u) { return S.panier.some(function (l) { var p = prod(l.pid); return p && universDe(p) === u; }); };
   var out = [];
+  // Sélection comparée à la carte publiée sur le site, avec les libellés de la caisse.
+  var nomsCarte = {
+    Desserts: ['profiteroles chocolat', 'nougat glace fruits rouges', 'tiramisu'],
+    Boissons: ['cocktail maison blanche', 'exotic passion', 'exotic mango', 'mojito classique'],
+  };
   [['Desserts', 'Une douceur pour finir ?'], ['Boissons', 'Et pour boire ?']].forEach(function (x) {
     if (dans(x[0])) return;
-    var ps = S.carte.produits.filter(function (p) { return universDe(p) === x[0] && !dispo(p); });
+    var ps = S.carte.produits.filter(function (p) { return universDe(p) === x[0] && nomsCarte[x[0]].includes(normaliserNom(p.nom)) && !dispo(p); });
     var signature = function (p) { return normaliserNom(p.nom) === 'cocktail maison blanche' ? 1 : 0; };
     ps.sort(function (a, b) { return signature(b) - signature(a) || b.prix - a.prix || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
     if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 1) });
