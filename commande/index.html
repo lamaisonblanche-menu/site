@@ -87,8 +87,23 @@ var Q = new URLSearchParams(location.search), JETON = Q.get('t') || '';
 var S = { table: null, carte: null, univers: null, panier: [], feuille: null, envoi: false, err: '', commandes: [] };
 var APP = (function () { try { var a = localStorage.getItem('mb_appareil'); if (!a) { a = 'a' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('mb_appareil', a); } return a; } catch (e) { return 'a' + Math.random().toString(36).slice(2); } })();
 var CLE = 'mb_cmd_' + JETON;
-try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
-function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes })); } catch (e) {} }
+var CLE_FAVORIS = 'mb_favoris_v1';
+var favoris = null;
+try {
+  var fSauves = JSON.parse(localStorage.getItem(CLE_FAVORIS) || 'null');
+  if (Array.isArray(fSauves)) favoris = fSauves.filter(function (id) { return typeof id === 'string'; }).slice(0, 30);
+} catch (e) {}
+function sauverFavoris(valeur) {
+  try {
+    if (valeur === null) localStorage.removeItem(CLE_FAVORIS);
+    else localStorage.setItem(CLE_FAVORIS, JSON.stringify(valeur));
+    favoris = valeur;
+  } catch (e) { alert('Ce navigateur ne permet pas de mémoriser vos préférences.'); }
+  rendre();
+}
+
+try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.sid = sv.sid; S.sidSig = sv.sidSig; S.noteCmd = sv.noteCmd; S.sidAddition = sv.sidAddition; S.suggestionVue = !!sv.suggestionVue; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
+function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes, sid: S.sid, sidSig: S.sidSig, noteCmd: S.noteCmd, sidAddition: S.sidAddition, suggestionVue: S.suggestionVue })); } catch (e) {} }
 
 var $ = function (s) { return document.querySelector(s); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -98,6 +113,26 @@ function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : 'x' + Date.n
 function appel(chemin, corps) {
   return fetch(RELAIS + chemin, corps ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) } : {})
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.erreur || 'Erreur ' + r.status); e.code = r.status; throw e; } return j; }); });
+}
+function positionClient() {
+  return new Promise(function (resolve, reject) {
+    function erreur(message) { reject(Object.assign(new Error(message), { code: 'position' })); }
+    if (!navigator.geolocation) return erreur('La localisation est indisponible. Demandez à un serveur.');
+    navigator.geolocation.getCurrentPosition(function (p) {
+      resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy });
+    }, function (e) {
+      erreur(e.code === 1 ? 'Autorisez la localisation dans votre navigateur pour commander.'
+        : 'Impossible de vous localiser. Activez la localisation précise puis réessayez.');
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+  });
+}
+function actualiserPanier() {
+  var avant = S.panier.length;
+  S.panier = S.panier.filter(function (l) { return prod(l.pid); });
+  if (S.panier.length === avant) return false;
+  S.errEnvoi = 'Un article a été retiré de la carte. Vérifiez votre panier.';
+  garder();
+  return true;
 }
 function prod(id) { return S.carte.produits.find(function (p) { return p.id === id; }); }
 function cat(id) { return S.carte.categories.find(function (c) { return c.id === id; }); }
@@ -112,12 +147,21 @@ function charger() {
   if (!JETON) { S.err = 'QR code incomplet. Demandez à un serveur.'; return rendre(); }
   Promise.all([appel('/api/table?t=' + encodeURIComponent(JETON)), appel('/api/carte')]).then(function (r) {
     S.table = r[0]; S.carte = r[1];
-    var u = universListe(); if (!S.univers || u.indexOf(S.univers) < 0) S.univers = u.filter(function (x) { return !S.carte.service || !S.carte.service.univers || S.carte.service.univers[x] !== false; })[0] || u[0];
-    S.panier = S.panier.filter(function (l) { return prod(l.pid); });
+    var u = universListe(); if (u.indexOf(S.univers) < 0) S.univers = u[0];
+    actualiserPanier();
     rendre(); suivre();
   }).catch(function (e) { S.err = e.message || 'Connexion impossible. Vérifiez votre connexion internet.'; rendre(); });
 }
-function universListe() { var u = []; S.carte.categories.forEach(function (c) { if (u.indexOf(c.univers) < 0) u.push(c.univers); }); return u.sort(function (a, b) { return (ORDRE_UNIVERS.indexOf(a) + 1 || 99) - (ORDRE_UNIVERS.indexOf(b) + 1 || 99); }); }
+function universListe() {
+  var nom = (S.table.salle || S.table.salleNom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  var ouverture = /brunch/.test(nom) ? 'Brunch' : /gastro/.test(nom) ? 'La carte' : null;
+  var disponibles = new Set(S.carte.categories.map(function (c) { return c.univers; }));
+  var ordre = Array.from(new Set([ouverture].concat(ORDRE_UNIVERS, Array.from(disponibles))));
+  var liste = ordre.filter(function (u) { return disponibles.has(u); });
+  if (ouverture && disponibles.has(ouverture)) return liste;
+  var service = S.carte.service && S.carte.service.univers || {};
+  return liste.filter(function (u) { return service[u] !== false; }).concat(liste.filter(function (u) { return service[u] === false; }));
+}
 
 function bandeau() {
   var t = S.table, sv = S.carte.service;
@@ -141,6 +185,15 @@ function vueCarte() {
     });
     h += '</section>';
   });
+  if (favoris) {
+    var connus = favoris.map(prod).filter(function (p) { return p && !dispo(p); });
+    if (connus.length) {
+      h += '<section class="sec"><h2>Mes favoris</h2>' + connus.map(function (p) {
+        return '<button class="lien" data-pid="' + esc(p.id) + '" onclick="A.ouvrir(this.dataset.pid)">' + esc(p.nom) + ' · ' + da(p.prix) + '</button>';
+      }).join('') + '</section>';
+    }
+  }
+  h += '<button class="lien" onclick="A.memoire()">' + (favoris ? 'Oublier mes préférences' : 'Se souvenir de mes préférences') + '</button>';
   h += '<button class="lien" onclick="A.addition()">Demander l’addition</button>';
   if (S.commandes.length) h += '<button class="lien" onclick="A.suivi()">Suivre mes commandes (' + S.commandes.length + ')</button>';
   h += '</main>';
@@ -161,6 +214,7 @@ function vueFiche(f) {
   });
   h += '<div class="grp"><div class="gt">Une précision ? <small>(facultatif)</small></div><textarea maxlength="120" placeholder="Ex. : sans oignon, sauce à part…" oninput="S.feuille.note=this.value">' + esc(f.note) + '</textarea></div>';
   h += '<div class="qte"><button onclick="A.fq(-1)">−</button><b>' + f.qte + '</b><button onclick="A.fq(1)">+</button></div>';
+  if (favoris) h += '<button class="lien" onclick="A.favori()">' + (favoris.includes(p.id) ? 'Retirer de mes favoris' : 'Ajouter à mes favoris') + '</button>';
   var l = { pid: f.pid, qte: f.qte, opts: f.opts };
   h += (f.err ? '<p class="err">' + esc(f.err) + '</p>' : '') + '<button class="cta" onclick="A.ajouter()"><span>Ajouter</span><span>' + da(prixLigne(l)) + '</span></button></div></div>';
   return h;
@@ -168,12 +222,12 @@ function vueFiche(f) {
 /* ---------- suggestions (dessert, boisson) ---------- */
 function suggestions() {
   var dans = function (u) { return S.panier.some(function (l) { var p = prod(l.pid); return p && universDe(p) === u; }); };
-  var top = S.carte.top || [], out = [];
+  var out = [];
   [['Desserts', 'Une douceur pour finir ?'], ['Boissons', 'Et pour boire ?']].forEach(function (x) {
     if (dans(x[0])) return;
     var ps = S.carte.produits.filter(function (p) { return universDe(p) === x[0] && !dispo(p); });
-    ps.sort(function (a, b) { return ((top.indexOf(a.id) + 1) || 99) - ((top.indexOf(b.id) + 1) || 99) || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
-    if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 6) });
+    ps.sort(function (a, b) { return b.prix - a.prix || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
+    if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 1) });
   });
   return out;
 }
@@ -194,7 +248,7 @@ function vuePanier() {
     var p = prod(l.pid), os = l.opts.map(function (o) { var g = opt(o.g); return g && g.choix[o.i] ? g.choix[o.i].nom : ''; }).filter(Boolean);
     h += '<div class="ln"><div class="tx">' + esc(p.nom) + (os.length ? '<small>' + esc(os.join(', ')) + '</small>' : '') + (l.note ? '<small>« ' + esc(l.note) + ' »</small>' : '') + '<small>' + da(prixLigne(l)) + '</small></div><div class="mini"><button onclick="A.lq(' + i + ',-1)">−</button><b>' + l.qte + '</b><button onclick="A.lq(' + i + ',1)">+</button></div></div>';
   });
-  h += '<div class="grp"><div class="gt">Un mot pour la cuisine ? <small>(facultatif)</small></div><textarea maxlength="200" placeholder="Ex. : anniversaire, allergie…" oninput="S.noteCmd=this.value">' + esc(S.noteCmd || '') + '</textarea></div>';
+  h += '<div class="grp"><div class="gt">Un mot pour la cuisine ? <small>(facultatif)</small></div><textarea maxlength="200" placeholder="Ex. : anniversaire, allergie…" oninput="S.noteCmd=this.value;garder()">' + esc(S.noteCmd || '') + '</textarea></div>';
   h += '<p style="color:var(--muted);font-size:14px">Votre commande sera validée par notre équipe avant d’être préparée. Le paiement se fait à la caisse.</p>';
   h += (S.errEnvoi ? '<p class="err">' + esc(S.errEnvoi) + '</p>' : '');
   var bloque = !S.carte.caisseEnLigne || S.table.pause || (S.carte.service && !S.carte.service.ouvert);
@@ -233,6 +287,15 @@ function suivre() {
 }
 
 var A = window.A = {
+  memoire: function () {
+    if (favoris === null) sauverFavoris([]);
+    else if (confirm('Effacer les favoris mémorisés dans ce navigateur ?')) sauverFavoris(null);
+  },
+  favori: function () {
+    if (!favoris || !S.feuille || !S.feuille.pid) return;
+    var id = S.feuille.pid;
+    sauverFavoris(favoris.includes(id) ? favoris.filter(function (p) { return p !== id; }) : [id].concat(favoris).slice(0, 30));
+  },
   univers: function (u) { S.univers = u; rendre(); window.scrollTo(0, 0); },
   ouvrir: function (pid) {
     var p = prod(pid), d = dispo(p); if (d) return;
@@ -246,6 +309,7 @@ var A = window.A = {
   },
   fq: function (d) { var f = S.feuille; f.qte = Math.max(1, Math.min(20, f.qte + d)); rendre(); },
   ajouter: function () {
+    if (S.envoi) return;
     var f = S.feuille, p = prod(f.pid);
     for (var k = 0; k < (p.options || []).length; k++) { var g = opt(p.options[k]); if (g && g.obligatoire && !f.opts.some(function (o) { return o.g === g.id; })) { f.err = 'Choisissez « ' + g.nom + ' ».'; return rendre(); } }
     var note = (f.note || '').trim(), cle = JSON.stringify([f.pid, f.opts, note]);
@@ -253,38 +317,48 @@ var A = window.A = {
     if (ex) ex.qte = Math.min(20, ex.qte + f.qte); else S.panier.push({ pid: f.pid, qte: f.qte, opts: f.opts, note: note });
     garder();
     var u = universDe(p);
-    S.feuille = (u !== 'Desserts' && u !== 'Boissons' && suggestions().length) ? 'sugg' : null;
+    var proposer = !S.suggestionVue && u !== 'Desserts' && u !== 'Boissons' && suggestions().length;
+    S.feuille = proposer ? 'sugg' : null;
+    if (proposer) { S.suggestionVue = true; garder(); }
     rendre();
   },
-  lq: function (i, d) { var l = S.panier[i]; l.qte += d; if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
+  lq: function (i, d) { if (S.envoi) return; var l = S.panier[i]; l.qte = Math.min(20, l.qte + d); if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
   panier: function () { S.errEnvoi = ''; S.feuille = 'panier'; rendre(); },
   suivi: function () { S.feuille = 'suivi'; rendre(); },
   fermer: function () { S.feuille = null; rendre(); },
   envoyer: function () {
     if (S.envoi || !S.panier.length) return;
+    if (actualiserPanier()) return rendre();
     S.envoi = true; S.errEnvoi = ''; rendre();
     // même identifiant tant que le panier n'a pas changé : un renvoi après coupure ne crée jamais de doublon
     var sig = JSON.stringify(S.panier) + (S.noteCmd || '');
     if (S.sidSig !== sig) { S.sid = uuid(); S.sidSig = sig; }
+    garder();
     var resume = S.panier.map(function (l) { return l.qte + ' ' + prod(l.pid).nom; }).join(', ');
+    var demande = { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) };
     var essai = function (n) {
-      return appel('/api/commande', { t: JETON, sid: S.sid, type: 'commande', appareil: APP, note: S.noteCmd || '', lignes: S.panier.map(function (l) { return { pid: l.pid, qte: l.qte, opts: l.opts, note: l.note }; }) })
+      return appel('/api/commande', demande)
         .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1); }); throw e; });
     };
-    essai(0).then(function (r) {
+    positionClient().then(function (position) { demande.position = position; return essai(0); }).then(function (r) {
       S.commandes.push({ id: r.id, type: 'commande', statut: r.statut || 'envoyee', ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
       S.panier = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
     }).catch(function (e) { S.envoi = false; S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.'; rendre(); });
   },
   addition: function () {
-    if (!confirm('Demander l’addition pour la table ' + S.table.table + ' ?')) return;
-    appel('/api/commande', { t: JETON, sid: uuid(), type: 'addition', appareil: APP }).then(function (r) {
+    if (S.envoiAddition || !confirm('Demander l’addition pour la table ' + S.table.table + ' ?')) return;
+    S.envoiAddition = true;
+    S.sidAddition = S.sidAddition || uuid(); garder();
+    positionClient().then(function (position) {
+      return appel('/api/commande', { t: JETON, sid: S.sidAddition, type: 'addition', appareil: APP, position: position });
+    }).then(function (r) {
+      S.sidAddition = null;
       S.commandes.push({ id: r.id, type: 'addition', statut: 'envoyee', ts: Date.now(), resume: '' }); garder(); S.feuille = 'suivi'; rendre(); suivre();
-    }).catch(function (e) { alert(e.message || 'Connexion impossible'); });
+    }).catch(function (e) { if (typeof e.code === 'number' && e.code < 500) { S.sidAddition = null; garder(); } alert(e.message || 'Connexion impossible'); }).finally(function () { S.envoiAddition = false; });
   },
 };
 charger();
-setInterval(function () { if (!S.feuille) appel('/api/carte').then(function (c) { S.carte = c; rendre(); }).catch(function () {}); }, 60000);
+setInterval(function () { if (!S.feuille && !S.envoi) appel('/api/carte').then(function (c) { if (!S.envoi) { S.carte = c; actualiserPanier(); rendre(); } }).catch(function () {}); }, 60000);
 </script>
 </body>
 </html>
