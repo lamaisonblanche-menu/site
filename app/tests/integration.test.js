@@ -53,7 +53,8 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     const responsable = token;
     const equipe = (await api('/api/admin/users')).data;
     equipe.push({ id: 'serveur-test', nom: 'Serveur test', pin: '0712', role: 'serveur', actif: true },
-      { id: 'serveur-test-long', nom: 'Serveur test long', pin: '071234', role: 'serveur', actif: true });
+      { id: 'serveur-test-long', nom: 'Serveur test long', pin: '071234', role: 'serveur', actif: true },
+      { id: 'caissier-test', nom: 'Caissier test', pin: '0713', role: 'caissier', actif: true });
     assert.equal((await api('/api/admin/users', { users: equipe })).status, 200);
     const ambigu = await api('/api/code-valide', { pin: '0712' }, false);
     assert.equal(ambigu.data.confirmer, true);
@@ -63,10 +64,22 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     const serveur = await api('/api/login', { pin: '0712' }, false);
     assert.equal(serveur.data.user.id, 'serveur-test');
     token = serveur.data.token;
-    const occupee = (await api('/api/etat')).data.commandes.find(c => c.id === id);
-    assert.equal(occupee.occupee, true);
-    assert.equal((await api('/api/commande/ouvrir', { salle: 'gastro', table: '1' })).status, 403);
-    assert.equal((await api('/api/commande/modifier', { id, note: 'Test' })).status, 403);
+    const tableCollegue = (await api('/api/etat')).data.commandes.find(c => c.id === id);
+    assert.equal(tableCollegue.serveurId, login.data.user.id);
+    assert.equal((await api('/api/commande/ouvrir', { salle: 'gastro', table: '1' })).data.id, id);
+    assert.equal((await api('/api/commande/modifier', { id, note: 'Test' })).status, 200);
+    assert.equal((await api('/api/commande/modifier', { id, salle: 'gastro', table: '2' })).status, 403);
+    assert.equal((await api('/api/maj')).status, 403);
+    assert.equal((await api('/api/maj/verifier', {})).status, 403);
+    assert.equal((await api('/api/maj/installer', {})).status, 403);
+    const caisse = await api('/api/login', { pin: '0713' }, false);
+    assert.equal(caisse.data.user.role, 'caissier');
+    token = caisse.data.token;
+    assert.equal((await api('/api/maj')).status, 200);
+    assert.equal((await api('/api/maj/verifier', {})).status, 200);
+    assert.equal((await api('/api/maj/installer', {})).status, 200);
+    assert.equal((await api('/api/admin/users')).status, 403);
+    token = serveur.data.token;
     assert.equal((await api('/api/qr/accepter', { id: 'exemple' })).status, 403);
     assert.equal((await api('/api/qr/refuser', { id: 'exemple' })).status, 403);
     token = responsable;
@@ -74,8 +87,11 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     assert.equal(badQty.status, 400);
     const sansNom = await api('/api/commande/envoyer', { id, lignes: [{ pid: supplement.id, qte: 1 }] });
     assert.equal(sansNom.status, 400);
+    token = serveur.data.token;
     const sent = await api('/api/commande/envoyer', { id, lignes: [{ pid: product.id, qte: 2 }, { pid: supplement.id, qte: 2, note: 'Olives' }] });
     assert.equal(sent.status, 200, JSON.stringify(sent.data));
+    assert.equal(sent.data.commande.lignes[0].par, serveur.data.user.id);
+    token = responsable;
     const state = await api('/api/etat');
     const order = state.data.commandes.find(c => c.id === id);
     assert.ok(order);
