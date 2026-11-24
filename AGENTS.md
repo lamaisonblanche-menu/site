@@ -205,3 +205,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 
 ### 3.6.7 (24/11/2026, Claude)
 - Youcef (serveur) : code 0110 (`db.equipe6`). Ne touche pas « Youcef D. » (sushiman).
+
+### 3.6.8 (24/11/2026, Claude) — alerte QR plus grosse (demande de Manil)
+- Nouvelle commande QR / addition : grande bannière rouge en haut (`qrAlerte`, `#qralerte`) au lieu du petit toast ; reste 12 s, un appui ouvre le panneau QR.
+- Bouton 📱 en alerte : plus grand, rouge, texte « Commande(s) QR » + nombre. Panneau remonté (bottom 112px).

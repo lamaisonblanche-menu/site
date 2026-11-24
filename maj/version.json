@@ -1,11 +1,11 @@
 {
- "version": "3.6.7",
- "date": "2026-11-24T09:54:19.825Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.8",
+ "date": "2026-11-24T09:58:58.798Z",
+ "notes": "Alerte des commandes QR plus grosse",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "01885e6ae39e17d7a4efd9f1fc0b6eb2f0506c0b51e5622947ae4d56a97ba14a"
+   "sha256": "e5a79df29353a75840b4fee9eb53f9b4d18927eca3791fe963c6d5b40ba872c3"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "682dd849b9990c0b67ac0323a0307c4d477f68491859cca4916661de2bf16181"
+   "sha256": "ab7de445f00159bd5ed77d183c379bdba223924052e755e3b920816e41b94088"
   },
   {
    "chemin": "public/index.html",
@@ -33,7 +33,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "5e25695c92a6ea9d2c322d14bb4e7d1f8b61b8abe3f3221e1dfac3187fac3bb2"
+   "sha256": "5b72012dac77518acaf0995960de149e7aa490d4f4d362eeba67682751d0c1ad"
   },
   {
    "chemin": "qr.js",

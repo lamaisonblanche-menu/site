@@ -678,3 +678,19 @@ td.r,th.r{white-space:nowrap}
 body.vkb-on #app{padding-bottom:var(--vkbh,300px)}
 body.vkb-on #modal{bottom:var(--vkbh,300px);align-items:flex-start}
 body.vkb-on .mbox{max-height:100%}
+
+/* 3.6.8 : alerte QR plus grosse */
+.qr-fab .lb{display:none;font-size:20px;font-weight:600}
+.qr-fab.alerte{height:84px;border-radius:42px;font-size:32px;padding:0 26px;gap:12px;background:var(--bad)}
+.qr-fab.alerte .lb{display:inline}
+.qr-fab.alerte b{background:#fff;color:var(--bad);min-width:38px;height:38px;border-radius:19px;font-size:22px}
+#qralerte{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:70;width:min(720px,calc(100vw - 28px));display:flex;align-items:center;gap:18px;padding:22px 26px;background:var(--bad);color:#fff;border-radius:20px;box-shadow:0 14px 44px rgba(0,0,0,.4);cursor:pointer}
+#qralerte[hidden]{display:none}
+#qralerte .ic{font-size:48px;line-height:1}
+#qralerte .tx{flex:1}
+#qralerte .ti{font-size:28px;font-weight:700}
+#qralerte .li{font-size:24px;margin-top:4px}
+#qralerte .ok{background:#fff;color:var(--bad);font-weight:700;font-size:22px;padding:14px 22px;border-radius:14px}
+#qralerte.anim{animation:qrin .35s ease-out, qrpulse 1.2s .35s 6}
+@keyframes qrin{from{transform:translate(-50%,-40px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.qr-fab.alerte ~ .qr-panel,.qr-panel{bottom:112px;max-height:calc(100vh - 140px)}

@@ -1561,10 +1561,19 @@ function qrSurveiller() {
     if (nv.length) {
       if (q.son) bip(3);
       const x = nv[0];
-      toast('📱 ' + (x.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande') + ' — ' + x.salleNom + ' table ' + x.table, false, 5000);
+      qrAlerte(x.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande QR', x.salleNom + ' — Table ' + x.table, nv.length);
     }
   }
   S.qr.vus = ids;
+}
+// 3.6.8 : grande alerte bien visible en haut de l'écran (au lieu du petit message en bas)
+function qrAlerte(titre, lieu, nb) {
+  let el = document.getElementById('qralerte');
+  if (!el) { el = document.createElement('div'); el.id = 'qralerte'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="ic">📱</div><div class="tx"><div class="ti">${esc(titre)}${nb > 1 ? ' (+' + (nb - 1) + ')' : ''}</div><div class="li">${esc(lieu)}</div></div><div class="ok">Voir</div>`;
+  el.onclick = () => { el.hidden = true; if (!S.qr.ouvert) A.qrToggle(); };
+  el.hidden = false; el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim');
+  clearTimeout(qrAlerte._t); qrAlerte._t = setTimeout(() => { el.hidden = true; }, 12000);
 }
 function qrWidget() {
   const q = S.etat && S.etat.qr;
@@ -1572,7 +1581,7 @@ function qrWidget() {
   const att = q.attente.filter(x => x.statut === 'attente' || x.statut === 'traitement');
   const echecs = q.attente.filter(x => x.statut === 'acceptee');
   const n = att.length + echecs.length;
-  const fab = `<button class="qr-fab ${n ? 'alerte' : ''} ${q.enLigne ? '' : 'horsligne'}" onclick="A.qrToggle()" title="Commandes des clients">📱${n ? '<b>' + n + '</b>' : ''}</button>`;
+  const fab = `<button class="qr-fab ${n ? 'alerte' : ''} ${q.enLigne ? '' : 'horsligne'}" onclick="A.qrToggle()" title="Commandes des clients">📱${n ? '<span class="lb">Commande' + (n > 1 ? 's' : '') + ' QR</span><b>' + n + '</b>' : ''}</button>`;
   if (!S.qr.ouvert) return fab;
   const ligne = (it, l, i) => {
     const r = (S.qr.retirer[it.id] || []).includes(i);
