@@ -42,7 +42,7 @@ async function api(path, body) {
   try { r = await fetch(path, opt); }
   catch (e) { toast('Pas de connexion avec la caisse principale. Vérifiez le réseau.', true); throw e; }
   const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && path !== '/api/login') { logout(true); throw new Error(j.erreur); }
+  if (r.status === 401 && path !== '/api/login') { if (opt.headers['X-Token'] === S.token) logout(true); throw new Error(j.erreur); }
   if (!r.ok) { const e = new Error(j.erreur || 'Erreur'); e.status = r.status; throw e; }
   return j;
 }
@@ -55,11 +55,17 @@ function toast(msg, bad, ms) {
 async function act(fn) { try { return await fn(); } catch (e) { if (e.message) toast(e.message, true); return null; } }
 
 async function refresh() {
-  if (!S.token) return;
-  try { S.etat = await api('/api/etat'); } catch (e) { return; }
+  const token = S.token;
+  if (!token) return;
+  try {
+    const etat = await api('/api/etat');
+    if (S.token !== token) return;
+    S.etat = etat;
+  } catch (e) { return; }
   if (S.view === 'caisse') await loadCaisse();
   if (S.view === 'kds') await loadKds();
   if (S.view === 'resa') await loadResa();
+  if (S.token !== token || !S.etat) return;
   alertesPrets();
   qrSurveiller();
   verifierVersion(S.etat.version);
@@ -190,21 +196,30 @@ async function login(cred) {
 function logout(expired) {
   if (S.token && !expired) api('/api/logout', {}).catch(() => {});
   S.token = ''; localStorage.removeItem('mb_token'); S.etat = null; S.view = 'login'; S.draft = []; S.cmdId = null; S.sel = null; S.qty = ''; pin = '';
+  S.envoiOperation = null;
   closeModal(); render();
 }
+const brouillonsVerrouilles = new Map();
 let lastTouch = Date.now();
 function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
-setInterval(() => {
+function verifierInactivite() {
   if (!S.etat) return;
+  const role = S.etat.user.role;
   const reg = +S.etat.config.deconnexionServeurSec;
-  const sec = CAISSE_PRINCIPALE || S.etat.user.role === 'cuisine' ? 0 : (Number.isFinite(reg) ? reg : 60);
-  if (sec > 0 && Date.now() - lastTouch > sec * 1000) {
-    if (S.draft.length) return; // jamais pendant une commande en cours de saisie
+  const serveurSalle = !CAISSE_PRINCIPALE && role === 'serveur';
+  const sec = serveurSalle ? (reg > 0 ? Math.min(reg, 30) : 30) : (Number.isFinite(reg) ? reg : 60);
+  if (!CAISSE_PRINCIPALE && role !== 'cuisine' && sec > 0 && Date.now() - lastTouch >= sec * 1000) {
+    if (!serveurSalle && S.draft.length) return;
+    if (serveurSalle && S.cmdId && S.draft.length) {
+      brouillonsVerrouilles.set(S.etat.user.id, { table: S.cmdId, lignes: S.draft, envoi: S.envoiOperation });
+    }
     logout();
+    return;
   }
   const c = $('#clock'); if (c) c.textContent = hm(Date.now());
-}, 1000);
+}
+setInterval(verifierInactivite, 1000);
 
 // ------------------------------------------------------------ Barre du haut
 function topbar() { return S.online ? '' : '<div class="offline">Connexion perdue avec la caisse principale… reconnexion en cours</div>'; }
@@ -934,7 +949,17 @@ const A = window.A = {
     draw();
   },
   comptoir() { act(async () => { const c = await api('/api/commande/ouvrir', { salle: 'comptoir', table: 'Comptoir', couverts: 1 }); S.etat.commandes.push(c); S.salle = 'emporter'; A.voir(c.id); }); },
-  voir(id) { if (S.etat.commandes.some(c => c.id === id && c.occupee)) return; S.cmdId = id; S.draft = []; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande'; render(); },
+  voir(id) {
+    if (S.etat.commandes.some(c => c.id === id && c.occupee)) return;
+    S.cmdId = id; S.draft = []; S.envoiOperation = null; S.search = ''; S.sel = null; S.qty = ''; S.view = 'commande';
+    const brouillon = brouillonsVerrouilles.get(S.etat.user.id);
+    if (brouillon?.table === id) {
+      S.draft = brouillon.lignes;
+      S.envoiOperation = brouillon.envoi;
+      brouillonsVerrouilles.delete(S.etat.user.id);
+    }
+    render();
+  },
   cat(id) { S.cat = id; S.search = ''; render(); },
   search(v) { S.search = v; render(); const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } },
   nq(k) { if (k === 'C') { S.qty = ''; S.sel = null; } else if (S.qty.length < 2) S.qty = (S.qty + k).replace(/^0+/, ''); render(); },
@@ -1017,15 +1042,22 @@ const A = window.A = {
   rr() { render(); },
   async envoyer() {
     const c = cmd(); if (!c || !S.draft.length || S.envoiEnCours) return;
+    const token = S.token;
+    const utilisateur = S.etat.user.id;
     S.envoiEnCours = true;
     let r;
     const corps = avecOperation(S.envoiOperation ||= {}, { id: c.id, lignes: S.draft.slice() });
     try { r = await act(() => api('/api/commande/envoyer', corps)); }
     finally { S.envoiEnCours = false; }
     if (!r) return;
+    if (brouillonsVerrouilles.get(utilisateur)?.envoi?.operation === corps.operation) brouillonsVerrouilles.delete(utilisateur);
+    if (S.token !== token || S.cmdId !== c.id) return;
     S.envoiOperation = null; S.draft = []; S.sel = null; S.qty = ''; showErrs(r);
-    if (!r.erreurs.length) toast('Commande envoyée ✓');
-    if (S.etat.user.role === 'serveur') { S.view = 'tables'; S.cmdId = null; }
+    if (!r.erreurs.length) {
+      toast('Commande envoyée ✓');
+      closeModal(); S.view = 'tables'; S.cmdId = null;
+      render();
+    }
     refresh();
   },
   ligneEnvoyee(id) {

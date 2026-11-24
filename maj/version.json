@@ -1,11 +1,11 @@
 {
- "version": "3.7.4",
- "date": "2026-11-24T13:53:04.783Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.5",
+ "date": "2026-11-24T15:18:56.502Z",
+ "notes": "Verrouille les écrans de salle après inactivité et revient au plan après un envoi réussi.",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "ca55f5e83e89fc12dca7a46e705a708a050d83ec4a0567fab5e647bc39236b79"
+   "sha256": "56a9fb1e3ee277fa386a0193cd8b39ebd826cfd473ea03e6cba6017cb5833e29"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "91a08f19a4641f478f4c1dd7bd6686ce382bd6459cfb15edb1e0f5184e45478b"
+   "sha256": "b651d28624b94c0366e91292789b6e32d1da5f97fa48f7a423614a903b9262ee"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "6c5b085a76695d16eea1de71165989e5f9f9cebb71b4beffd56024519470966b"
+   "sha256": "8372a5c73fa60ec24479a1cadd2000ef5b42c079209d6611361c50a1b0ef81b7"
   },
   {
    "chemin": "suivi.js",

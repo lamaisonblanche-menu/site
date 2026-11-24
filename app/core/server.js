@@ -1315,7 +1315,10 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
   const erreurs = [], echecs = [];
   for (const { poste, doc } of bonsAImprimer) {
     const r = await imprimer(poste, doc);
-    if (r.ok) opt.apresImpression?.(poste);
+    if (r.simule && opt.signalerSimulation) {
+      erreurs.push('Impression simulée pour ' + poste + ' : configurez une imprimante');
+      echecs.push(poste);
+    } else if (r.ok) opt.apresImpression?.(poste);
     else { erreurs.push(r.erreur); echecs.push(poste); }
   }
   journal(u, 'envoi', (opt.source === 'qr' ? '[QR] ' : '') + 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
@@ -1422,6 +1425,7 @@ const routes = {
     const r = await envoyerLignes(c, b.lignes, u, {
       couverts: b.couverts,
       durable: !!operation,
+      signalerSimulation: true,
       avantImpression: operation ? () => { (c.envois ||= {})[operation] = {}; } : undefined,
     });
     if (operation) {
