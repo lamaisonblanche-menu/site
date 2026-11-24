@@ -70,3 +70,4 @@ Fait et testé (rien de publié) :
 ## Journal
 - 24/11 01:20 (Claude) : refactor envoi, migration prix, qr.js, ce document.
 - 24/11 01:30 (Claude) : interface caisse, relais, page client, PDF des QR, tests.
+- 24/11 01:40 (Claude) : relais EN LIGNE https://mb-commandes.lamaisonblanche.workers.dev (compte Cloudflare de Manil, secret CAISSE_SECRET posé, connu de Manil seulement). Test complet téléphone → relais réel → caisse OK. Page : RELAIS renseigné sur la branche claude/qr-page-commande. Reste : feu vert de Manil pour publier la caisse 3.6.0 et fusionner la page dans main, puis saisir adresse + clé dans Gestion → Commandes QR.

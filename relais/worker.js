@@ -85,7 +85,7 @@ export class Relais {
   async carte() {
     const e = await this.charger();
     if (!e.carte) return json({ erreur: 'Carte indisponible pour le moment' }, 503);
-    return json({ ...e.carte, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'public, max-age=20' });
+    return json({ ...e.carte, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
   }
   async commande(req) {
     const b = await req.json().catch(() => ({}));
