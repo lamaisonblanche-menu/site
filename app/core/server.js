@@ -770,49 +770,11 @@ function rapport(du, au) {
     rases: db.jours.filter(j => j.rase && j.date >= du && j.date <= au).map(j => ({ n: j.n, date: j.date, ...j.rase })),
   };
 }
-function rapportLignes(q) {
-  const aujourdHui = dateLocale(now());
-  const dateValide = d => /^\d{4}-\d{2}-\d{2}$/.test(d);
-  const du = q.du || aujourdHui, au = q.au || aujourdHui;
-  if (!dateValide(du) || !dateValide(au) || du > au) E('Période invalide');
-  const vendeurs = new Map(db.users.map(u => [u.id, u.nom]));
-  const lignes = [], totaux = new Map();
-  const filtres = { article: q.article, famille: q.famille, vendeur: q.vendeur };
-  const valeurs = { article: new Set(), famille: new Set(), vendeur: new Set() };
-  const groupement = Object.hasOwn(filtres, q.grouper) ? q.grouper : 'article';
-  for (const t of db.tickets.slice().reverse()) {
-    if (t.date < du || t.date > au) continue;
-    const eligible = l => !l.offert && !l.annule;
-    const base = t.lignes.reduce((n, l) => n + (eligible(l) ? l.prix * l.qte : 0), 0);
-    let cumul = 0, reparti = 0;
-    for (const l of t.lignes) {
-      if (eligible(l)) cumul += l.prix * l.qte;
-      const part = base && !t.annule && t.mode !== 'offert' ? Math.round(t.net * cumul / base) : 0;
-      const ligne = {
-        ticket: t.num, date: t.date, table: t.table, saisiA: l.envoye || null, encaisseA: t.ts,
-        article: l.nom, famille: l.catNom || 'Sans famille',
-        vendeur: l.source === 'qr' ? 'QR code' : (l.saisiPar || vendeurs.get(l.par) || 'Non renseigné'),
-        caissier: t.caissier, qte: l.qte, prix: l.prix, net: part - reparti,
-        statut: t.annule || l.annule ? 'Annulé' : (l.offert || t.mode === 'offert') ? 'Offert' : 'Vendu',
-      };
-      reparti = part;
-      for (const cle of Object.keys(valeurs)) valeurs[cle].add(ligne[cle]);
-      if (Object.entries(filtres).some(([cle, v]) => v && v !== ligne[cle])) continue;
-      lignes.push(ligne);
-      const nom = ligne[groupement];
-      const groupe = totaux.get(nom) || { nom, vendus: 0, offerts: 0, annules: 0, net: 0 };
-      const quantite = { Vendu: 'vendus', Offert: 'offerts', Annulé: 'annules' }[ligne.statut];
-      groupe[quantite] += ligne.qte;
-      groupe.net += ligne.net;
-      totaux.set(nom, groupe);
-    }
-  }
-  const offset = Math.max(0, Number.parseInt(q.offset, 10) || 0);
-  return {
-    total: lignes.length, offset, lignes: lignes.slice(offset, offset + 100),
-    filtres: Object.fromEntries(Object.entries(valeurs).map(([cle, v]) => [cle, [...v].sort((a, b) => a.localeCompare(b, 'fr'))])),
-    groupes: [...totaux.values()].sort((a, b) => b.net - a.net),
-  };
+const suivi = require('./suivi.js');
+function rapportLignes(q, exportComplet = false) {
+  return suivi.lignesVentes(db, q, dateLocale(now()), E, {
+    exportComplet, couts: suivi.lireCouts(DATA), salleNom,
+  });
 }
 // ---- envoi de mails (Gmail, avec un mot de passe d'application), sans module externe
 function envoyerMail(dest, sujet, texte) {
@@ -2028,6 +1990,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ erreur: code === 500 ? 'Erreur interne : ' + e.message : e.message }));
   }
+});
+
+suivi.demarrer({
+  data: DATA, publicDir: path.join(DIR, 'public'), rapportLignes, rapport, resumeJour,
+  jourCourant, now, dateLocale, csv,
 });
 
 server.on('error', e => { console.error('Impossible de démarrer : ' + e.message); process.exit(e.code === 'EADDRINUSE' ? 3 : 1); });
