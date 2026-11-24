@@ -1,7 +1,7 @@
 {
  "version": "3.6.8",
- "date": "2026-11-24T09:58:58.798Z",
- "notes": "Alerte des commandes QR plus grosse",
+ "date": "2026-11-24T09:59:09.857Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
