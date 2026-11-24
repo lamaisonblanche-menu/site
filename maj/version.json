@@ -1,7 +1,7 @@
 {
  "version": "3.6.3",
- "date": "2026-11-24T09:20:17.185Z",
- "notes": "Clavier à l'écran sur chaque champ à remplir, et choix obligatoire Iced ou Hot sur les lattes",
+ "date": "2026-11-24T09:20:31.764Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
