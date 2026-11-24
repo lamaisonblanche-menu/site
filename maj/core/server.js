@@ -503,6 +503,13 @@ class Doc {
   constructor() { this.parts = [Buffer.from([ESC, 0x40, ESC, 0x74, db.config.pageCode || 16])]; this.w = db.config.largeur || 48; this.txt = []; }
   raw(...b) { this.parts.push(Buffer.from(b)); return this; }
   t(s) { this.parts.push(enc(s + '\n')); this.txt.push(s); return this; }
+  tGras(avant, texte, apres) {
+    this.parts.push(enc(avant));
+    this.bold(1).parts.push(enc(texte));
+    this.bold(0).parts.push(enc(apres + '\n'));
+    this.txt.push(avant + texte + apres);
+    return this;
+  }
   center(on) { return this.raw(ESC, 0x61, on ? 1 : 0); }
   bold(on) { return this.raw(ESC, 0x45, on ? 1 : 0); }
   size(n) { return this.raw(GS, 0x21, n === 2 ? 0x11 : n === 3 ? 0x01 : 0); } // 2 = double, 3 = double hauteur
@@ -681,7 +688,7 @@ function ticketDoc(tk, duplicata) {
   if (duplicata) d.center(1).bold(1).t('*** DUPLICATA ***').bold(0).center(0);
   d.t('Ticket n° ' + tk.num + '   ' + dateH(tk.ts));
   if (tk.salle === 'emporter') d.bold(1).t('A EMPORTER ' + tk.table + (tk.client && tk.client.nom ? ' - ' + tk.client.nom : '')).bold(0);
-  else d.t(salleNom(tk.salle) + ' - Table ' + tk.table + ' - ' + (tk.couverts || 1) + ' couv.');
+  else d.tGras(salleNom(tk.salle) + ' - ', 'Table ' + tk.table, ' - ' + (tk.couverts || 1) + ' couv.');
   d.t('Serveur : ' + tk.serveur + '   Caisse : ' + tk.caissier);
   d.line();
   lignesTicket(d, tk.lignes);
