@@ -751,6 +751,7 @@ function admReglages() {
     <div class="field grow"><label>Mot de passe d’application</label><input type="password" value="${esc((c.mail || {}).pass || '')}" placeholder="16 lettres" onchange="A.mset('pass',this.value)"></div></div>
     <div class="field"><label>Envoyer à</label><input value="${esc((c.mail || {}).dest || 'maisonblanchehydra@gmail.com')}" onchange="A.mset('dest',this.value)"></div>
     <div class="row"><button class="btn dark" onclick="A.saveCfg()">Enregistrer</button><button class="btn" onclick="A.mtest()">Envoyer un mail d’essai</button></div></div>
+  <div class="panel"><h3>Rapports du bureau</h3><button class="btn" onclick="A.suiviBureau()">Afficher le lien et la clé</button></div>
   <div class="panel"><h3>Application et mises à jour</h3>${admApp()}</div>
   <div class="panel"><h3>Sauvegarde</h3><p class="muted">Une copie est faite automatiquement chaque jour dans le dossier data/sauvegardes du PC de caisse (90 jours gardés). Vous pouvez aussi télécharger une copie complète à garder ailleurs (clé USB, Google Drive).</p><a class="btn" href="/export/sauvegarde.json?t=${S.token}">Télécharger une sauvegarde</a></div>`;
 }
@@ -1243,6 +1244,17 @@ const A = window.A = {
   mset(k, v) { adm.cfg.mail = adm.cfg.mail || { actif: false, user: 'maisonblanchehydra@gmail.com', dest: 'maisonblanchehydra@gmail.com', pass: '' }; if (!adm.cfg.mail.user) adm.cfg.mail.user = 'maisonblanchehydra@gmail.com'; if (!adm.cfg.mail.dest) adm.cfg.mail.dest = 'maisonblanchehydra@gmail.com'; adm.cfg.mail[k] = v; },
   mtest() { act(async () => { if (adm.cfg) await api('/api/admin/config', adm.cfg); toast('Envoi du mail d’essai…'); const r = await api('/api/admin/mail-test', {}); toast(r.ok ? 'Mail d’essai envoyé ✓ — regardez la boîte de réception' : r.erreur, !r.ok, 7000); }); },
   remail(jour) { act(async () => { toast('Envoi…'); const r = await api('/api/rase/renvoyer-mail', { jour }); toast(r.ok ? 'Rase envoyée ✓' : r.erreur, !r.ok, 6000); await loadCaisse(); render(); }); },
+  suiviBureau(action) {
+    act(async () => {
+      if (action === 'renouveler' && !confirm('Remplacer la clé de lecture des rapports ?')) return;
+      if (action === 'desactiver' && !confirm('Couper l’accès aux rapports depuis le bureau ?')) return;
+      const r = await api('/api/admin/suivi-bureau', { [action || 'activer']: true });
+      if (!r.actif) { closeModal(); toast('Accès bureau désactivé'); return; }
+      modal(mh('Rapports du bureau') + '<p>Ouvrez cette adresse depuis le PC du bureau, sur le réseau du restaurant.</p>' +
+        (r.adresses.length ? r.adresses.map(a => `<div class="field"><input aria-label="Adresse" readonly value="${esc(a)}"></div>`).join('') : '<p>Adresse réseau locale indisponible.</p>') +
+        `<div class="field"><label>Clé de consultation</label><input readonly value="${esc(r.cle)}"></div><div class="mf"><button class="btn" onclick="A.suiviBureau('desactiver')">Désactiver</button><button class="btn" onclick="A.suiviBureau('renouveler')">Renouveler la clé</button><button class="btn dark" onclick="A.close()">Fermer</button></div>`);
+    });
+  },
   majVerif() { act(async () => { await api('/api/maj/verifier', {}); toast('Vérification en cours…'); setTimeout(() => A.atab('reglages'), 6000); }); },
   majInstaller() { if (confirm('Installer la nouvelle version maintenant ? La caisse redémarre en quelques secondes. Les tables ouvertes sont gardées.')) act(async () => { await api('/api/maj/installer', {}); toast('Installation… la caisse redémarre'); }); },
   quitterApp() { if (confirm('Fermer la caisse sur ce PC ?')) caisseApp.quitter(); },
