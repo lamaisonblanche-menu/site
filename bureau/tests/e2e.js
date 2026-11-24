@@ -113,6 +113,42 @@ async function capture(page, nom) { await page.screenshot({ path: path.join(CAPT
   fs.writeFileSync(path.join(CAPTURES, 'export-ventes.csv'), csv);
   ok('Export CSV (menu) toujours possible', fs.readdirSync(EXPORTS).join(', '));
 
+  // 5 bis. historique FrontCash (chiffres FICTIFS de test, jamais les vrais)
+  const fc = { version: 1, lignes: [
+    { date: '2026-11-20', caisse: 'MASTER C1', Ent: 100000, Det: 100000, Reg: 100000, Esp: 90000, Chq: 0, Tpe: 10000, Deb: 0, Off: 0, Aut: 0, Diff: 0 },
+    { date: '2026-11-23', caisse: 'BRUNCH C3', Ent: 777700, Det: 777700, Reg: 777700, Esp: 777700, Chq: 0, Tpe: 0, Deb: 0, Off: 0, Aut: 0, Diff: 0 },
+  ] };
+  fs.writeFileSync(path.join(DONNEES_APP, 'frontcash.json'), JSON.stringify(fc));
+  const periode = async (du, au) => {
+    await appli.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.reload());
+    await pause(1500);
+    await attendre(async () => page.url().includes('/suivi/') && await page.isVisible('#rapports'), 20000, 'rechargement');
+    await page.fill('#periode input[name=du]', du); await page.fill('#periode input[name=au]', au);
+    await page.click('#periode button:not([type])');
+    await pause(2500);
+    return { jours: await page.textContent('#jours'), synthese: (await page.textContent('#synthese')).replace(/\s/g, ''), clotures: await page.textContent('#clotures'), lignes: await page.textContent('#lignes') };
+  };
+  let v = await periode('2026-11-20', '2026-11-24');
+  if (!v.jours.includes('11-20 · FrontCash')) throw new Error('FrontCash absent des ventes par jour : ' + v.jours);
+  if (v.jours.includes('11-23') || v.synthese.includes('7777')) throw new Error('23/11 FrontCash affiché (doublon)');
+  if (!v.synthese.includes('CAnet' + (2 * article.prix + 1000).toLocaleString('fr-DZ').replace(/\s/g, ''))) console.log('  (CA affiché : ' + v.synthese.slice(0, 40) + ')');
+  if (!v.clotures.includes('FrontCash · MASTER C1')) throw new Error('clôture FrontCash absente');
+  if (v.lignes.includes('FrontCash') || v.lignes.includes('MASTER')) throw new Error('lignes de vente inventées pour FrontCash');
+  await capture(page, '5b-periode-mixte');
+  ok('Période mixte : FrontCash marqué, 23/11 exclu, pas de ligne article/serveur inventée', v.synthese.slice(0, 30));
+  v = await periode('2026-11-20', '2026-11-20');
+  if (!v.jours.includes('FrontCash') || !v.synthese.includes('1000DA')) throw new Error('période FrontCash seule : ' + v.synthese.slice(0, 60));
+  ok('Période FrontCash seule', v.synthese.slice(0, 30));
+  v = await periode('2026-11-24', '2026-11-24');
+  if (v.jours.includes('FrontCash') || v.clotures.includes('FrontCash')) throw new Error('FrontCash affiché sur une période de la nouvelle caisse');
+  ok('Période nouvelle caisse seule : aucune mention FrontCash');
+  for (const f of fs.readdirSync(EXPORTS)) fs.unlinkSync(path.join(EXPORTS, f));
+  await periode('2026-11-20', '2026-11-24');
+  await page.click('#export');
+  const pdf2 = await attendre(() => { const f = fs.readdirSync(EXPORTS).find(n => n.endsWith('.pdf')); return f && fs.statSync(path.join(EXPORTS, f)).size > 5000 && path.join(EXPORTS, f); }, 30000, 'export PDF FrontCash');
+  fs.copyFileSync(pdf2, path.join(CAPTURES, 'rapport-frontcash-test.pdf'));
+  ok('Export PDF de la période mixte', path.basename(pdf2));
+
   // 6. fermeture puis relance : reconnexion directe sans code
   await appli.close();
   ({ appli, page } = await lancerApp());

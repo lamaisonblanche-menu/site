@@ -61,9 +61,10 @@ function lireFrontCash() {
 
 async function installerAffichageFrontCash(wc) {
   const lignes = lireFrontCash();
-  if (!lignes.length || wc.getURL() !== origine() + '/suivi/') return;
-  await wc.executeJavaScript(`(() => {
-    if (typeof afficher !== 'function' || typeof charger !== 'function') return;
+  if (!lignes.length) return;
+  if (!wc.getURL().startsWith(origine() + '/suivi/')) { log('FrontCash non appliqué :', wc.getURL()); return; }
+  const res = await wc.executeJavaScript(`(() => {
+    if (typeof afficher !== 'function' || typeof charger !== 'function') return 'absent';
     const fusionner = ${FrontCash.fusionner.toString()};
     const lignes = ${JSON.stringify(lignes)};
     const original = afficher;
@@ -81,7 +82,9 @@ async function installerAffichageFrontCash(wc) {
       if (precedent && s.frontcashPrecedent) precedent.textContent += ' · FrontCash inclus';
     };
     if (typeof secret === 'string' && secret) charger();
+    return 'ok';
   })()`);
+  log('historique FrontCash :', res, lignes.length + ' journées');
 }
 
 // ------------------------------------------------------------------ Fenêtre
