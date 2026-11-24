@@ -87,8 +87,23 @@ var Q = new URLSearchParams(location.search), JETON = Q.get('t') || '';
 var S = { table: null, carte: null, univers: null, panier: [], feuille: null, envoi: false, err: '', commandes: [] };
 var APP = (function () { try { var a = localStorage.getItem('mb_appareil'); if (!a) { a = 'a' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('mb_appareil', a); } return a; } catch (e) { return 'a' + Math.random().toString(36).slice(2); } })();
 var CLE = 'mb_cmd_' + JETON;
-try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.sid = sv.sid; S.sidSig = sv.sidSig; S.noteCmd = sv.noteCmd; S.sidAddition = sv.sidAddition; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
-function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes, sid: S.sid, sidSig: S.sidSig, noteCmd: S.noteCmd, sidAddition: S.sidAddition })); } catch (e) {} }
+var CLE_FAVORIS = 'mb_favoris_v1';
+var favoris = null;
+try {
+  var fSauves = JSON.parse(localStorage.getItem(CLE_FAVORIS) || 'null');
+  if (Array.isArray(fSauves)) favoris = fSauves.filter(function (id) { return typeof id === 'string'; }).slice(0, 30);
+} catch (e) {}
+function sauverFavoris(valeur) {
+  try {
+    if (valeur === null) localStorage.removeItem(CLE_FAVORIS);
+    else localStorage.setItem(CLE_FAVORIS, JSON.stringify(valeur));
+    favoris = valeur;
+  } catch (e) { alert('Ce navigateur ne permet pas de mémoriser vos préférences.'); }
+  rendre();
+}
+
+try { var sv = JSON.parse(sessionStorage.getItem(CLE) || '{}'); S.panier = sv.panier || []; S.sid = sv.sid; S.sidSig = sv.sidSig; S.noteCmd = sv.noteCmd; S.sidAddition = sv.sidAddition; S.suggestionVue = !!sv.suggestionVue; S.commandes = (sv.commandes || []).filter(function (c) { return Date.now() - c.ts < 6 * 3600000; }); } catch (e) {}
+function garder() { try { sessionStorage.setItem(CLE, JSON.stringify({ panier: S.panier, commandes: S.commandes, sid: S.sid, sidSig: S.sidSig, noteCmd: S.noteCmd, sidAddition: S.sidAddition, suggestionVue: S.suggestionVue })); } catch (e) {} }
 
 var $ = function (s) { return document.querySelector(s); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -132,12 +147,21 @@ function charger() {
   if (!JETON) { S.err = 'QR code incomplet. Demandez à un serveur.'; return rendre(); }
   Promise.all([appel('/api/table?t=' + encodeURIComponent(JETON)), appel('/api/carte')]).then(function (r) {
     S.table = r[0]; S.carte = r[1];
-    var u = universListe(); if (!S.univers || u.indexOf(S.univers) < 0) S.univers = u.filter(function (x) { return !S.carte.service || !S.carte.service.univers || S.carte.service.univers[x] !== false; })[0] || u[0];
+    var u = universListe(); if (u.indexOf(S.univers) < 0) S.univers = u[0];
     actualiserPanier();
     rendre(); suivre();
   }).catch(function (e) { S.err = e.message || 'Connexion impossible. Vérifiez votre connexion internet.'; rendre(); });
 }
-function universListe() { var u = []; S.carte.categories.forEach(function (c) { if (u.indexOf(c.univers) < 0) u.push(c.univers); }); return u.sort(function (a, b) { return (ORDRE_UNIVERS.indexOf(a) + 1 || 99) - (ORDRE_UNIVERS.indexOf(b) + 1 || 99); }); }
+function universListe() {
+  var nom = (S.table.salle || S.table.salleNom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  var ouverture = /brunch/.test(nom) ? 'Brunch' : /gastro/.test(nom) ? 'La carte' : null;
+  var disponibles = new Set(S.carte.categories.map(function (c) { return c.univers; }));
+  var ordre = Array.from(new Set([ouverture].concat(ORDRE_UNIVERS, Array.from(disponibles))));
+  var liste = ordre.filter(function (u) { return disponibles.has(u); });
+  if (ouverture && disponibles.has(ouverture)) return liste;
+  var service = S.carte.service && S.carte.service.univers || {};
+  return liste.filter(function (u) { return service[u] !== false; }).concat(liste.filter(function (u) { return service[u] === false; }));
+}
 
 function bandeau() {
   var t = S.table, sv = S.carte.service;
@@ -161,6 +185,15 @@ function vueCarte() {
     });
     h += '</section>';
   });
+  if (favoris) {
+    var connus = favoris.map(prod).filter(function (p) { return p && !dispo(p); });
+    if (connus.length) {
+      h += '<section class="sec"><h2>Mes favoris</h2>' + connus.map(function (p) {
+        return '<button class="lien" data-pid="' + esc(p.id) + '" onclick="A.ouvrir(this.dataset.pid)">' + esc(p.nom) + ' · ' + da(p.prix) + '</button>';
+      }).join('') + '</section>';
+    }
+  }
+  h += '<button class="lien" onclick="A.memoire()">' + (favoris ? 'Oublier mes préférences' : 'Se souvenir de mes préférences') + '</button>';
   h += '<button class="lien" onclick="A.addition()">Demander l’addition</button>';
   if (S.commandes.length) h += '<button class="lien" onclick="A.suivi()">Suivre mes commandes (' + S.commandes.length + ')</button>';
   h += '</main>';
@@ -181,6 +214,7 @@ function vueFiche(f) {
   });
   h += '<div class="grp"><div class="gt">Une précision ? <small>(facultatif)</small></div><textarea maxlength="120" placeholder="Ex. : sans oignon, sauce à part…" oninput="S.feuille.note=this.value">' + esc(f.note) + '</textarea></div>';
   h += '<div class="qte"><button onclick="A.fq(-1)">−</button><b>' + f.qte + '</b><button onclick="A.fq(1)">+</button></div>';
+  if (favoris) h += '<button class="lien" onclick="A.favori()">' + (favoris.includes(p.id) ? 'Retirer de mes favoris' : 'Ajouter à mes favoris') + '</button>';
   var l = { pid: f.pid, qte: f.qte, opts: f.opts };
   h += (f.err ? '<p class="err">' + esc(f.err) + '</p>' : '') + '<button class="cta" onclick="A.ajouter()"><span>Ajouter</span><span>' + da(prixLigne(l)) + '</span></button></div></div>';
   return h;
@@ -188,12 +222,12 @@ function vueFiche(f) {
 /* ---------- suggestions (dessert, boisson) ---------- */
 function suggestions() {
   var dans = function (u) { return S.panier.some(function (l) { var p = prod(l.pid); return p && universDe(p) === u; }); };
-  var top = S.carte.top || [], out = [];
+  var out = [];
   [['Desserts', 'Une douceur pour finir ?'], ['Boissons', 'Et pour boire ?']].forEach(function (x) {
     if (dans(x[0])) return;
     var ps = S.carte.produits.filter(function (p) { return universDe(p) === x[0] && !dispo(p); });
-    ps.sort(function (a, b) { return ((top.indexOf(a.id) + 1) || 99) - ((top.indexOf(b.id) + 1) || 99) || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
-    if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 6) });
+    ps.sort(function (a, b) { return b.prix - a.prix || (photo(b) ? 1 : 0) - (photo(a) ? 1 : 0); });
+    if (ps.length) out.push({ titre: x[1], ps: ps.slice(0, 1) });
   });
   return out;
 }
@@ -253,6 +287,15 @@ function suivre() {
 }
 
 var A = window.A = {
+  memoire: function () {
+    if (favoris === null) sauverFavoris([]);
+    else if (confirm('Effacer les favoris mémorisés dans ce navigateur ?')) sauverFavoris(null);
+  },
+  favori: function () {
+    if (!favoris || !S.feuille || !S.feuille.pid) return;
+    var id = S.feuille.pid;
+    sauverFavoris(favoris.includes(id) ? favoris.filter(function (p) { return p !== id; }) : [id].concat(favoris).slice(0, 30));
+  },
   univers: function (u) { S.univers = u; rendre(); window.scrollTo(0, 0); },
   ouvrir: function (pid) {
     var p = prod(pid), d = dispo(p); if (d) return;
@@ -274,7 +317,9 @@ var A = window.A = {
     if (ex) ex.qte = Math.min(20, ex.qte + f.qte); else S.panier.push({ pid: f.pid, qte: f.qte, opts: f.opts, note: note });
     garder();
     var u = universDe(p);
-    S.feuille = (u !== 'Desserts' && u !== 'Boissons' && suggestions().length) ? 'sugg' : null;
+    var proposer = !S.suggestionVue && u !== 'Desserts' && u !== 'Boissons' && suggestions().length;
+    S.feuille = proposer ? 'sugg' : null;
+    if (proposer) { S.suggestionVue = true; garder(); }
     rendre();
   },
   lq: function (i, d) { if (S.envoi) return; var l = S.panier[i]; l.qte = Math.min(20, l.qte + d); if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
