@@ -1,11 +1,11 @@
 {
- "version": "3.7.0",
- "date": "2026-11-24T10:25:46.981Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.1",
+ "date": "2026-11-24T11:21:11.772Z",
+ "notes": "Grand bandeau de commande QR et libellé de table en gras sur les tickets",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "84746b20a3a72f6ff85a629706e50507c1bd200907456b76dd808a2a5ca0efba"
+   "sha256": "4e99e7eac21c2b71a97139cacca695d98c93fbd7dd26505f04f5271809ac4b94"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "467e53aa868cc7624bd0a9c834e3e78961c138fa12b63d60ea4b8a4ffa44a0cb"
+   "sha256": "1c84e060738b3d1e1c6449abdb73bb0fe754a0eb2c66773807dde32bc28a7e82"
   },
   {
    "chemin": "public/index.html",
@@ -33,7 +33,7 @@
   },
   {
    "chemin": "public/style.css",
-   "sha256": "5b72012dac77518acaf0995960de149e7aa490d4f4d362eeba67682751d0c1ad"
+   "sha256": "e73c68f99376d027d93fe110fa48fef0fe16b58b272c772345c121f204d48412"
   },
   {
    "chemin": "public/suivi-client.js",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1b5c64416658f4e0f6f7095c3e3aa44320bbf861ee2505dadabead1d8b910163"
+   "sha256": "0334fafcacf50f5a098839b6ae3c01785cd761fb9b86c2f7820bb275b4881fa5"
   },
   {
    "chemin": "suivi.js",
