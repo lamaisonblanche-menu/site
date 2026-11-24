@@ -236,7 +236,6 @@ module.exports = function qrCommandes(K) {
   R['POST /api/qr/accepter'] = async (b, u) => {
     if (!peut(u, 'serveur')) E('Non autorisé', 403);
     const it = trouver(b.id);
-    if (it.type !== 'addition' && !peut(u, 'caissier')) E('Décision réservée à la caisse', 403);
     if (it.statut !== 'attente') E(it.statut === 'traitement' ? 'Déjà en cours d’acceptation sur un autre écran' : 'Déjà traitée' + (it.decision ? ' par ' + it.decision.par : ''));
     if (!it.salle) E('QR code inconnu : refusez cette demande');
     if (it.type === 'addition') {
@@ -306,7 +305,6 @@ module.exports = function qrCommandes(K) {
   R['POST /api/qr/refuser'] = (b, u) => {
     if (!peut(u, 'serveur')) E('Non autorisé', 403);
     const it = trouver(b.id);
-    if (it.type !== 'addition' && !peut(u, 'caissier')) E('Décision réservée à la caisse', 403);
     if (it.statut !== 'attente') E('Déjà traitée');
     it.statut = it.type === 'addition' ? 'vue' : 'refusee'; it.motif = String(b.motif || '').slice(0, 120); it.decision = { par: u.nom, ts: now() };
     journal(u, it.type === 'addition' ? 'QR addition vue' : 'QR refusé', (it.salle ? salleNom(it.salle) + ' ' + it.table : '?') + (it.motif ? ' — ' + it.motif : ''));
