@@ -564,15 +564,15 @@ function blocLignesVentes() {
   const R = S.rapportLignes;
   if (!R) return '';
   const f = S.filtresVentes || {};
-  const titres = { article: 'Article', famille: 'Famille', vendeur: 'Vendeur ou QR' };
+  const titres = { article: 'Article', famille: 'Famille', vendeur: 'Vendeur ou QR', salle: 'Salle', origine: 'Origine', statut: 'Statut', heure: 'Heure', date: 'Date' };
   const choix = (cle, options, tous) => `<select aria-label="${titres[cle] || 'Regrouper par'}" onchange="A.filtreVentes('${cle}',this.value)">${tous ? '<option value="">' + tous + '</option>' : ''}${options.map(([v, n]) => `<option value="${esc(v)}" ${(f[cle] || (cle === 'grouper' ? 'article' : '')) === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   return `<div class="panel"><h3>Ventes par article, famille et vendeur</h3>
     <div class="row">${choix('grouper', Object.entries(titres))}${Object.entries(R.filtres).map(([cle, options]) => choix(cle, options.map(v => [v, v]), titres[cle] + ' · Tous')).join('')}</div>
-    <div style="overflow-x:auto"><table class="l"><tr><th>Groupe</th><th>Vendus</th><th>Offerts</th><th>Annulés sur ticket</th><th>Net</th></tr>
+    <div style="overflow-x:auto"><table class="l"><tr><th>Groupe</th><th>Vendus</th><th>Offerts</th><th>Annulés</th><th>Net</th></tr>
     ${R.groupes.map(g => `<tr><td>${esc(g.nom)}</td><td>${g.vendus}</td><td>${g.offerts}</td><td>${g.annules}</td><td>${da(g.net)}</td></tr>`).join('')}</table></div>
     <details ${S.detailVentesOuvert ? 'open' : ''} ontoggle="S.detailVentesOuvert=this.open"><summary>Détail des lignes de ticket · ${R.total}</summary>
     <div style="overflow-x:auto"><table class="l"><tr><th>Ticket</th><th>Saisie</th><th>Article</th><th>Famille</th><th>Vendeur</th><th>Caissier</th><th>Quantité</th><th>Prix unitaire</th><th>Net</th><th>Statut</th></tr>
-    ${R.lignes.map(l => `<tr><td>${l.ticket} · ${esc(l.date)}</td><td>${l.saisiA ? hm(l.saisiA) : '—'}</td><td>${esc(l.article)}</td><td>${esc(l.famille)}</td><td>${esc(l.vendeur)}</td><td>${esc(l.caissier || '')}</td><td>${l.qte}</td><td>${da(l.prix)}</td><td>${da(l.net)}</td><td>${esc(l.statut)}</td></tr>`).join('')}</table></div>
+    ${R.lignes.map(l => `<tr><td>${l.ticket ?? '—'} · ${esc(l.date)}</td><td>${l.saisiA ? hm(l.saisiA) : '—'}</td><td>${esc(l.article)}</td><td>${esc(l.famille)}</td><td>${esc(l.vendeur)}</td><td>${esc(l.caissier || '')}</td><td>${l.qte}</td><td>${da(l.prix)}</td><td>${da(l.net)}</td><td>${esc(l.statut)}</td></tr>`).join('')}</table></div>
     <div class="row"><button class="btn sm" ${R.offset ? '' : 'disabled'} onclick="A.filtreVentes('offset',${Math.max(0, R.offset - 100)})">Précédent</button><button class="btn sm" ${R.offset + 100 < R.total ? '' : 'disabled'} onclick="A.filtreVentes('offset',${R.offset + 100})">Suivant</button></div></details></div>`;
 }
 function admRapports() {
