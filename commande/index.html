@@ -114,6 +114,23 @@ function appel(chemin, corps) {
   return fetch(RELAIS + chemin, corps ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) } : {})
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.erreur || 'Erreur ' + r.status); e.code = r.status; throw e; } return j; }); });
 }
+function positionClient() {
+  return new Promise(function (resolve, reject) {
+    function erreur(message) { reject(Object.assign(new Error(message), { code: 'position' })); }
+    if (!navigator.geolocation) return erreur('La localisation est indisponible. Demandez à un serveur.');
+    navigator.geolocation.getCurrentPosition(function (p) {
+      resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy });
+    }, function (e) {
+      erreur(e.code === 1 ? 'Autorisez la localisation dans votre navigateur pour commander.'
+        : 'Impossible de vous localiser. Activez la localisation précise puis réessayez.');
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+  });
+}
+function chargerEssais() {
+  return appel('/api/essais?t=' + encodeURIComponent(JETON)).then(function (r) {
+    return Array.isArray(r.produits) ? r.produits : [];
+  }).catch(function () { return []; });
+}
 function actualiserPanier() {
   var avant = S.panier.length;
   S.panier = S.panier.filter(function (l) { return prod(l.pid); });
@@ -122,7 +139,7 @@ function actualiserPanier() {
   garder();
   return true;
 }
-function prod(id) { return S.carte.produits.find(function (p) { return p.id === id; }); }
+function prod(id) { return S.carte.produits.concat(S.essais || []).find(function (p) { return p.id === id; }); }
 function cat(id) { return S.carte.categories.find(function (c) { return c.id === id; }); }
 function opt(id) { return S.carte.options.find(function (o) { return o.id === id; }); }
 function universDe(p) { var c = cat(p.cat); return (c && c.univers) || 'La carte'; }
@@ -133,8 +150,8 @@ function nb() { return S.panier.reduce(function (s, l) { return s + l.qte; }, 0)
 
 function charger() {
   if (!JETON) { S.err = 'QR code incomplet. Demandez à un serveur.'; return rendre(); }
-  Promise.all([appel('/api/table?t=' + encodeURIComponent(JETON)), appel('/api/carte')]).then(function (r) {
-    S.table = r[0]; S.carte = r[1];
+  Promise.all([appel('/api/table?t=' + encodeURIComponent(JETON)), appel('/api/carte'), chargerEssais()]).then(function (r) {
+    S.table = r[0]; S.carte = r[1]; S.essais = r[2];
     var u = universListe(); if (u.indexOf(S.univers) < 0) S.univers = u[0];
     actualiserPanier();
     rendre(); suivre();
@@ -181,6 +198,14 @@ function vueCarte() {
   var h = '<div class="top"><div class="l1"><img src="/logo-blanc.png" alt="La Maison Blanche"><div class="tb">' + esc(S.table.salleNom) + '<b>Table ' + esc(S.table.table) + '</b></div></div><div class="tabs">';
   universListe().forEach(function (u) { h += '<button class="tab ' + (u === S.univers ? 'on' : '') + '" onclick="A.univers(\'' + u.replace(/'/g, "\\'") + '\')">' + esc(u) + '</button>'; });
   h += '</div></div>' + bandeau() + '<main>';
+  var aGouter = (S.essais || []).filter(function (p) { return !dispo(p); });
+  if (aGouter.length && S.carte.caisseEnLigne) {
+    h += '<section class="sec"><h2>À goûter en avant-première</h2><p>Prix réduit exceptionnellement pour cet essai. Si vous goûtez le plat, dites-nous ce que vous en avez pensé.</p>' +
+      aGouter.map(function (p) {
+        return '<button class="it" data-pid="' + esc(p.id) + '" onclick="A.ouvrir(this.dataset.pid)"><div class="tx"><div class="n">' + esc(p.nom) +
+          '</div><div class="d">' + esc(p.description) + '</div><div class="p">' + da(p.prix) + '</div></div><span class="plus">+</span></button>';
+      }).join('') + '</section>';
+  }
   var vedette = miseEnAvant(S.univers);
   if (vedette) {
     var p = vedette.produit, ph = photo(p);
@@ -217,9 +242,11 @@ function vueCarte() {
 
 /* ---------- fiche d'un plat ---------- */
 function vueFiche(f) {
-  var p = prod(f.pid), ph = photo(p), h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille">';
+  var p = prod(f.pid); if (!p) return '';
+  var ph = photo(p), h = '<div class="voile" onclick="if(event.target===this)A.fermer()"><div class="feuille">';
   if (ph) h += '<img class="grand" src="' + ph + '" alt="">';
   h += '<h3>' + esc(p.nom) + '</h3>' + (DESC[p.nom] ? '<p style="color:var(--muted)">' + esc(DESC[p.nom]) + '</p>' : '');
+  if (p.description) h += '<p>' + esc(p.description) + '</p><p>Prix réduit exceptionnellement pour cet essai.</p>';
   (p.options || []).forEach(function (gid) {
     var g = opt(gid); if (!g) return;
     h += '<div class="grp"><div class="gt">' + esc(g.nom) + ' <small>' + (g.obligatoire ? '(obligatoire)' : g.multiple ? '(au choix, facultatif)' : '(facultatif)') + '</small></div>';
@@ -227,8 +254,8 @@ function vueFiche(f) {
     h += '</div>';
   });
   h += '<div class="grp"><div class="gt">Une précision ? <small>(facultatif)</small></div><textarea maxlength="120" placeholder="Ex. : sans oignon, sauce à part…" oninput="S.feuille.note=this.value">' + esc(f.note) + '</textarea></div>';
-  h += '<div class="qte"><button onclick="A.fq(-1)">−</button><b>' + f.qte + '</b><button onclick="A.fq(1)">+</button></div>';
-  if (favoris) h += '<button class="lien" onclick="A.favori()">' + (favoris.includes(p.id) ? 'Retirer de mes favoris' : 'Ajouter à mes favoris') + '</button>';
+  if (!p.description) h += '<div class="qte"><button onclick="A.fq(-1)">−</button><b>' + f.qte + '</b><button onclick="A.fq(1)">+</button></div>';
+  if (favoris && !p.description) h += '<button class="lien" onclick="A.favori()">' + (favoris.includes(p.id) ? 'Retirer de mes favoris' : 'Ajouter à mes favoris') + '</button>';
   var l = { pid: f.pid, qte: f.qte, opts: f.opts };
   h += (f.err ? '<p class="err">' + esc(f.err) + '</p>' : '') + '<button class="cta" onclick="A.ajouter()"><span>Ajouter</span><span>' + da(prixLigne(l)) + '</span></button></div></div>';
   return h;
@@ -283,7 +310,12 @@ function vueSuivi() {
     var L = LIB[c.statut] || LIB.envoyee;
     h += '<div class="etat" style="padding:16px 0;border-bottom:1px solid var(--line)"><div class="ic">' + L[0] + '</div><h3>' + (c.type === 'addition' ? 'Addition demandée' : L[1]) + '</h3><p style="color:var(--muted)">' +
       (c.statut === 'refusee' ? esc(c.motif || 'Un serveur va venir vous voir.') : c.type === 'addition' && c.statut !== 'vue' ? 'Un serveur vous l’apporte.' : L[2]) + '</p>' +
-      (c.type !== 'addition' ? '<small style="color:var(--muted)">' + new Date(c.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + c.resume + (c.total ? ' · ' + da(c.total) : '') + '</small>' : '') + '</div>';
+      (c.type !== 'addition' ? '<small style="color:var(--muted)">' + new Date(c.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + esc(c.resume) + (c.total ? ' · ' + da(c.total) : '') + '</small>' : '') + '</div>';
+    for (var essai of (c.essais || [])) {
+      h += essai.retour ? '<p>Merci pour votre retour sur ' + esc(essai.nom) + '.</p>' :
+        '<button class="lien" data-commande="' + esc(c.id) + '" data-pid="' + esc(essai.id) +
+        '" onclick="A.retourEssai(this.dataset.commande,this.dataset.pid)">J’ai goûté · donner mon avis sur ' + esc(essai.nom) + '</button>';
+    }
   });
   return h + '<button class="btn2" style="background:var(--ink);color:#fff" onclick="A.fermer()">Commander autre chose</button></div></div>';
 }
@@ -302,7 +334,7 @@ function suivre() {
   clearTimeout(suiviT);
   var en = S.commandes.filter(function (c) { return ['envoyee', 'recue'].indexOf(c.statut) >= 0 || (c.type === 'addition' && c.statut !== 'vue'); });
   if (!en.length) return;
-  Promise.all(en.map(function (c) { return appel('/api/commande?id=' + c.id + '&a=' + APP).then(function (r) { c.statut = r.statut; c.motif = r.motif; if (r.total) c.total = r.total; }).catch(function () {}); }))
+  Promise.all(en.map(function (c) { return appel('/api/commande?id=' + c.id + '&a=' + APP).then(function (r) { c.statut = r.statut; c.motif = r.motif; c.essais = r.essais || []; if (r.total) c.total = r.total; }).catch(function () {}); }))
     .then(function () { garder(); if (S.feuille === 'suivi' || !S.feuille) rendre(); suiviT = setTimeout(suivre, 4000); });
 }
 
@@ -327,10 +359,15 @@ var A = window.A = {
     else f.opts = f.opts.filter(function (o) { return o.g !== gid; }).concat(on && !g.obligatoire ? [] : [{ g: gid, i: i }]);
     f.err = ''; rendre();
   },
-  fq: function (d) { var f = S.feuille; f.qte = Math.max(1, Math.min(20, f.qte + d)); rendre(); },
+  fq: function (d) { var f = S.feuille; if (prod(f.pid)?.description) return; f.qte = Math.max(1, Math.min(20, f.qte + d)); rendre(); },
   ajouter: function () {
     if (S.envoi) return;
     var f = S.feuille, p = prod(f.pid);
+    if (!p || dispo(p)) return;
+    if (p.description && S.panier.some(function (l) { return l.pid === p.id; })) {
+      f.err = 'Une seule portion de ce plat d’essai par commande.';
+      return rendre();
+    }
     for (var k = 0; k < (p.options || []).length; k++) { var g = opt(p.options[k]); if (g && g.obligatoire && !f.opts.some(function (o) { return o.g === g.id; })) { f.err = 'Choisissez « ' + g.nom + ' ».'; return rendre(); } }
     var note = (f.note || '').trim(), cle = JSON.stringify([f.pid, f.opts, note]);
     var ex = S.panier.find(function (l) { return JSON.stringify([l.pid, l.opts, l.note]) === cle; });
@@ -342,10 +379,20 @@ var A = window.A = {
     if (proposer) { S.suggestionVue = true; garder(); }
     rendre();
   },
-  lq: function (i, d) { if (S.envoi) return; var l = S.panier[i]; l.qte = Math.min(20, l.qte + d); if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
+  lq: function (i, d) { if (S.envoi) return; var l = S.panier[i]; l.qte = Math.min(prod(l.pid)?.description ? 1 : 20, l.qte + d); if (l.qte < 1) S.panier.splice(i, 1); garder(); if (!S.panier.length) S.feuille = null; rendre(); },
   panier: function () { S.errEnvoi = ''; S.feuille = 'panier'; rendre(); },
   suivi: function () { S.feuille = 'suivi'; rendre(); },
   fermer: function () { S.feuille = null; rendre(); },
+  retourEssai: function (id, pid) {
+    var c = S.commandes.find(function (x) { return x.id === id; });
+    var p = c && (c.essais || []).find(function (x) { return x.id === pid; });
+    if (!p || p.retour) return;
+    var texte = window.prompt('Votre avis après dégustation de « ' + p.nom + ' » (facultatif).');
+    if (!texte || !texte.trim()) return;
+    appel('/api/essais/retour', { id: id, pid: pid, appareil: APP, texte: texte }).then(function () {
+      p.retour = true; garder(); rendre();
+    }).catch(function (e) { alert(e.message); });
+  },
   envoyer: function () {
     if (S.envoi || !S.panier.length) return;
     if (actualiserPanier()) return rendre();
@@ -360,23 +407,34 @@ var A = window.A = {
       return appel('/api/commande', demande)
         .catch(function (e) { if (!e.code && n < 3) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return essai(n + 1); }); throw e; });
     };
-    essai(0).then(function (r) {
-      S.commandes.push({ id: r.id, type: 'commande', statut: r.statut || 'envoyee', ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
+    (S.carte.positionRequise ? positionClient() : Promise.resolve(null)).then(function (p) {
+      if (p) demande.position = p;
+      return essai(0);
+    }).then(function (r) {
+      S.commandes.push({ id: r.id, type: 'commande', statut: r.statut === 'acceptee' ? 'recue' : (r.statut || 'envoyee'), ts: Date.now(), resume: resume.length > 80 ? resume.slice(0, 77) + '…' : resume, total: total() });
+      S.essais = (S.essais || []).filter(function (p) { return !demande.lignes.some(function (l) { return l.pid === p.id; }); });
       S.panier = []; S.noteCmd = ''; S.sid = null; S.sidSig = null; S.envoi = false; S.feuille = 'suivi'; garder(); rendre(); suivre();
-    }).catch(function (e) { S.envoi = false; S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.'; rendre(); });
+    }).catch(function (e) {
+      S.envoi = false;
+      S.errEnvoi = e.code ? e.message : 'Connexion perdue. Vérifiez votre réseau puis réessayez : votre commande ne sera pas envoyée deux fois.';
+      if (e.code === 409) chargerEssais().then(function (essais) { S.essais = essais; actualiserPanier(); rendre(); });
+      rendre();
+    });
   },
   addition: function () {
     if (S.envoiAddition || !confirm('Demander l’addition pour la table ' + S.table.table + ' ?')) return;
     S.envoiAddition = true;
     S.sidAddition = S.sidAddition || uuid(); garder();
-    appel('/api/commande', { t: JETON, sid: S.sidAddition, type: 'addition', appareil: APP }).then(function (r) {
+    (S.carte.positionRequise ? positionClient() : Promise.resolve(null)).then(function (position) {
+      return appel('/api/commande', { t: JETON, sid: S.sidAddition, type: 'addition', appareil: APP, position: position || undefined });
+    }).then(function (r) {
       S.sidAddition = null;
       S.commandes.push({ id: r.id, type: 'addition', statut: 'envoyee', ts: Date.now(), resume: '' }); garder(); S.feuille = 'suivi'; rendre(); suivre();
     }).catch(function (e) { if (typeof e.code === 'number' && e.code < 500) { S.sidAddition = null; garder(); } alert(e.message || 'Connexion impossible'); }).finally(function () { S.envoiAddition = false; });
   },
 };
 charger();
-setInterval(function () { if (!S.feuille && !S.envoi) appel('/api/carte').then(function (c) { if (!S.envoi) { S.carte = c; actualiserPanier(); rendre(); } }).catch(function () {}); }, 60000);
+setInterval(function () { if (!S.feuille && !S.envoi) Promise.all([appel('/api/carte'), chargerEssais()]).then(function (r) { if (!S.envoi && !S.feuille) { S.carte = r[0]; S.essais = r[1]; actualiserPanier(); rendre(); } }).catch(function () {}); }, 60000);
 </script>
 </body>
 </html>
