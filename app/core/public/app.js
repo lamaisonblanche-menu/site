@@ -434,10 +434,8 @@ function viewResa() {
       <p class="muted rv-site">${R.mail ? `Réservations du site : ${R.site.erreur ? '⚠ ' + esc(R.site.erreur) : R.site.dernier ? 'lues à ' + hm(R.site.dernier) : 'pas encore lues'} ${cais ? '<button class="btn sm" onclick="A.resaSite()">Lire maintenant</button>' : ''}` : 'Mail non réglé (Gestion → Réglages) : pas de notification et pas de lecture des réservations du site.'}</p></div>`;
 }
 // ---- petit clavier à l'écran (écrans tactiles sans clavier)
-function clavier(id) {
-  const rangs = ['1234567890', 'azertyuiop', 'qsdfghjklm', 'wxcvbn\'-,.', 'éèàçù'];
-  return `<div class="kb">${rangs.map(r => `<div>${[...r].map(k => `<button onclick="A.kb('${id}','${k === "'" ? "\\'" : k}')">${k}</button>`).join('')}${r.startsWith('w') ? `<button class="w2" onclick="A.kb('${id}','⌫')">⌫</button>` : ''}</div>`).join('')}<div><button class="sp" onclick="A.kb('${id}',' ')">espace</button><button class="w2" onclick="A.kb('${id}','C')">Effacer</button></div></div>`;
-}
+// remplacé en 3.6.3 par le clavier global (en bas de l'écran, s'ouvre seul sur chaque champ)
+function clavier() { return ''; }
 
 // ------------------------------------------------------------ Écran cuisine
 async function loadKds() { const r = await api('/api/kds?poste=tous').catch(() => null); if (!r) return; const nv = r.bons.filter(b => b.etat === 'a_faire' && S._kdsIds && !S._kdsIds.has(b.id) && (S.kdsPoste === 'tous' || !S.kdsPoste || b.poste === S.kdsPoste)); if (nv.length) bip(nv.some(b => b.type === 'annulation') ? 3 : 1); S._kdsIds = new Set(r.bons.map(b => b.id)); S.kds = r; }
@@ -1357,7 +1355,7 @@ Object.assign(A, {
         <div class="chips">${g.choix.map((ch, k) => `<button class="chip big ${(sel[g.id] || []).includes(k) ? 'on' : ''}" onclick="A.fo('${g.id}',${k})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div></div>`).join('')}
       <div class="fe-g"><div class="fe-l">${p.id === 'supplement-fixe' ? 'Quel supplément ? (obligatoire)' : 'Commentaire pour la cuisine'}</div>
         <div class="chips">${coms.map(x => `<button class="chip ${chips.includes(x) ? 'on' : ''}" onclick="A.fc('${jsq(x)}')">${esc(x)}</button>`).join('')}</div>
-        <div class="row"><input id="fe-libre" class="fe-in grow" value="${esc(libre)}" placeholder="Autre commentaire…" oninput="A.fl(this.value)"><button class="btn sm ${S.kbOn ? 'dark' : ''}" onclick="S.kbOn=!S.kbOn;A.fdraw()">⌨</button></div>
+        <div class="row"><input id="fe-libre" class="fe-in grow" value="${esc(libre)}" placeholder="Autre commentaire…" oninput="A.fl(this.value)"><button class="btn sm" onclick="const i=$('#fe-libre');if(i)i.focus()">⌨</button></div>
         ${S.kbOn ? clavier('fe-libre') : ''}</div>
       ${c.salle !== 'emporter' ? `<div class="fe-row"><span>🥡 À emporter</span><button class="tog ${d.emporter ? 'on' : ''}" onclick="A.fe()">${d.emporter ? 'Oui' : 'Non'}</button></div>` : ''}
       <div class="fe-row"><span>Part en cuisine</span><div class="seg">${[0, 1, 2, 3].map(s => `<button class="${suiteDraft(d) === s ? 'on' : ''}" onclick="A.fs(${s})">${SUITE_NOM(s)}</button>`).join('')}</div></div>
@@ -1479,7 +1477,7 @@ Object.assign(A, {
       <div class="row"><div class="field grow"><label>Nom du client</label><input id="rs-nom" value="${esc(st.nom)}" onfocus="A.rsf('rs-nom')" oninput="A.rss('nom',this.value)"></div>
         <div class="field grow"><label>Téléphone</label><input id="rs-tel" inputmode="tel" value="${esc(st.tel)}" onfocus="A.rsf('rs-tel')" oninput="A.rss('tel',this.value)"></div></div>
       <div class="field"><label>Remarque (anniversaire, chaise bébé…)</label><input id="rs-note" value="${esc(st.note)}" onfocus="A.rsf('rs-note')" oninput="A.rss('note',this.value)"></div>
-      ${st.kb ? clavier(st.champ) + '<div style="text-align:right;margin-top:6px"><button class="btn sm" onclick="A.rskb(0)">Fermer le clavier ⌄</button></div>' : ''}
+      
       <div class="rs-g"><label>Jour</label><div class="chips">${[0, 1, 2].map(n => { const d = plusJours(auj, n); return `<button class="chip big ${st.date === d ? 'on' : ''}" onclick="A.rsv('date','${d}')">${n === 0 ? 'Aujourd’hui' : n === 1 ? 'Demain' : new Date(d + 'T12:00').toLocaleDateString('fr-FR', { weekday: 'long' })}</button>`; }).join('')}
         <input type="date" class="rdate" value="${st.date}" min="${auj}" onchange="A.rsv('date',this.value)"></div></div>
       <div class="rs-g"><label>Heure</label><div class="chips rs-h">${heures.map(h => `<button class="chip ${st.heure === h ? 'on' : ''}" onclick="A.rsv('heure','${h}')">${h.replace(':', 'h')}</button>`).join('')}</div></div>
@@ -1637,6 +1635,84 @@ function render() {
 document.addEventListener('keydown', e => {
   if (S.view === 'login' && !$('#modal').innerHTML) { if (/^\d$/.test(e.key)) A.pin(e.key); else if (e.key === 'Backspace') A.pin('C'); else if (e.key === 'Enter') A.pin('OK'); }
   else if (e.key === 'Escape') closeModal();
+});
+
+// ------------------------------------------------------------ Clavier à l'écran partout (3.6.3)
+// Écrans tactiles sans clavier : dès qu'un champ à écrire est touché, un clavier s'ouvre en bas de l'écran.
+// Les touches ne prennent pas le focus (pointerdown/mousedown annulés) : le champ reste actif.
+const VKB = { el: null, cible: null, id: '', mode: 'abc', maj: false, modif: false };
+const VKB_TYPES = ['', 'text', 'search', 'password', 'email', 'tel', 'url', 'number'];
+function vkbChamp(e) {
+  if (!e || e.disabled || e.readOnly || (e.dataset && 'nokb' in e.dataset)) return false;
+  if (e.tagName === 'TEXTAREA') return true;
+  return e.tagName === 'INPUT' && VKB_TYPES.includes((e.getAttribute('type') || '').toLowerCase());
+}
+function vkbNum(e) { const t = (e.getAttribute('type') || '').toLowerCase(), m = (e.getAttribute('inputmode') || '').toLowerCase(); return t === 'number' || t === 'tel' || ['numeric', 'decimal', 'tel'].includes(m); }
+function vkbDessin() {
+  const k = (c, cl, t) => `<button type="button" data-k="${esc(c)}"${cl ? ` class="${cl}"` : ''}>${t || esc(c)}</button>`;
+  let h;
+  if (VKB.mode === '123') {
+    const tel = VKB.cible && ((VKB.cible.getAttribute('type') || '') === 'tel' || (VKB.cible.getAttribute('inputmode') || '') === 'tel');
+    h = `<div class="vkb-num">${['7', '8', '9', '4', '5', '6', '1', '2', '3'].map(c => k(c)).join('')}${k(tel ? '+' : (VKB.cible && VKB.cible.type === 'number' ? '.' : ','))}${k('0')}${k('⌫', 'fn', '⌫')}</div>
+      <div class="vkb-r">${k('ABC', 'fn', 'ABC')}${k('C', 'fn', 'Effacer')}${k('⏎', 'ok', 'OK')}${k('⌄', 'fn', '⌄')}</div>`;
+  } else {
+    const rangs = ['1234567890', 'azertyuiop', 'qsdfghjklm', "wxcvbn,.'-", 'éèêàçù@:/?'];
+    const L = c => VKB.maj && /[a-zéèêàçù]/.test(c) ? c.toUpperCase() : c;
+    h = rangs.map((r, n) => `<div class="vkb-r">${n === 3 ? k('⇧', 'fn' + (VKB.maj ? ' on' : ''), '⇧ Maj') : ''}${[...r].map(c => k(L(c))).join('')}${n === 3 ? k('⌫', 'fn', '⌫') : ''}</div>`).join('') +
+      `<div class="vkb-r">${k('123', 'fn', '123')}${k(' ', 'sp', 'espace')}${k('C', 'fn', 'Effacer')}${k('⏎', 'ok', 'OK')}${k('⌄', 'fn', '⌄')}</div>`;
+  }
+  VKB.el.innerHTML = h;
+  document.documentElement.style.setProperty('--vkbh', VKB.el.offsetHeight + 'px');
+}
+function vkbMontrer(e) {
+  if (!VKB.el) {
+    VKB.el = document.createElement('div'); VKB.el.id = 'vkb'; VKB.el.hidden = true; document.body.appendChild(VKB.el);
+    const stop = ev => ev.preventDefault();
+    VKB.el.addEventListener('pointerdown', stop); VKB.el.addEventListener('mousedown', stop);
+    VKB.el.addEventListener('click', ev => { const b = ev.target.closest('button[data-k]'); if (b) vkbTouche(b.dataset.k); });
+  }
+  if (VKB.cible !== e) { VKB.modif = false; VKB.maj = false; }
+  VKB.cible = e; VKB.id = e.id || '';
+  VKB.mode = vkbNum(e) ? '123' : (VKB.el.hidden || VKB.mode === '123' ? 'abc' : VKB.mode);
+  VKB.el.hidden = false; document.body.classList.add('vkb-on'); vkbDessin();
+  setTimeout(() => { try { e.scrollIntoView({ block: 'nearest' }); } catch (x) {} }, 30);
+}
+function vkbCacher() { if (!VKB.el) return; VKB.el.hidden = true; document.body.classList.remove('vkb-on'); VKB.cible = null; }
+function vkbChange(e) { if (VKB.modif && e && document.contains(e)) { VKB.modif = false; e.dispatchEvent(new Event('change', { bubbles: true })); } }
+function vkbTouche(k) {
+  let e = VKB.cible;
+  if (!e || !document.contains(e)) { e = VKB.id ? document.getElementById(VKB.id) : null; if (!e) return vkbCacher(); VKB.cible = e; }
+  if (k === '⌄') { vkbChange(e); e.blur(); return vkbCacher(); }
+  if (k === 'ABC' || k === '123') { VKB.mode = k === 'ABC' ? 'abc' : '123'; return vkbDessin(); }
+  if (k === '⇧') { VKB.maj = !VKB.maj; return vkbDessin(); }
+  if (k === '⏎') {
+    if (e.tagName === 'TEXTAREA') k = '\n';
+    else { vkbChange(e); e.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); if (document.contains(e)) e.blur(); return vkbCacher(); }
+  }
+  let v = e.value, d = null, f = null;
+  try { d = e.selectionStart; f = e.selectionEnd; } catch (x) {}
+  if (d == null || f == null) { d = f = v.length; }
+  if (k === 'C') { v = ''; d = 0; }
+  else if (k === '⌫') { if (d !== f) { v = v.slice(0, d) + v.slice(f); } else if (d > 0) { v = v.slice(0, d - 1) + v.slice(d); d--; } }
+  else {
+    const t = (e.getAttribute('type') || '').toLowerCase();
+    if (!VKB.maj && !['email', 'url', 'password'].includes(t) && !/^(off|none)$/i.test(e.getAttribute('autocapitalize') || '') && !/https?:|@|www/i.test(e.placeholder || '') && k.length === 1 && /[a-zéèêàçù]/.test(k) && (d === 0 || /[.!?]\s$/.test(v.slice(0, d)))) k = k.toUpperCase();
+    const max = e.maxLength > 0 ? e.maxLength : Infinity;
+    if (v.length - (f - d) + k.length > max) return;
+    v = v.slice(0, d) + k + v.slice(f); d += k.length;
+    if (VKB.maj) { VKB.maj = false; vkbDessin(); }
+  }
+  e.value = v; VKB.modif = true;
+  e.dispatchEvent(new Event('input', { bubbles: true }));
+  // si l'écran a été redessiné, on retrouve le champ par son id
+  if (!document.contains(e) && VKB.id) { const n = document.getElementById(VKB.id); if (n) { VKB.cible = e = n; d = n.value.length; } }
+  if (document.activeElement !== e) e.focus();
+  try { e.setSelectionRange(d, d); } catch (x) {}
+}
+document.addEventListener('focusin', ev => { if (vkbChamp(ev.target)) vkbMontrer(ev.target); });
+document.addEventListener('focusout', ev => {
+  if (ev.target === VKB.cible) vkbChange(ev.target);
+  setTimeout(() => { if (!vkbChamp(document.activeElement)) vkbCacher(); }, 60);
 });
 
 (async function start() {

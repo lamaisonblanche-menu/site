@@ -662,3 +662,19 @@ td.r,th.r{white-space:nowrap}
 .qr-card .act{display:flex;gap:8px;margin-top:8px}
 .qr-card .act .btn{flex:1}
 .qr-motifs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+
+/* clavier à l'écran global (3.6.3) */
+#vkb{position:fixed;left:0;right:0;bottom:0;z-index:70;background:#d9d6cf;padding:8px 8px 10px;display:grid;gap:6px;box-shadow:0 -6px 24px rgba(0,0,0,.25);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#vkb[hidden]{display:none}
+#vkb .vkb-r{display:flex;gap:6px}
+#vkb button{flex:1;min-height:52px;border-radius:9px;background:#fff;font-size:21px;color:var(--ink);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+#vkb button:active{background:var(--ink);color:#fff}
+#vkb button.fn{background:#bdb9b1;font-size:16px;flex:1.4}
+#vkb button.fn.on{background:var(--ink);color:#fff}
+#vkb button.sp{flex:5}
+#vkb button.ok{background:var(--ok);color:#fff;font-weight:700;flex:1.6;font-size:18px}
+#vkb .vkb-num{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:520px;width:100%;margin:0 auto}
+#vkb .vkb-num + .vkb-r{max-width:520px;width:100%;margin:0 auto}
+body.vkb-on #app{padding-bottom:var(--vkbh,300px)}
+body.vkb-on #modal{bottom:var(--vkbh,300px);align-items:flex-start}
+body.vkb-on .mbox{max-height:100%}

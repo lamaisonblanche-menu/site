@@ -188,3 +188,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Relais : Cloudflare Worker `relais/` en ligne sur https://mb-commandes.lamaisonblanche.workers.dev (compte Cloudflare de Manil). Page client : `commande/index.html` sur la branche `main`.
 - Interface : bouton 📱 flottant + panneau latéral (rôle serveur et plus), son, accepter / refuser / retirer un article, addition, alerte si bons non imprimés.
 - QR des 66 tables : `docs/QR-tables-La-Maison-Blanche.pdf` (jetons fixes `QR_INITIAUX`).
+
+### 3.6.3 (24/11/2026, Claude) — clavier partout + Iced/Hot sur les lattes (demandes de Manil)
+- Clavier à l'écran GLOBAL (`VKB` dans app.js, `#vkb` dans style.css) : s'ouvre seul en bas de l'écran dès qu'un champ texte, mot de passe, e-mail, téléphone ou nombre est touché (pas les champs date/heure/case à cocher ; `data-nokb` pour l'exclure). Pavé numérique pour les nombres et téléphones (bouton ABC/123), Maj, accents, OK (= Entrée + `change`), ⌄ pour fermer. Les touches ne volent pas le focus ; `input` et `change` sont envoyés comme au clavier. Si l'écran est redessiné, le champ est retrouvé par son `id`. L'ancien `clavier(id)` renvoie '' (gardé pour compatibilité).
+- Migration `db.latte7` : groupe d'options obligatoire `iced-hot` (« Iced ou Hot » : Iced / Hot, 0 DA) sur tous les articles de la catégorie Lattes et tout article dont le nom contient « latte ».

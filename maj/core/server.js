@@ -388,6 +388,14 @@ if (!db.prixSite6) {
   db.prixSite6 = { ts: Date.now(), changes };
   setTimeout(() => saveNow(), 0);
 }
+// Lattes (version 3.6.3, demande du gérant) : le serveur doit choisir Iced ou Hot (option obligatoire, sans supplément)
+if (!db.latte7) {
+  if (!db.options.some(g => g.id === 'iced-hot')) db.options.push({ id: 'iced-hot', nom: 'Iced ou Hot', obligatoire: true, multiple: false, choix: [{ nom: 'Iced', prix: 0 }, { nom: 'Hot', prix: 0 }] });
+  const cats = new Set(db.categories.filter(c => /latte/i.test(c.nom)).map(c => c.id));
+  for (const p of db.produits) if (cats.has(p.cat) || /latte/i.test(p.nom)) { p.options = Array.isArray(p.options) ? p.options : []; if (!p.options.includes('iced-hot')) p.options.unshift('iced-hot'); }
+  db.latte7 = true;
+  setTimeout(() => saveNow(), 0);
+}
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
