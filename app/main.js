@@ -196,7 +196,7 @@ function demarrer() {
     attente();
     lancerServeur();
     setTimeout(() => verifierMaj(), 20000);
-    setInterval(() => verifierMaj(), 15 * 60000);
+    setInterval(() => verifierMaj(), 60 * 1000);
     setInterval(() => installerMaj(false), 60000);
   } else {
     attente();
