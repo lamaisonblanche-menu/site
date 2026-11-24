@@ -67,6 +67,14 @@ Fait et testé (rien de publié) :
 - Réimpression ciblée des seuls bons en échec (aujourd'hui « Réimprimer les bons » réimprime toute la table).
 - Turnstile (anti-robots Cloudflare) sur la page si des abus apparaissent.
 
+## Évolution en préparation : localisation à 100 mètres (ChatGPT, non publiée)
+- La page cliente demande une position précise au moment de l'envoi et affiche le message obligatoire en cas de refus.
+- Le relais vérifie le rayon de 100 m avec `GEO_LAT` et `GEO_LON` à configurer avant activation. Sans coordonnées configurées, il refuse les commandes.
+- La position transmise par un navigateur peut être falsifiée : **validation humaine à la caisse conservée**. Ne pas confondre contrôle GPS et preuve de présence.
+- Les demandes d'addition restent inchangées pour le moment.
+- Modifications préparées sur les branches distinctes `chatgpt/qr-page-geoloc-100m` (site) et `chatgpt/qr-geoloc-100m` (relais). Aucun déploiement ni fusion.
+
 ## Journal
+- 24/11 (ChatGPT) : ajout du contrôle de localisation à 100 mètres dans la page et le relais, sur deux branches de travail séparées ; coordonnées du restaurant et tests encore à finaliser, aucune publication.
 - 24/11 01:20 (Claude) : refactor envoi, migration prix, qr.js, ce document.
 - 24/11 01:30 (Claude) : interface caisse, relais, page client, PDF des QR, tests.
