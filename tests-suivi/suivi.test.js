@@ -85,6 +85,21 @@ test('dates invalides, jour vide, dossier coûts absent', () => {
     assert.equal(lireCouts(dir).size, 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+test('fichier de coûts local, versions triées et valeur décimale exacte', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'couts-'));
+  try {
+    writeFileSync(path.join(dir, 'couts-matiere.json'), JSON.stringify([
+      { articleId: 'produit', depuis: '2026-10-01', dinars: 19 },
+      { articleId: 'produit', depuis: date, dinars: 31.29 },
+      { articleId: 'produit', depuis: '2026-02-30', dinars: 5 },
+      { articleId: 'autre', depuis: date, dinars: -1 },
+    ]));
+    const c = lireCouts(dir);
+    assert.equal(c.size, 1);
+    assert.deepEqual(c.get('produit').map(x => x.centimes), [3129, 1900]);
+    assert.equal(rapports(base, {}, { couts: c }).lignes[0].margeCentimes, 6871);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 async function portLibre() {
   const serveur = net.createServer();
   await new Promise((resolve, reject) => serveur.once('error', reject).listen(0, '127.0.0.1', resolve));
