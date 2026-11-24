@@ -790,6 +790,7 @@ function admQr() {
   <div class="cols"><div class="panel"><h3>Activation</h3>
     <p>${c.actif ? (enLigne ? '🟢 En ligne : les clients peuvent commander' : '🟠 Activé mais relais injoignable' + (Q.sync.erreur ? ' : ' + esc(Q.sync.erreur) : '')) : '⚪ Désactivé : les clients voient seulement la carte'}</p>
     <label class="chk"><input type="checkbox" ${c.actif ? 'checked' : ''} onchange="adm.qrCfg.actif=this.checked"> Accepter les commandes des clients</label>
+    ${Q.suiviSuggestions?.length ? `<div class="panel"><h3>Suggestions QR · 200 paniers maximum sur 14 jours</h3><table class="l"><tr><th>Salle</th><th>Article</th><th>Affichages</th><th>Clics</th><th>Ajouts</th><th>Acceptés en caisse</th></tr>${Q.suiviSuggestions.map(r => `<tr><td>${esc(r.salle)}</td><td>${esc(r.nom)}</td><td>${r.affichages}</td><td>${r.clics}</td><td>${r.ajouts}</td><td>${r.acceptes}</td></tr>`).join('')}</table></div>` : ''}
     ${Q.retoursEssais?.length ? `<div class="panel"><h3>Retours de dégustation</h3>${Q.retoursEssais.map(r => `<p><b>${esc(r.nom)}</b> · Table ${esc(r.table)}<br>${esc(r.texte)}</p>`).join('')}</div>` : ''}
     <label class="chk"><input type="checkbox" ${c.essais ? 'checked' : ''} onchange="adm.qrCfg.essais=this.checked"> Activer les deux avant-premières QR · une portion par plat</label>
     <label class="chk"><input type="checkbox" ${c.son !== false ? 'checked' : ''} onchange="adm.qrCfg.son=this.checked"> Son à chaque nouvelle commande</label>
