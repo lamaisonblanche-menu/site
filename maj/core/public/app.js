@@ -1570,22 +1570,9 @@ function qrSurveiller() {
   const ids = new Set(q.attente.filter(x => x.statut === 'attente').map(x => x.id));
   if (S.qr.vus) {
     const nv = q.attente.filter(x => x.statut === 'attente' && !S.qr.vus.has(x.id));
-    if (nv.length) {
-      if (q.son) bip(3);
-      const x = nv[0];
-      qrAlerte(x.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande QR', x.salleNom + ' — Table ' + x.table, nv.length);
-    }
+    if (nv.length && q.son) bip(3);
   }
   S.qr.vus = ids;
-}
-// 3.6.8 : grande alerte bien visible en haut de l'écran (au lieu du petit message en bas)
-function qrAlerte(titre, lieu, nb) {
-  let el = document.getElementById('qralerte');
-  if (!el) { el = document.createElement('div'); el.id = 'qralerte'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="ic">📱</div><div class="tx"><div class="ti">${esc(titre)}${nb > 1 ? ' (+' + (nb - 1) + ')' : ''}</div><div class="li">${esc(lieu)}</div></div><div class="ok">Voir</div>`;
-  el.onclick = () => { el.hidden = true; if (!S.qr.ouvert) A.qrToggle(); };
-  el.hidden = false; el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim');
-  clearTimeout(qrAlerte._t); qrAlerte._t = setTimeout(() => { el.hidden = true; }, 12000);
 }
 function qrWidget() {
   const q = S.etat && S.etat.qr;
@@ -1594,7 +1581,18 @@ function qrWidget() {
   const echecs = q.attente.filter(x => x.statut === 'acceptee');
   const n = att.length + echecs.length;
   const fab = `<button class="qr-fab ${n ? 'alerte' : ''} ${q.enLigne ? '' : 'horsligne'}" onclick="A.qrToggle()" title="Commandes des clients">📱${n ? '<span class="lb">Commande' + (n > 1 ? 's' : '') + ' QR</span><b>' + n + '</b>' : ''}</button>`;
-  if (!S.qr.ouvert) return fab;
+  if (!S.qr.ouvert) {
+    const attente = att.filter(x => x.statut === 'attente');
+    const prochaine = attente[0];
+    if (!prochaine) return fab;
+    const titre = prochaine.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande QR';
+    const autres = attente.length - 1;
+    return fab + `<button type="button" id="qralerte" onclick="A.qrToggle()">
+      <span class="tx"><span class="ti">${titre}${autres ? ' (+' + autres + ')' : ''}</span>
+      <span class="li">${esc(prochaine.salleNom)} · Table ${esc(prochaine.table || '?')}</span></span>
+      <span class="ok">Voir</span>
+    </button>`;
+  }
   const ligne = (it, l, i) => {
     const r = (S.qr.retirer[it.id] || []).includes(i);
     return `<div class="qr-ln ${r ? 'retire' : ''}" onclick="A.qrRetirer('${it.id}',${i})"><b>${l.qte}×</b><div class="grow">${esc(l.nom)}${l.opts && l.opts.length ? '<small>' + esc(l.opts.join(', ')) + '</small>' : ''}${l.note ? '<small>« ' + esc(l.note) + ' »</small>' : ''}</div><span>${fmt(l.prix * l.qte)}</span></div>`;
