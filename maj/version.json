@@ -1,11 +1,11 @@
 {
- "version": "3.6.5",
- "date": "2026-11-24T09:32:52.006Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.6.6",
+ "date": "2026-11-24T09:45:10.604Z",
+ "notes": "Bouton Coller pour la clé secrète QR",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "40803a7a78dc98a2ebe1d1d0a901433465279db2c2d9314a6206eff688386016"
+   "sha256": "14e0f057c25f7d383ad4f3b04ef946cca611c629e5c0366ad78a7eac8bbd794b"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "36de13cb79c245ef7769bbb6346090cc8023e589cca89eea04e8fd95663b61d6"
+   "sha256": "682dd849b9990c0b67ac0323a0307c4d477f68491859cca4916661de2bf16181"
   },
   {
    "chemin": "public/index.html",

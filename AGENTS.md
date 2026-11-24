@@ -199,3 +199,6 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 
 ### 3.6.5 (24/11/2026, Claude)
 - `qr.js` : adresse du relais pré-remplie si vide (https://mb-commandes.lamaisonblanche.workers.dev). La clé secrète n’est JAMAIS mise dans le code (dépôt public) : le gérant la tape lui-même.
+
+### 3.6.6 (24/11/2026, Claude)
+- Commandes QR : champ « Clé secrète du relais » affiché en clair + bouton « 📋 Coller » (l’appui long ne colle pas dans Electron).
