@@ -842,7 +842,7 @@ const A = window.A = {
     try {
       const r = await api('/api/qr/accepter', { id, retirer: S.qr.retirer[id] || [], pin });
       delete S.qr.retirer[id]; if (pin !== undefined) closeModal();
-      showErrs(r); if (!r.erreurs || !r.erreurs.length) toast('Commande acceptée, bons imprimés ✓');
+      showErrs(r); if (!r.erreurs || !r.erreurs.length) toast(r.cmdId ? 'Commande acceptée, bons imprimés ✓' : 'Addition imprimée ✓');
       refresh();
     } catch (e) {
       if (/réservée/.test(e.message) && pin === undefined) return askPin('Table réservée : accord du caissier', v => A.qrAccepter(id, v), 'Badge ou code d’un caissier');
@@ -852,7 +852,7 @@ const A = window.A = {
   },
   async qrRefuser(id, motif) { const r = await act(() => api('/api/qr/refuser', { id, motif })); if (r) { S.qr.refus = null; toast(motif ? 'Commande refusée' : 'C’est noté'); refresh(); } },
   async qrVuImpr(id) { await act(() => api('/api/qr/vu-impression', { id })); refresh(); },
-  async qrReimprimer(id) { const it = S.etat.qr.attente.find(x => x.id === id); const c = it && S.etat.commandes.find(k => k.salle === it.salle && k.table === it.table); if (!c) return toast('Table déjà encaissée', true); const r = await act(() => api('/api/commande/reimprimer-bons', { id: c.id })); if (r) { showErrs(r); if (!r.erreurs.length) { toast('Bons réimprimés ✓'); A.qrVuImpr(id); } } },
+  async qrReimprimer(id) { const r = await act(() => api('/api/qr/reimprimer', { id })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Bons manquants réimprimés ✓'); refresh(); } },
   pin(k) {
     if (k === 'C') pin = ''; else if (k === 'OK') return S.pointage ? pointer({ pin }) : login(); else if (pin.length < 6) pin += k;
     render();
@@ -1543,7 +1543,7 @@ function qrWidget() {
     const tete = `<div class="t"><span>${esc(it.salleNom)} · Table ${esc(it.table || '?')}</span><span class="muted">${hm(it.recu)}</span></div>${it.premiere && it.type !== 'addition' ? '<div class="muted" style="font-size:13px">1re commande : la table s’ouvrira à l’acceptation</div>' : ''}`;
     const al = it.alertes.map(a => `<div class="al ${it.invalide ? 'bad' : ''}">${esc(a)}</div>`).join('');
     if (it.statut === 'acceptee') return `<div class="qr-card echec">${tete}<div class="al bad">Bons NON imprimés : ${esc(it.echecs.join(', '))}. Vérifiez l’imprimante puis réimprimez.</div>
-      <div class="act"><button class="btn sm dark" onclick="A.qrReimprimer('${it.id}')">Réimprimer les bons</button><button class="btn sm" onclick="A.qrVuImpr('${it.id}')">C’est réglé</button></div></div>`;
+      <div class="act"><button class="btn sm dark" onclick="A.qrReimprimer('${it.id}')">Réimprimer les bons manquants</button><button class="btn sm" onclick="A.qrVuImpr('${it.id}')">C’est réglé</button></div></div>`;
     if (it.type === 'addition') return `<div class="qr-card addition">${tete}<div>Le client demande <b>l’addition</b>.</div>${al}
       <div class="act"><button class="btn sm dark" onclick="A.qrAccepter('${it.id}')">Imprimer l’addition</button><button class="btn sm" onclick="A.qrRefuser('${it.id}','')">Vu</button></div></div>`;
     const ret = S.qr.retirer[it.id] || [];
