@@ -1,7 +1,7 @@
 {
  "version": "3.6.2",
- "date": "2026-11-24T09:03:18.255Z",
- "notes": "Clavier tactile pour les employés et avant-premières QR",
+ "date": "2026-11-24T09:04:20.546Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "a4c3041a66f5ed3e435a58ca3786acad464e5caa4bd491be250ef90c7f32e6eb"
+   "sha256": "bb27dac21e1f32f5c03d1b0b4ca3275e197af5071c075bd8db24e9b71b66afd8"
   },
   {
    "chemin": "seed-menu.json",
