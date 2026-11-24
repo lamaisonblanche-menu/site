@@ -641,3 +641,24 @@ td.r,th.r{white-space:nowrap}
 .ptab.resv.bientot{background:#dccbff;box-shadow:0 0 0 3px #8b6ad8}
 .ptab .pr{font-weight:800;color:#5b3bb0}
 .legend i.l-resv{background:#efe7ff;border:2px solid #8b6ad8}
+
+/* ---------- Commandes QR (3.6.0) : bouton flottant + panneau latéral discret ---------- */
+.qr-fab{position:fixed;right:16px;bottom:16px;z-index:40;min-width:64px;height:64px;border-radius:32px;background:var(--ink);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.qr-fab b{background:var(--bad);border-radius:12px;min-width:24px;height:24px;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.qr-fab.alerte{animation:qrpulse 1.2s infinite}
+.qr-fab.horsligne{background:#777}
+@keyframes qrpulse{0%,100%{box-shadow:0 0 0 0 rgba(179,38,30,.6)}50%{box-shadow:0 0 0 14px rgba(179,38,30,0)}}
+.qr-panel{position:fixed;right:12px;bottom:90px;z-index:41;width:min(380px,calc(100vw - 24px));max-height:calc(100vh - 120px);overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:10px}
+.qr-panel h4{margin:4px 6px 8px;font-family:var(--f-d);font-weight:400;font-size:19px;display:flex;align-items:center;gap:8px}
+.qr-card{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px;background:#fff}
+.qr-card.addition{background:var(--gold-l)}
+.qr-card.echec{background:var(--bad-l)}
+.qr-card .t{display:flex;justify-content:space-between;font-weight:600;font-size:17px}
+.qr-card .al{background:var(--warn-l);color:var(--warn);border-radius:8px;padding:4px 8px;margin:6px 0;font-size:14px}
+.qr-card .al.bad{background:var(--bad-l);color:var(--bad)}
+.qr-ln{display:flex;gap:8px;padding:6px 4px;border-bottom:1px dashed var(--line);font-size:15px}
+.qr-ln.retire{text-decoration:line-through;opacity:.45}
+.qr-ln small{display:block;color:var(--muted)}
+.qr-card .act{display:flex;gap:8px;margin-top:8px}
+.qr-card .act .btn{flex:1}
+.qr-motifs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}

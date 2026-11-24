@@ -49,6 +49,7 @@ async function refresh() {
   if (S.view === 'kds') await loadKds();
   if (S.view === 'resa') await loadResa();
   alertesPrets();
+  qrSurveiller();
   verifierVersion(S.etat.version);
   render();
 }
@@ -525,13 +526,13 @@ function viewCaisse() {
 }
 
 // ------------------------------------------------------------ Gestion (admin)
-const TABS = [['rapports', 'Rapports'], ['carte', 'Carte et prix'], ['equipe', 'Équipe, codes et badges'], ['salles', 'Plans de salle'], ['imprimantes', 'Imprimantes'], ['pointage', 'Pointage'], ['reglages', 'Réglages'], ['journal', 'Journal']];
+const TABS = [['rapports', 'Rapports'], ['carte', 'Carte et prix'], ['equipe', 'Équipe, codes et badges'], ['salles', 'Plans de salle'], ['imprimantes', 'Imprimantes'], ['pointage', 'Pointage'], ['qr', 'Commandes QR'], ['reglages', 'Réglages'], ['journal', 'Journal']];
 let adm = {};
 function viewAdmin() {
   const t = S.adminTab;
   const tabs = TABS.map(([k, n]) => `<button class="tab ${k === t ? 'on' : ''}" onclick="A.atab('${k}')">${n}</button>`).join('');
   let body = '';
-  try { body = ({ rapports: admRapports, carte: admCarte, equipe: admEquipe, salles: admSalles, imprimantes: admImpr, pointage: admPointage, reglages: admReglages, journal: admJournal })[t](); } catch (e) { body = '<p>Chargement…</p>'; console.error(e); }
+  try { body = ({ rapports: admRapports, carte: admCarte, equipe: admEquipe, salles: admSalles, imprimantes: admImpr, pointage: admPointage, reglages: admReglages, journal: admJournal, qr: admQr })[t](); } catch (e) { body = '<p>Chargement…</p>'; console.error(e); }
   if (t === 'salles') return topbar() + `<div class="tbar"><div class="tabs">${tabs}</div></div>${body}`;
   return topbar() + `<div class="main"><div class="tabs" style="margin-bottom:14px">${tabs}</div>${body}</div>`;
 }
@@ -774,6 +775,31 @@ function admApp() {
     ${window.caisseApp ? `${I && I.mode === 'principale' ? '<button class="btn" onclick="caisseApp.dossier()">Ouvrir le dossier des données</button>' : ''}<button class="btn" onclick="caisseApp.reglages()">Réglages de ce PC</button><button class="btn ghost" onclick="caisseApp.journal()">Journal technique</button><button class="btn bad" onclick="A.quitterApp()">Quitter l’application</button>` : ''}
   </div>`;
 }
+function admQr() {
+  const Q = adm.qr, c = adm.qrCfg;
+  if (!Q || !c) return '<p>Chargement…</p>';
+  const STAT = { attente: 'En attente', traitement: 'En cours', acceptee: 'Acceptée', refusee: 'Refusée', vue: 'Vue' };
+  const h = (k, l) => `<div class="field"><label>${l}</label><input type="time" value="${esc(c[k])}" onchange="adm.qrCfg.${k}=this.value"></div>`;
+  const hor = Object.entries(c.horaires || {}).map(([u, [a, b]]) => `<div class="row"><b style="width:110px">${esc(u)}</b><input type="time" value="${a}" onchange="adm.qrCfg.horaires['${jsq(u)}'][0]=this.value"> à <input type="time" value="${b}" onchange="adm.qrCfg.horaires['${jsq(u)}'][1]=this.value"></div>`).join('');
+  const enLigne = Q.sync.ok && Date.now() - Q.sync.ok < 20000;
+  const parSalle = {}; for (const t of Q.tables.filter(t => !t.retire)) (parSalle[t.salleNom] = parSalle[t.salleNom] || []).push(t);
+  const salles = Object.entries(parSalle).map(([nom, ts]) => `<div class="panel"><h3>${esc(nom)} <span class="muted">(${ts.length} tables)</span></h3>
+    <div class="row" style="flex-wrap:wrap;gap:6px">${ts.map(t => `<button class="btn sm ${t.pause ? 'bad' : ''}" title="${t.pause ? 'En pause : toucher pour réactiver' : 'Toucher pour mettre en pause'}" onclick="A.qrPause('${t.jeton}',${!t.pause})">${esc(t.table)}${t.pause ? ' ⏸' : ''}</button>`).join('')}</div>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="A.qrImprimer('${ts[0].salle}')">Imprimer les QR de la salle (imprimante des tickets)</button></div></div>`).join('');
+  return `<div class="row" style="margin-bottom:12px"><p class="muted grow">Les clients scannent le QR de leur table et commandent depuis leur téléphone. Rien n’est imprimé en cuisine tant qu’un serveur, le maître d’hôtel ou un caissier n’a pas accepté.</p><button class="btn dark" onclick="A.qrSave()">Enregistrer</button></div>
+  <div class="cols"><div class="panel"><h3>Activation</h3>
+    <p>${c.actif ? (enLigne ? '🟢 En ligne : les clients peuvent commander' : '🟠 Activé mais relais injoignable' + (Q.sync.erreur ? ' : ' + esc(Q.sync.erreur) : '')) : '⚪ Désactivé : les clients voient seulement la carte'}</p>
+    <label class="chk"><input type="checkbox" ${c.actif ? 'checked' : ''} onchange="adm.qrCfg.actif=this.checked"> Accepter les commandes des clients</label>
+    <label class="chk"><input type="checkbox" ${c.son !== false ? 'checked' : ''} onchange="adm.qrCfg.son=this.checked"> Son à chaque nouvelle commande</label>
+    <div class="field"><label>Adresse du relais (fournie par Claude)</label><input value="${esc(c.relais)}" placeholder="https://…" onchange="adm.qrCfg.relais=this.value.trim()"></div>
+    <div class="field"><label>Clé secrète du relais</label><input type="password" value="${esc(c.secret)}" onchange="adm.qrCfg.secret=this.value"></div>
+    <div class="field"><label>Montant maximum sans alerte (DA)</label><input type="number" value="${esc(c.montantMax)}" onchange="adm.qrCfg.montantMax=+this.value"></div></div>
+  <div class="panel"><h3>Horaires des commandes</h3>${h('ouverture', 'Ouverture (sauf vendredi)')}${h('ouvertureVendredi', 'Ouverture le vendredi')}${h('derniereCommande', 'Dernière commande')}
+    <p class="muted">Par univers de la carte (en dehors, ces plats sont grisés sur le téléphone) :</p>${hor}</div></div>
+  <p class="muted">Toucher une table pour la mettre en pause (plus de commandes depuis son QR) ou la réactiver.</p>${salles}
+  <div class="panel"><h3>Dernières demandes</h3><table class="tbl"><tr><th>Heure</th><th>Table</th><th>Type</th><th>Statut</th><th>Montant</th><th>Par</th></tr>
+    ${Q.historique.map(x => `<tr><td>${hm(x.recu)}</td><td>${esc(x.salle)} ${esc(x.table || '')}</td><td>${x.type === 'addition' ? 'Addition' : 'Commande'}</td><td>${STAT[x.statut] || x.statut}${x.motif ? ' — ' + esc(x.motif) : ''}</td><td>${x.type === 'addition' ? '' : da(x.montant)}</td><td>${esc(x.par)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Aucune pour l’instant</td></tr>'}</table></div>`;
+}
 function admJournal() {
   if (!adm.journal) return '<p>Chargement…</p>';
   return `<div class="panel"><h3>Journal des actions (500 dernières)</h3><table class="l"><tr><th>Date</th><th>Qui</th><th>Action</th><th>Détail</th></tr>
@@ -805,6 +831,28 @@ function askPin(titre, cb, qui) {
 
 // ------------------------------------------------------------ Actions
 const A = window.A = {
+  // ---- commandes QR
+  async qrSave() { const r = await act(() => api('/api/qr/reglages', adm.qrCfg)); if (r) { toast('Réglages QR enregistrés ✓'); A.atab('qr'); } },
+  async qrPause(jeton, pause) { const r = await act(() => api('/api/qr/pause', { jeton, pause })); if (r) A.atab('qr'); },
+  async qrImprimer(salle) { const r = await act(() => api('/api/qr/imprimer', { salle })); if (r) { showErrs(r); if (!r.erreurs.length) toast(r.nb + ' QR imprimés ✓'); } },
+  qrToggle() { S.qr.ouvert = !S.qr.ouvert; S.qr.refus = null; render(); },
+  qrRetirer(id, i) { const r = S.qr.retirer[id] = S.qr.retirer[id] || []; const k = r.indexOf(i); if (k >= 0) r.splice(k, 1); else r.push(i); render(); },
+  qrRefus(id) { S.qr.refus = id; render(); },
+  async qrAccepter(id, pin) {
+    try {
+      const r = await api('/api/qr/accepter', { id, retirer: S.qr.retirer[id] || [], pin });
+      delete S.qr.retirer[id]; if (pin !== undefined) closeModal();
+      showErrs(r); if (!r.erreurs || !r.erreurs.length) toast('Commande acceptée, bons imprimés ✓');
+      refresh();
+    } catch (e) {
+      if (/réservée/.test(e.message) && pin === undefined) return askPin('Table réservée : accord du caissier', v => A.qrAccepter(id, v), 'Badge ou code d’un caissier');
+      if (pin !== undefined) closeModal();
+      toast(e.message, true, 6000); refresh();
+    }
+  },
+  async qrRefuser(id, motif) { const r = await act(() => api('/api/qr/refuser', { id, motif })); if (r) { S.qr.refus = null; toast(motif ? 'Commande refusée' : 'C’est noté'); refresh(); } },
+  async qrVuImpr(id) { await act(() => api('/api/qr/vu-impression', { id })); refresh(); },
+  async qrReimprimer(id) { const it = S.etat.qr.attente.find(x => x.id === id); const c = it && S.etat.commandes.find(k => k.salle === it.salle && k.table === it.table); if (!c) return toast('Table déjà encaissée', true); const r = await act(() => api('/api/commande/reimprimer-bons', { id: c.id })); if (r) { showErrs(r); if (!r.erreurs.length) { toast('Bons réimprimés ✓'); A.qrVuImpr(id); } } },
   pin(k) {
     if (k === 'C') pin = ''; else if (k === 'OK') return S.pointage ? pointer({ pin }) : login(); else if (pin.length < 6) pin += k;
     render();
@@ -1154,6 +1202,7 @@ const A = window.A = {
     if (t === 'rapports') { const [du, au] = periode(S.periode); S.rapport = await act(() => api(`/api/rapport?du=${du}&au=${au}`)); }
     if (t === 'equipe' && !adm.users) adm.users = await act(() => api('/api/admin/users'));
     if (t === 'journal') adm.journal = await act(() => api('/api/journal'));
+    if (t === 'qr') { adm.qr = await act(() => api('/api/qr/admin')); adm.qrCfg = adm.qr ? JSON.parse(JSON.stringify(adm.qr.config)) : null; }
     if (t === 'reglages') { adm.maj = await api('/api/maj').catch(() => null); if (window.caisseApp) adm.info = await caisseApp.info().catch(() => null); }
     if (t === 'pointage') { const [du, au] = periode(S.periode); adm.pointages = await act(() => api(`/api/admin/pointages?du=${du}&au=${au}`)); }
     render();
@@ -1461,6 +1510,55 @@ Object.assign(A, {
 });
 
 // ------------------------------------------------------------ Rendu
+
+// ------------------------------------------------------------ Commandes QR des clients (3.6.0)
+// Bouton flottant en bas à droite + petit panneau : n'empêche jamais de travailler sur le reste de l'écran.
+S.qr = { ouvert: false, retirer: {}, refus: null, vus: null };
+function qrSurveiller() {
+  const q = S.etat && S.etat.qr; if (!q) return;
+  const ids = new Set(q.attente.filter(x => x.statut === 'attente').map(x => x.id));
+  if (S.qr.vus) {
+    const nv = q.attente.filter(x => x.statut === 'attente' && !S.qr.vus.has(x.id));
+    if (nv.length) {
+      if (q.son) bip(3);
+      const x = nv[0];
+      toast('📱 ' + (x.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande') + ' — ' + x.salleNom + ' table ' + x.table, false, 5000);
+    }
+  }
+  S.qr.vus = ids;
+}
+function qrWidget() {
+  const q = S.etat && S.etat.qr;
+  if (!q || !q.actif || S.view === 'login') return '';
+  const att = q.attente.filter(x => x.statut === 'attente' || x.statut === 'traitement');
+  const echecs = q.attente.filter(x => x.statut === 'acceptee');
+  const n = att.length + echecs.length;
+  const fab = `<button class="qr-fab ${n ? 'alerte' : ''} ${q.enLigne ? '' : 'horsligne'}" onclick="A.qrToggle()" title="Commandes des clients">📱${n ? '<b>' + n + '</b>' : ''}</button>`;
+  if (!S.qr.ouvert) return fab;
+  const ligne = (it, l, i) => {
+    const r = (S.qr.retirer[it.id] || []).includes(i);
+    return `<div class="qr-ln ${r ? 'retire' : ''}" onclick="A.qrRetirer('${it.id}',${i})"><b>${l.qte}×</b><div class="grow">${esc(l.nom)}${l.opts && l.opts.length ? '<small>' + esc(l.opts.join(', ')) + '</small>' : ''}${l.note ? '<small>« ' + esc(l.note) + ' »</small>' : ''}</div><span>${fmt(l.prix * l.qte)}</span></div>`;
+  };
+  const carte = it => {
+    const tete = `<div class="t"><span>${esc(it.salleNom)} · Table ${esc(it.table || '?')}</span><span class="muted">${hm(it.recu)}</span></div>${it.premiere && it.type !== 'addition' ? '<div class="muted" style="font-size:13px">1re commande : la table s’ouvrira à l’acceptation</div>' : ''}`;
+    const al = it.alertes.map(a => `<div class="al ${it.invalide ? 'bad' : ''}">${esc(a)}</div>`).join('');
+    if (it.statut === 'acceptee') return `<div class="qr-card echec">${tete}<div class="al bad">Bons NON imprimés : ${esc(it.echecs.join(', '))}. Vérifiez l’imprimante puis réimprimez.</div>
+      <div class="act"><button class="btn sm dark" onclick="A.qrReimprimer('${it.id}')">Réimprimer les bons</button><button class="btn sm" onclick="A.qrVuImpr('${it.id}')">C’est réglé</button></div></div>`;
+    if (it.type === 'addition') return `<div class="qr-card addition">${tete}<div>Le client demande <b>l’addition</b>.</div>${al}
+      <div class="act"><button class="btn sm dark" onclick="A.qrAccepter('${it.id}')">Imprimer l’addition</button><button class="btn sm" onclick="A.qrRefuser('${it.id}','')">Vu</button></div></div>`;
+    const ret = S.qr.retirer[it.id] || [];
+    const total = it.detail.reduce((s, l, i) => s + (ret.includes(i) ? 0 : l.prix * l.qte), 0);
+    const refus = S.qr.refus === it.id ? `<div class="qr-motifs">${['Article indisponible', 'Table non occupée', 'Commande en double', 'Cuisine fermée', 'Merci de voir un serveur'].map(m => `<button class="btn sm" onclick="A.qrRefuser('${it.id}','${jsq(m)}')">${esc(m)}</button>`).join('')}<button class="btn sm ghost" onclick="A.qrRefus(null)">Annuler</button></div>` : '';
+    return `<div class="qr-card">${tete}${al}${it.detail.map((l, i) => ligne(it, l, i)).join('')}
+      ${it.note ? `<div class="muted" style="margin-top:6px">Note : « ${esc(it.note)} »</div>` : ''}
+      <div class="t" style="margin-top:6px"><span>Total</span><span>${da(total)}</span></div>
+      ${it.statut === 'traitement' ? '<p class="muted">Acceptation en cours…</p>' : `<div class="act"><button class="btn sm ok" onclick="A.qrAccepter('${it.id}')">Accepter${ret.length ? ' (sans ' + ret.length + ')' : ''}</button><button class="btn sm bad" onclick="A.qrRefus('${it.id}')">Refuser</button></div>${refus}`}
+      ${ret.length ? '' : '<p class="muted" style="font-size:13px;margin:6px 0 0">Touchez un article pour le retirer avant d’accepter.</p>'}</div>`;
+  };
+  const etat = q.enLigne ? '' : `<div class="qr-card echec"><b>Relais injoignable</b><br><span class="muted">${esc(q.erreur || 'Pas de connexion internet')}. Les clients ne peuvent pas commander pour l’instant ; la caisse marche normalement.</span></div>`;
+  return fab + `<div class="qr-panel"><h4>📱 Commandes des clients<span class="grow"></span><button class="btn sm ghost" onclick="A.qrToggle()">Fermer</button></h4>${etat}
+    ${n ? [...echecs, ...att].map(carte).join('') : '<p class="muted" style="padding:8px">Aucune demande en attente.</p>'}</div>`;
+}
 function render() {
   if (S.dragging) return;
   const app = $('#app');
@@ -1484,7 +1582,10 @@ function render() {
       h = '<div style="background:#ffe4ad;color:#362200;padding:12px;text-align:center;font-weight:bold">La caisse va faire la rase à ' + hm(z.ts) + ' ' + bouton + '</div>' + h;
     }
   }
+  if (S.etat && S.view !== 'login') h += qrWidget();
+  const qp = app.querySelector('.qr-panel'), qrScroll = qp ? qp.scrollTop : 0;
   app.innerHTML = h;
+  { const np = app.querySelector('.qr-panel'); if (np) np.scrollTop = qrScroll; }
   S._scKey = cle;
   sels.forEach((q, i) => { const e = app.querySelector(q); if (e && sc[i]) e.scrollTop = sc[i]; });
   if (focusSearch) { const i = $('#srch'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }

@@ -35,6 +35,8 @@ module.exports = function qrCommandes(K) {
       ouverture: '09:00', ouvertureVendredi: '16:00', derniereCommande: '22:45',
       horaires: { Brunch: ['09:00', '18:00'], Asiatique: ['11:00', '22:45'] },
       pauses: {}, son: true,
+      // 'direct' : tout part en cuisine dès l'acceptation (le client commande lui-même ses desserts plus tard) ; 'normal' : suites comme au poste du serveur
+      suites: 'direct',
       ...(db.config.qr || {}),
     };
     tablesQr();
@@ -119,7 +121,7 @@ module.exports = function qrCommandes(K) {
     catch (e) { al.push(e.message); it.invalide = true; it.detail = it.lignes.map(l => { const p = db.produits.find(x => x.id === l.pid); return { nom: p ? p.nom : '(article supprimé)', qte: l.qte, prix: p ? p.prix : 0, opts: [], note: l.note }; }); it.montant = it.detail.reduce((s, l) => s + l.prix * l.qte, 0); }
     if (it.montant > (+c.montantMax || 40000)) al.push('Montant élevé : ' + it.montant + ' DA');
     const ouverte = Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.salle === it.salle && x.table === it.table);
-    if (!ouverte) al.push('Nouvelle table : pas encore de commande ouverte');
+    it.premiere = !ouverte; // première commande : la table s'ouvrira à l'acceptation (information, pas une alerte)
     const h = new Date(it.recu), m = h.getHours() * 60 + h.getMinutes(), auj = K.dateLocale(it.recu);
     const r = (db.reservations || []).find(x => x.date === auj && x.salle === it.salle && x.table === it.table && x.statut === 'prevue' && m >= mn(x.heure) - 30 && m <= mn(x.heure) + 60);
     if (r) al.push('Table réservée à ' + r.heure + ' (' + r.nom + ')');
@@ -192,7 +194,7 @@ module.exports = function qrCommandes(K) {
     return {
       actif: !!c.actif, configure: !!(c.relais && c.secret), enLigne: !!c.actif && now() - etatSync.ok < 20000, erreur: c.actif ? etatSync.erreur : '', son: c.son !== false,
       attente: D().qrInbox.filter(x => x.recu > limite && (x.statut === 'attente' || x.statut === 'traitement' || (x.statut === 'acceptee' && x.echecs && x.echecs.length && !x.echecsVu)))
-        .slice(-40).map(x => ({ id: x.id, type: x.type, salle: x.salle, salleNom: x.salle ? salleNom(x.salle) : '?', table: x.table, recu: x.recu, statut: x.statut, detail: x.detail || [], note: x.note, montant: x.montant || 0, alertes: x.alertes || [], invalide: !!x.invalide, echecs: x.echecs || [], client: x.client || '' })),
+        .slice(-40).map(x => ({ id: x.id, type: x.type, salle: x.salle, salleNom: x.salle ? salleNom(x.salle) : '?', table: x.table, recu: x.recu, statut: x.statut, detail: x.detail || [], note: x.note, montant: x.montant || 0, alertes: x.alertes || [], premiere: !!x.premiere, invalide: !!x.invalide, echecs: x.echecs || [], client: x.client || '' })),
       pauses: c.pauses || {},
     };
   }
@@ -217,6 +219,7 @@ module.exports = function qrCommandes(K) {
     const retirer = Array.isArray(b.retirer) ? b.retirer.map(Number) : [];
     const lignes = it.lignes.filter((_, i) => !retirer.includes(i));
     if (!lignes.length) E('Aucun article à accepter : refusez la commande');
+    if (cfg().suites !== 'normal') for (const l of lignes) l.suite = 0;
     K.verifierLignes({ salle: it.salle }, lignes); // contrôle complet AVANT de toucher à la table (stock, options, cuissons)
     it.statut = 'traitement';
     try {
@@ -268,6 +271,7 @@ module.exports = function qrCommandes(K) {
     if (b.secret !== undefined && !/^•+$/.test(b.secret)) c.secret = String(b.secret || '').trim();
     if (b.actif !== undefined) c.actif = !!b.actif;
     if (b.son !== undefined) c.son = !!b.son;
+    if (b.suites !== undefined) c.suites = b.suites === 'normal' ? 'normal' : 'direct';
     if (b.montantMax !== undefined) c.montantMax = Math.max(1000, Math.round(+b.montantMax || 40000));
     for (const k of ['ouverture', 'ouvertureVendredi', 'derniereCommande']) if (b[k] !== undefined) { if (!h(b[k])) E('Heure invalide : ' + b[k]); c[k] = b[k]; }
     if (b.horaires && typeof b.horaires === 'object') { const o = {}; for (const [k, v] of Object.entries(b.horaires)) { if (!Array.isArray(v) || !h(v[0]) || !h(v[1])) E('Horaire invalide pour ' + k); o[String(k).slice(0, 30)] = [v[0], v[1]]; } c.horaires = o; }
