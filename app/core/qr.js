@@ -205,6 +205,10 @@ module.exports = function qrCommandes(K) {
         db.retoursEssaisQr = r.retoursEssais;
         change = true;
       }
+      if (Array.isArray(r.suiviSuggestions) && JSON.stringify(db.suiviSuggestionsQr || []) !== JSON.stringify(r.suiviSuggestions)) {
+        db.suiviSuggestionsQr = r.suiviSuggestions;
+        change = true;
+      }
       if (nv) { saveNow(); broadcast(); } else if (change) save();
       etatSync.ok = now(); etatSync.erreur = '';
     } catch (e) { etatSync.erreur = e.message; }
@@ -321,7 +325,7 @@ module.exports = function qrCommandes(K) {
     return {
       config: { ...c, secret: c.secret ? '••••••••' : '' }, sync: { ok: etatSync.ok, erreur: etatSync.erreur, essai: etatSync.essai }, service: service(),
       tables: Object.entries(D().qrTables).map(([j, t]) => ({ jeton: j, salle: t.salle, salleNom: salleNom(t.salle), table: t.table, retire: !!t.retire, pause: !!(c.pauses || {})[j], url: URL_COMMANDE + j })),
-      retoursEssais: D().retoursEssaisQr || [],
+      retoursEssais: D().retoursEssaisQr || [], suiviSuggestions: D().suiviSuggestionsQr || [],
       historique: D().qrInbox.slice(-60).reverse().map(x => ({ id: x.id, type: x.type, salle: x.salle ? salleNom(x.salle) : '?', table: x.table, recu: x.recu, statut: x.statut, montant: x.montantAccepte || x.montant || 0, par: x.decision ? x.decision.par : '', motif: x.motif || '', alertes: x.alertes || [] })),
     };
   };
