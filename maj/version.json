@@ -1,6 +1,6 @@
 {
  "version": "3.6.1",
- "date": "2026-11-24T01:04:02.783Z",
+ "date": "2026-11-24T01:04:55.729Z",
  "notes": "Supplément unique à 500 DA, réimpression QR ciblée et reprise des additions",
  "fichiers": [
   {
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "779ef6868a7e49517de5fa5175b49b6bdfb4491e275fb14fe330651f64bc4215"
+   "sha256": "50189233722eb86ae6bd3084742f7b569c071909960cd695d3c66957f95f6b98"
   },
   {
    "chemin": "seed-menu.json",
