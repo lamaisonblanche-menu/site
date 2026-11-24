@@ -1570,22 +1570,9 @@ function qrSurveiller() {
   const ids = new Set(q.attente.filter(x => x.statut === 'attente').map(x => x.id));
   if (S.qr.vus) {
     const nv = q.attente.filter(x => x.statut === 'attente' && !S.qr.vus.has(x.id));
-    if (nv.length) {
-      if (q.son) bip(3);
-      const x = nv[0];
-      qrAlerte(x.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande QR', x.salleNom + ' — Table ' + x.table, nv.length);
-    }
+    if (nv.length && q.son) bip(3);
   }
   S.qr.vus = ids;
-}
-// 3.6.8 : grande alerte bien visible en haut de l'écran (au lieu du petit message en bas)
-function qrAlerte(titre, lieu, nb) {
-  let el = document.getElementById('qralerte');
-  if (!el) { el = document.createElement('div'); el.id = 'qralerte'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="ic">📱</div><div class="tx"><div class="ti">${esc(titre)}${nb > 1 ? ' (+' + (nb - 1) + ')' : ''}</div><div class="li">${esc(lieu)}</div></div><div class="ok">Voir</div>`;
-  el.onclick = () => { el.hidden = true; if (!S.qr.ouvert) A.qrToggle(); };
-  el.hidden = false; el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim');
-  clearTimeout(qrAlerte._t); qrAlerte._t = setTimeout(() => { el.hidden = true; }, 12000);
 }
 function qrWidget() {
   const q = S.etat && S.etat.qr;
@@ -1594,10 +1581,21 @@ function qrWidget() {
   const echecs = q.attente.filter(x => x.statut === 'acceptee');
   const n = att.length + echecs.length;
   const fab = `<button class="qr-fab ${n ? 'alerte' : ''} ${q.enLigne ? '' : 'horsligne'}" onclick="A.qrToggle()" title="Commandes des clients">📱${n ? '<span class="lb">Commande' + (n > 1 ? 's' : '') + ' QR</span><b>' + n + '</b>' : ''}</button>`;
-  if (!S.qr.ouvert) return fab;
-  const ligne = (it, l, i, modifiable) => {
-    const r = modifiable && (S.qr.retirer[it.id] || []).includes(i);
-    return `<div class="qr-ln ${r ? 'retire' : ''}" ${modifiable ? `onclick="A.qrRetirer('${it.id}',${i})"` : ''}><b>${l.qte}×</b><div class="grow">${esc(l.nom)}${l.opts && l.opts.length ? '<small>' + esc(l.opts.join(', ')) + '</small>' : ''}${l.note ? '<small>« ' + esc(l.note) + ' »</small>' : ''}</div><span>${fmt(l.prix * l.qte)}</span></div>`;
+  if (!S.qr.ouvert) {
+    const attente = att.filter(x => x.statut === 'attente');
+    const prochaine = attente[0];
+    if (!prochaine) return fab;
+    const titre = prochaine.type === 'addition' ? 'Addition demandée' : 'Nouvelle commande QR';
+    const autres = attente.length - 1;
+    return fab + `<button type="button" id="qralerte" onclick="A.qrToggle()">
+      <span class="tx"><span class="ti">${titre}${autres ? ' (+' + autres + ')' : ''}</span>
+      <span class="li">${esc(prochaine.salleNom)} · Table ${esc(prochaine.table || '?')}</span></span>
+      <span class="ok">Voir</span>
+    </button>`;
+  }
+  const ligne = (it, l, i) => {
+    const r = (S.qr.retirer[it.id] || []).includes(i);
+    return `<div class="qr-ln ${r ? 'retire' : ''}" onclick="A.qrRetirer('${it.id}',${i})"><b>${l.qte}×</b><div class="grow">${esc(l.nom)}${l.opts && l.opts.length ? '<small>' + esc(l.opts.join(', ')) + '</small>' : ''}${l.note ? '<small>« ' + esc(l.note) + ' »</small>' : ''}</div><span>${fmt(l.prix * l.qte)}</span></div>`;
   };
   const carte = it => {
     const tete = `<div class="t"><span>${esc(it.salleNom)} · Table ${esc(it.table || '?')}</span><span class="muted">${hm(it.recu)}</span></div>${it.premiere && it.type !== 'addition' ? '<div class="muted" style="font-size:13px">1re commande : la table s’ouvrira à l’acceptation</div>' : ''}`;
@@ -1606,15 +1604,14 @@ function qrWidget() {
       <div class="act"><button class="btn sm dark" onclick="A.qrReimprimer('${it.id}')">Réimprimer les bons manquants</button><button class="btn sm" onclick="A.qrVuImpr('${it.id}')">C’est réglé</button></div></div>`;
     if (it.type === 'addition') return `<div class="qr-card addition">${tete}<div>Le client demande <b>l’addition</b>.</div>${al}
       <div class="act"><button class="btn sm dark" onclick="A.qrAccepter('${it.id}')">Imprimer l’addition</button><button class="btn sm" onclick="A.qrRefuser('${it.id}','')">Vu</button></div></div>`;
-    const caisse = peut('caissier');
-    const ret = caisse ? S.qr.retirer[it.id] || [] : [];
+    const ret = S.qr.retirer[it.id] || [];
     const total = it.detail.reduce((s, l, i) => s + (ret.includes(i) ? 0 : l.prix * l.qte), 0);
     const refus = S.qr.refus === it.id ? `<div class="qr-motifs">${['Article indisponible', 'Table non occupée', 'Commande en double', 'Cuisine fermée', 'Merci de voir un serveur'].map(m => `<button class="btn sm" onclick="A.qrRefuser('${it.id}','${jsq(m)}')">${esc(m)}</button>`).join('')}<button class="btn sm ghost" onclick="A.qrRefus(null)">Annuler</button></div>` : '';
-    return `<div class="qr-card">${tete}${al}${it.detail.map((l, i) => ligne(it, l, i, caisse)).join('')}
+    return `<div class="qr-card">${tete}${al}${it.detail.map((l, i) => ligne(it, l, i)).join('')}
       ${it.note ? `<div class="muted" style="margin-top:6px">Note : « ${esc(it.note)} »</div>` : ''}
       <div class="t" style="margin-top:6px"><span>Total</span><span>${da(total)}</span></div>
-      ${it.statut === 'traitement' ? '<p class="muted">Acceptation en cours…</p>' : !caisse ? '<p class="muted">En attente de validation par la caisse.</p>' : `<div class="act"><button class="btn sm ok" onclick="A.qrAccepter('${it.id}')">Accepter${ret.length ? ' (sans ' + ret.length + ')' : ''}</button><button class="btn sm bad" onclick="A.qrRefus('${it.id}')">Refuser</button></div>${refus}`}
-      ${!caisse || ret.length ? '' : '<p class="muted" style="font-size:13px;margin:6px 0 0">Touchez un article pour le retirer avant d’accepter.</p>'}</div>`;
+      ${it.statut === 'traitement' ? '<p class="muted">Acceptation en cours…</p>' : `<div class="act"><button class="btn sm ok" onclick="A.qrAccepter('${it.id}')">Accepter${ret.length ? ' (sans ' + ret.length + ')' : ''}</button><button class="btn sm bad" onclick="A.qrRefus('${it.id}')">Refuser</button></div>${refus}`}
+      ${ret.length ? '' : '<p class="muted" style="font-size:13px;margin:6px 0 0">Touchez un article pour le retirer avant d’accepter.</p>'}</div>`;
   };
   const etat = q.enLigne ? '' : `<div class="qr-card echec"><b>Relais injoignable</b><br><span class="muted">${esc(q.erreur || 'Pas de connexion internet')}. Les clients ne peuvent pas commander pour l’instant ; la caisse marche normalement.</span></div>`;
   return fab + `<div class="qr-panel"><h4>📱 Commandes des clients<span class="grow"></span><button class="btn sm ghost" onclick="A.qrToggle()">Fermer</button></h4>${etat}
