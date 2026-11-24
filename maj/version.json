@@ -1,7 +1,7 @@
 {
  "version": "3.6.4",
- "date": "2026-11-24T09:29:21.959Z",
- "notes": "Correctif : un champ en cours de saisie (ex. clé du relais) ne s'efface plus",
+ "date": "2026-11-24T09:29:32.109Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
