@@ -1,7 +1,7 @@
 {
  "version": "3.6.0",
- "date": "2026-11-24T00:46:16.332Z",
- "notes": "Commandes des clients par QR code (à activer dans Gestion → Commandes QR) et prix alignés sur le site",
+ "date": "2026-11-24T00:46:40.795Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
