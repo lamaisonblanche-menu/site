@@ -1,7 +1,7 @@
 {
  "version": "3.7.7",
- "date": "2026-11-24T15:38:53.941Z",
- "notes": "Écrans verrouillés après 30 s, sortie de la table après Envoyer, supplément corrigé, rase automatique seulement la nuit",
+ "date": "2026-11-24T15:39:10.846Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
