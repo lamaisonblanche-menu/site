@@ -1,0 +1,14 @@
+# Relais des commandes QR — La Maison Blanche
+name = "mb-commandes"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[[durable_objects.bindings]]
+name = "RELAIS"
+class_name = "Relais"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Relais"]
+
+# La clé partagée avec la caisse se règle hors du code :  npx wrangler secret put CAISSE_SECRET
