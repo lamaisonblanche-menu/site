@@ -866,9 +866,12 @@ const A = window.A = {
       const essai = pin;
       S._auto = setTimeout(async () => {
         if (pin !== essai) return;
-        const r = await fetch('/api/code-valide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: essai }) }).then(x => x.json()).catch(() => ({}));
-        if (r.ok && pin === essai) { if (S.pointage) pointer({ pin: essai }); else login({ pin: essai }); }
-        else if (pin === essai && essai.length === 6) { const l = $('#lerr'); if (l) l.textContent = 'Code incorrect'; }
+        const r = await fetch('/api/code-valide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: essai }) }).then(x => x.json()).catch(() => ({ erreur: 'Pas de connexion avec la caisse principale' }));
+        if (pin !== essai) return;
+        if (r.ok) { if (S.pointage) pointer({ pin: essai }); else login({ pin: essai }); return; }
+        // 3.7.3 : avant, un code refusé ou un écran bloqué ne montrait RIEN (le serveur croyait que son code ne marchait plus)
+        const msg = r.erreur || (r.impasse ? 'Code incorrect, retapez-le' : '');
+        if (msg) { pin = ''; render(); const d = $('#dots'); if (d) d.classList.add('shake'); const l = $('#lerr'); if (l) l.textContent = msg; }
       }, 250);
     }
   },

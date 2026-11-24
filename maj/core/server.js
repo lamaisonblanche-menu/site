@@ -481,18 +481,23 @@ try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(SESSIONS_FI
 function sauverSessions() { try { fs.writeFileSync(SESSIONS_FILE + '.tmp', JSON.stringify(Object.fromEntries(sessions))); fs.renameSync(SESSIONS_FILE + '.tmp', SESSIONS_FILE); } catch (e) {} }
 setInterval(sauverSessions, 30000);
 const essaisAcces = new Map();
+// 3.7.3 : anti-essais assoupli. Avant : 5 erreurs en 5 min (même une simple faute de frappe, même la vérification
+// automatique pendant la frappe) bloquaient TOUT l'écran 5 min, y compris les bons codes. Maintenant : 10 erreurs → 2 min.
+const ESSAIS_MAX = 10, ESSAIS_FENETRE = 5 * 60000, ESSAIS_BLOCAGE = 2 * 60000;
+const ipDe = req => String(req?.socket?.remoteAddress || 'inconnue');
+function estBloque(ip) { const x = essaisAcces.get(ip); return !!(x && x.bloqueJusqua > now()); }
 function controleEssais(req) {
-  const ip = String(req?.socket?.remoteAddress || 'inconnue');
-  const t = now(), x = essaisAcces.get(ip);
-  if (x && x.bloqueJusqua > t) E('Trop de tentatives. Réessayez dans quelques minutes.', 429);
+  const ip = ipDe(req);
+  const t = now();
+  if (estBloque(ip)) E('Trop de codes faux sur cet écran. Réessayez dans ' + Math.max(1, Math.ceil((essaisAcces.get(ip).bloqueJusqua - t) / 60000)) + ' min, ou passez votre badge.', 429);
   if (essaisAcces.size > 2000) for (const [k, v] of essaisAcces) if (t - v.debut > 3600000) essaisAcces.delete(k);
   return ip;
 }
 function echecAcces(ip) {
   const t = now(), ancien = essaisAcces.get(ip);
-  const x = ancien && t - ancien.debut < 5 * 60000 ? ancien : { debut: t, n: 0, bloqueJusqua: 0 };
+  const x = ancien && t - ancien.debut < ESSAIS_FENETRE ? ancien : { debut: t, n: 0, bloqueJusqua: 0 };
   x.n++;
-  if (x.n >= 5) x.bloqueJusqua = t + 5 * 60000;
+  if (x.n >= ESSAIS_MAX) { x.bloqueJusqua = t + ESSAIS_BLOCAGE; x.n = 0; x.debut = t; }
   essaisAcces.set(ip, x);
 }
 function succesAcces(ip) { essaisAcces.delete(ip); }
@@ -1316,8 +1321,8 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
 const autorisationsPointage = new Map();
 const routes = {
   'POST /api/login': (b, _u, req) => {
-    const ip = controleEssais(req);
     const u = parCode(b.badge || b.pin);
+    const ip = b.badge && u ? ipDe(req) : controleEssais(req);
     if (!u) { echecAcces(ip); E(b.badge ? 'Badge inconnu' : 'Code incorrect', 401); }
     succesAcces(ip);
     const token = crypto.randomBytes(18).toString('hex');
@@ -1759,7 +1764,17 @@ const routes = {
     return { erreurs: res.ok ? [] : [res.erreur] };
   },
   // vérifie un code sans ouvrir de session (connexion automatique dès que le code est bon)
-  'POST /api/code-valide': (b, _u, req) => { const ip = controleEssais(req); const u = parCode(b.pin); const ok = !!u && String(b.pin).length >= 4; if (!ok) echecAcces(ip); else succesAcces(ip); return { ok }; },
+  // Vérification pendant la frappe (connexion automatique). 3.7.3 : un début de code qui peut encore devenir bon
+  // (ex. « 1234 » alors qu'il existe un code « 123456 ») ne compte plus comme une erreur et ne connecte pas la mauvaise personne.
+  'POST /api/code-valide': (b, _u, req) => {
+    const ip = controleEssais(req);
+    const pin = String(b.pin || '').trim();
+    const u = pin.length >= 4 ? parCode(pin) : null;
+    const plusLong = db.users.some(x => x.actif && String(x.pin || '').length > pin.length && String(x.pin).startsWith(pin));
+    if (u) succesAcces(ip);
+    else if (!plusLong && pin.length >= 4) echecAcces(ip);
+    return { ok: !!u && !plusLong, impasse: !u && !plusLong && pin.length >= 4 };
+  },
   'POST /api/pointage/autoriser': (b, _u, req) => {
     const ip = String(req.socket.remoteAddress || '');
     if (!/^(::1|127\.|::ffff:127\.)/.test(ip)) E('Autorisation uniquement sur la caisse principale', 403);

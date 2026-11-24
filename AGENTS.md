@@ -212,3 +212,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 
 ### 3.7.2 (24/11/2026, Claude) — nouveaux plats (demande de Manil)
 - Migration `db.carte8` : famille « Plats du jour » (cuisine, juste avant Pâtes fraîches) avec l'article « Plat du jour » 4 500 DA (le serveur précise le plat dans le commentaire) ; « Spaghettis pesto burrata » 2 300 DA et « Linguine aux crevettes » 2 800 DA ajoutés comme articles normaux dans « Pâtes fraîches ». Les avant-premières QR `essai-…` ne sont pas touchées.
+
+### 3.7.3 (24/11/2026, Claude) — codes refusés à tort (signalé par Manil : « un serveur n'a pas pu rentrer »)
+- Cause : l'anti-essais bloquait l'écran (par IP) 5 min après 5 erreurs en 5 min, et la vérification automatique pendant la frappe (`/api/code-valide`) comptait chaque début de code comme une erreur. Un écran de salle partagé était donc vite bloqué ; pendant le blocage, même un bon code était refusé, et l'écran n'affichait RIEN (la réponse 429 était ignorée).
+- Maintenant : 10 erreurs en 5 min → blocage 2 min (`ESSAIS_MAX/FENETRE/BLOCAGE`) ; un début de code qui peut encore devenir un code valide (codes de 5-6 chiffres) ne compte pas et ne connecte pas la mauvaise personne ; un badge connu passe toujours ; l'écran affiche « Code incorrect, retapez-le » ou le message de blocage.

@@ -1,11 +1,11 @@
 {
- "version": "3.7.2",
- "date": "2026-11-24T12:11:03.617Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.3",
+ "date": "2026-11-24T13:38:18.645Z",
+ "notes": "Codes des serveurs : plus de blocage de l'écran après quelques fautes de frappe, message clair si le code est faux",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "c6985d515b3473f1ea6ec6306d74ea3cb913b64740172689a8e2b1edde3ec9fc"
+   "sha256": "c5c590b00cd6c1d7a69736ea08aa29cdd07d75eae430122c5b6651d299368c49"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "1c84e060738b3d1e1c6449abdb73bb0fe754a0eb2c66773807dde32bc28a7e82"
+   "sha256": "88909a0fef7f55d2ab0fcb83d4620a19cafb8f976b28d8a1eb3c896e04757f99"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "9e4a3d5f56f363f77a42d0a6ce05d1384d568926463326322dd8141017be0bc3"
+   "sha256": "f632683167a5b394627e0dda2e846c1c67b5912ec8a462e299eb2294ca7a5ccc"
   },
   {
    "chemin": "suivi.js",
