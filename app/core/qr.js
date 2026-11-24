@@ -238,7 +238,7 @@ module.exports = function qrCommandes(K) {
     impressionsEnCours.add(it.id);
     try {
       let c = ouverteDe(it);
-      if (!c) c = R['POST /api/commande/ouvrir']({ salle: it.salle, table: it.table, couverts: 1, pin: b.pin }, u);
+      if (!c) c = R['POST /api/commande/ouvrir']({ salle: it.salle, table: it.table, couverts: 1, pin: b.pin }, u, null, null, true);
       if (it.note && !c.note) c.note = 'Client : ' + it.note.slice(0, 100);
       const r = await K.envoyerLignes(c, lignes, u, {
         source: 'qr', entete: ENTETE_BON, durable: true,
