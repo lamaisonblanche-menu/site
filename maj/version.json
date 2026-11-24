@@ -1,7 +1,7 @@
 {
  "version": "3.6.2",
- "date": "2026-11-24T02:31:34.893Z",
- "notes": "Avant-premières et suivi des suggestions QR",
+ "date": "2026-11-24T09:03:18.255Z",
+ "notes": "Clavier tactile pour les employés et avant-premières QR",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "ce5e5486f3b558b82ea414ae9baa7fff65b91e86526c6a27de9a1de0b6ea6784"
+   "sha256": "0538365fba47b5c3bf442a3ed4140eabe5d79ed03a5012b8100655255332a904"
   },
   {
    "chemin": "public/index.html",
@@ -37,7 +37,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "bb27dac21e1f32f5c03d1b0b4ca3275e197af5071c075bd8db24e9b71b66afd8"
+   "sha256": "a4c3041a66f5ed3e435a58ca3786acad464e5caa4bd491be250ef90c7f32e6eb"
   },
   {
    "chemin": "seed-menu.json",
