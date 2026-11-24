@@ -364,6 +364,17 @@ for (const s of db.config.salles) {
   s.deco = s.deco || []; s.fond = s.fond || 'creme'; s.ratio = s.ratio || 1.6; s.taille = s.taille || 7;
 }
 
+// Prix alignés sur le site lamaisonblanchehydra.com (version 3.6.0, demande du gérant : le site fait foi).
+// Correspondance par nom d'article (les identifiants diffèrent d'une caisse à l'autre). Chaque changement est noté au journal.
+if (!db.prixSite6) {
+  const SITE = [["Œuf à la turque",1500],["Œuf Benedict",2000],["Toast avocat saumon",2600],["Club sandwich saumon fumé",2700],["Club sandwich poulet fumé",2200],["Croissant croque-monsieur",2000],["Long toast tunacado",2500],["Salade César",1600],["Crêpe salée poulet, épinard",1500],["Sandwich La Maison Blanche",2300],["Sandwich salade César",1700],["Burger bœuf",2000],["Burger poulet crispy",1800],["Cake fondant caramel",1500],["Hot cookie",1600],["Brioche perdue tiramisu",1500],["Brioche perdue caramel",2000],["NY roll citron meringué",1000],["NY roll pistache",1200],["Crêpe Suzette glace vanille",1600],["Matilda cake",1000],["Pancake beurre miel",1000],["Gaufre Nutella",1500],["Gaufre pistache",1500],["Crêpe Nutella",1500],["Crêpe pistache",1500],["Tiramisu",1000],["Meringue lemon cake",1000],["Granola bowl",1800],["Carpaccio de bœuf",2500],["Burrata, carpaccio de tomates",2000],["Salade grecque",2200],["Salade de quinoa aux crustacés",2800],["Médaillon de foie gras",3300],["Soupe du jour",1800],["Soupe aux fruits de mer",2400],["Boureks × 2",800],["Escargots de Bourgogne",2300],["Tarte aux crevettes",2700],["Saint-Jacques, pommes vertes",3300],["Duo calamars crevettes à l'ail",2800],["Gambas tempura",3200],["Moules frites",2100],["Cœur de filet, sauce morilles",4500],["Côte de bœuf (2 pers.)",9000],["Méchoui d'agneau",5000],["Souris d'agneau confite",4500],["Entrecôte poivre vert",3200],["Saumon à l'orange",4500],["Daurade aux crustacés",3700],["Loup de mer",3700],["Ballotine de poulet au saumon",3000],["Magret de canard au cassis",4500],["Blanquette exotique MB",3000],["Raviolis ricotta épinards",2600],["Rigatoni au saumon",2800],["Tagliatelles poulet champignons",2400],["Linguine alla scoglio",4500],["Spaghettis moules pesto",2800],["Profiteroles chocolat",1200],["Pavlova",1000],["Crème brûlée",1000],["Fondant chocolat glace",1000],["Tiramisu",1000],["Nougat glacé fruits rouges",1200],["Meringue lemon cake",1000],["Nems au poulet × 3",1700],["Gyoza au poulet × 5",2200],["Soupe de gyoza",2400],["Crispy rice tempura × 5",2300],["Crispy rice avocat × 5",2400],["Futomaki × 10",2500],["Maki avocat × 12",1800],["Maki saumon × 12",2200],["Nigiri saumon × 3",1800],["California saumon avocat × 8",2400],["Dragon saumon roll × 8",2600],["Rainbow roll × 8",2800],["Crunchy saumon roll × 8",2600],["Crunchy poulet roll × 8",2400],["Flamed roll × 8",2800],["Creamy avocado roll × 8",2400],["Veggie roll × 8",2500],["Maki crispy tartare saumon × 6",1800],["Crunch tempura × 8",2800],["Duo signature × 24",5400],["Party box × 54",14200],["Poke bowl",3200],["Wok au poulet",2400],["Ramen gyoza",2500],["Ramen aux crevettes",3200],["Taco crispy",3100],["Mochis glacés × 2",2000],["Eau minérale GM",200],["Eau pétillante GM",200],["Coca",250],["Coca zéro",250],["Selecto",250],["Hamoud blanche",250],["Sprite",250],["Schweppes",250],["Café",400],["Cappuccino",500],["Chocolat chaud",700],["Thé",400],["Infusion",400],["Latte vanille",750],["Latte caramel beurre salé",750],["Matcha latte vanille",900],["Matcha latte fraise",900],["Matcha latte pistache",1000],["Macchiato",500],["Tiramisu latte",1000],["Matcha tiramisu latte",1100],["Parfum des femmes",650],["Exotic passion",750],["Exotic mango",750],["Exotic fruits rouges",750],["Mojito classique",650],["Mojito fraise",750],["Piña colada",700],["Ice tea pêche",700],["Ice tea fruits des bois",700],["Cocktail Maison Blanche",1000],["Detox ananas pomme menthe",700],["Detox orange carotte dattes",800],["Detox pomme gingembre coco",800],["Jus d'orange",500],["Jus de citron",500],["Jus de mangue",900],["Jus de fraise",700],["Smoothie pistachio kunafa",1100],["Smoothie peanut butter",1100]];
+  const n = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const changes = [];
+  for (const [nom, prix] of SITE) for (const p of db.produits.filter(x => n(x.nom) === n(nom))) if (p.prix !== prix) { changes.push(p.nom + ' ' + p.prix + ' → ' + prix); p.prix = prix; }
+  if (changes.length) db.journal.push({ ts: Date.now(), user: '-', action: 'prix alignés sur le site', detail: changes.join(' ; ') });
+  db.prixSite6 = { ts: Date.now(), changes };
+  setTimeout(() => saveNow(), 0);
+}
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
@@ -578,7 +589,7 @@ function lignesBon(d, l) {
 function bon(poste, cmd, lignes, titre, infos) {
   const d = new Doc();
   d.center(1).size(2).bold(1).t(((db.config.imprimantes[poste] || {}).nom || poste).toUpperCase()).size(0);
-  if (titre) d.t(titre);
+  if (titre) for (const ligne of String(titre).split('\n')) d.t(ligne);
   d.bold(0).center(0).line('=');
   d.size(2).bold(1).t(titreCmd(cmd)).size(0).bold(0);
   if (cmd.salle === 'emporter') infosEmporter(d, cmd); else d.t(salleNom(cmd.salle) + ' - ' + (cmd.couverts || '?') + ' couv.');
@@ -1156,7 +1167,7 @@ function etatPublic(u) {
     users: db.users.map(x => ({ id: x.id, nom: x.nom, role: x.role, actif: x.actif })),
     commandes: Object.values(db.commandes).filter(x => x.statut === 'ouverte'),
     jour: jourCourant(false) || null,
-    options: db.options, top: topVentes(), version: VERSION,
+    options: db.options, top: topVentes(), version: VERSION, qr: QR.etat(u),
     reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
     prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
@@ -1176,6 +1187,79 @@ function bonsKds(poste) {
 }
 function getCmd(id) { const c = db.commandes[id]; if (!c) E('Commande introuvable', 404); if (c.statut !== 'ouverte') E('Cette table a déjà été encaissée ou fermée.'); return c; }
 
+// Envoi d'articles sur une commande (3.6.0) : utilisé par « Envoyer » et par l'acceptation d'une commande QR.
+// verifierLignes ne modifie rien (lève une erreur lisible si un article est invalide, épuisé ou incomplet).
+function verifierLignes(c, lignes) {
+  const besoin = {};
+  if (!Array.isArray(lignes) || !lignes.length) E('Rien à envoyer');
+  for (const x of lignes) {
+    const q = Number(x.qte);
+    if (!Number.isInteger(q) || q < 1 || q > 99) E('Quantité invalide (1 à 99)');
+    besoin[x.pid] = (besoin[x.pid] || 0) + q;
+  }
+  for (const [pid, q] of Object.entries(besoin)) {
+    const p = db.produits.find(p => p.id === pid);
+    if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
+  }
+  const nouvelles = [];
+  for (const x of lignes) {
+    const p = db.produits.find(p => p.id === x.pid);
+    if (!p) continue;
+    const qte = Number(x.qte);
+    if (p.id === 'supplement-fixe' && !String(x.note || '').trim()) E('Quel supplément ? Indiquez son nom avant de l’ajouter.');
+    const cat = db.categories.find(k => k.id === p.cat) || {};
+    // options (cuisson, accompagnement, suppléments…)
+    const opts = [];
+    for (const gid of p.options || []) {
+      const g = db.options.find(o => o.id === gid); if (!g) continue;
+      const indices = (x.opts || []).filter(o => o.g === gid).map(o => o.i);
+      if (indices.some(i => !Number.isInteger(i) || i < 0 || i >= g.choix.length)) E('Option invalide pour ' + p.nom);
+      if (new Set(indices).size !== indices.length) E('Option sélectionnée plusieurs fois');
+      if (!g.multiple && indices.length > 1) E('Une seule option autorisée pour « ' + g.nom + ' »');
+      const choisis = indices.map(i => g.choix[i]);
+      if (g.obligatoire && !choisis.length) E('Choisissez « ' + g.nom + ' » pour ' + p.nom);
+      for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
+    }
+    const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
+    nouvelles.push({ pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: p.id === 'supplement-fixe' ? '' : String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter' });
+  }
+  if (!nouvelles.length) E('Rien à envoyer');
+  return nouvelles;
+}
+async function envoyerLignes(c, lignes, u, opt = {}) {
+  const prets = verifierLignes(c, lignes);
+  const nouvelles = prets.map(l => { db.seq.ligne++; return { id: 'L' + db.seq.ligne, ...l, envoye: now(), par: u.id, annule: null, offert: false, ...(opt.source ? { source: opt.source } : {}) }; });
+  for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
+  const suiteAvant = c.lignes.some(l => l.envoye);
+  c.lignes.push(...nouvelles);
+  // la première suite commandée part tout de suite, les suivantes attendent la réclame
+  const actives = c.lignes.filter(l => !l.annule && !l.paye && l.suite > 0).map(l => l.suite);
+  if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
+  if (opt.couverts) c.couverts = +opt.couverts;
+  creerBons(c, nouvelles);
+  if (opt.avantImpression) opt.avantImpression(nouvelles);
+  save();
+  if (opt.durable) saveNow();
+  const erreurs = [], echecs = [];
+  // commande commune : l'asiatique voit aussi la partie cuisine (gastro/brunch) et inversement
+  const CUISINES = ['cuisine', 'cuisine2', 'asiatique'];
+  const dePoste = k => nouvelles.filter(l => postesDe(l.pid).includes(k));
+  const commune = dePoste('asiatique').length && (dePoste('cuisine').length || dePoste('cuisine2').length);
+  const titre = [opt.entete, suiteAvant ? '-- SUITE DE COMMANDE --' : ''].filter(Boolean).join('\n');
+  for (const poste of postesBons()) {
+    const ls = dePoste(poste);
+    if (!ls.length) continue;
+    let infos = null;
+    if (commune && CUISINES.includes(poste)) {
+      infos = {};
+      for (const k of CUISINES) if (k !== poste && !(poste !== 'asiatique' && k !== 'asiatique')) { const autres = dePoste(k).filter(l => !ls.includes(l)); if (autres.length) infos[k] = autres; }
+    }
+    const r = await imprimer(poste, bon(poste, c, ls, titre, infos));
+    if (!r.ok) { erreurs.push(r.erreur); echecs.push(poste); }
+  }
+  journal(u, 'envoi', (opt.source === 'qr' ? '[QR] ' : '') + 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
+  return { nouvelles, erreurs, echecs };
+}
 const autorisationsPointage = new Map();
 const routes = {
   'POST /api/login': (b, _u, req) => {
@@ -1265,68 +1349,8 @@ const routes = {
   'POST /api/commande/envoyer': async (b, u) => {
     if (u.role === 'cuisine') E('Non autorisé', 403);
     const c = getCmd(b.id);
-    const besoin = {};
-    if (!Array.isArray(b.lignes) || !b.lignes.length) E('Rien à envoyer');
-    for (const x of b.lignes) {
-      const q = Number(x.qte);
-      if (!Number.isInteger(q) || q < 1 || q > 99) E('Quantité invalide (1 à 99)');
-      besoin[x.pid] = (besoin[x.pid] || 0) + q;
-    }
-    for (const [pid, q] of Object.entries(besoin)) {
-      const p = db.produits.find(p => p.id === pid);
-      if (p && p.stock !== null && p.stock !== undefined && p.stock < q) E(p.stock <= 0 ? p.nom + ' est épuisé' : 'Il ne reste que ' + p.stock + ' « ' + p.nom + ' »');
-    }
-    const nouvelles = [];
-    for (const x of b.lignes || []) {
-      const p = db.produits.find(p => p.id === x.pid);
-      if (!p) continue;
-      const qte = Number(x.qte);
-      if (p.id === 'supplement-fixe' && !String(x.note || '').trim()) E('Quel supplément ? Indiquez son nom avant de l’ajouter.');
-      const cat = db.categories.find(k => k.id === p.cat) || {};
-      // options (cuisson, accompagnement, suppléments…)
-      const opts = [];
-      for (const gid of p.options || []) {
-        const g = db.options.find(o => o.id === gid); if (!g) continue;
-        const indices = (x.opts || []).filter(o => o.g === gid).map(o => o.i);
-        if (indices.some(i => !Number.isInteger(i) || i < 0 || i >= g.choix.length)) E('Option invalide pour ' + p.nom);
-        if (new Set(indices).size !== indices.length) E('Option sélectionnée plusieurs fois');
-        if (!g.multiple && indices.length > 1) E('Une seule option autorisée pour « ' + g.nom + ' »');
-        const choisis = indices.map(i => g.choix[i]);
-        if (g.obligatoire && !choisis.length) E('Choisissez « ' + g.nom + ' » pour ' + p.nom);
-        for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
-      }
-      const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
-      db.seq.ligne++;
-      nouvelles.push({ id: 'L' + db.seq.ligne, pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: p.id === 'supplement-fixe' ? '' : String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter', envoye: now(), par: u.id, annule: null, offert: false });
-    }
-    if (!nouvelles.length) E('Rien à envoyer');
-    for (const l of nouvelles) { const p = db.produits.find(p => p.id === l.pid); if (p.stock !== null && p.stock !== undefined) p.stock -= l.qte; }
-    const suiteAvant = c.lignes.some(l => l.envoye);
-    c.lignes.push(...nouvelles);
-    // la première suite commandée part tout de suite, les suivantes attendent la réclame
-    const actives = c.lignes.filter(l => !l.annule && !l.paye && l.suite > 0).map(l => l.suite);
-    if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
-    if (b.couverts) c.couverts = +b.couverts;
-    creerBons(c, nouvelles);
-    save();
-    const erreurs = [];
-    // commande commune : l'asiatique voit aussi la partie cuisine (gastro/brunch) et inversement
-    const CUISINES = ['cuisine', 'cuisine2', 'asiatique'];
-    const dePoste = k => nouvelles.filter(l => postesDe(l.pid).includes(k));
-    const commune = dePoste('asiatique').length && (dePoste('cuisine').length || dePoste('cuisine2').length);
-    for (const poste of postesBons()) {
-      const ls = dePoste(poste);
-      if (!ls.length) continue;
-      let infos = null;
-      if (commune && CUISINES.includes(poste)) {
-        infos = {};
-        for (const k of CUISINES) if (k !== poste && !(poste !== 'asiatique' && k !== 'asiatique')) { const autres = dePoste(k).filter(l => !ls.includes(l)); if (autres.length) infos[k] = autres; }
-      }
-      const r = await imprimer(poste, bon(poste, c, ls, suiteAvant ? '-- SUITE DE COMMANDE --' : '', infos));
-      if (!r.ok) erreurs.push(r.erreur);
-    }
-    journal(u, 'envoi', 'Table ' + c.table + ' : ' + nouvelles.map(l => l.qte + ' ' + l.nom).join(', '));
-    return { commande: c, erreurs };
+    const r = await envoyerLignes(c, b.lignes, u, { couverts: b.couverts });
+    return { commande: c, erreurs: r.erreurs };
   },
   'POST /api/commande/reclamer': async (b, u) => {
     const c = getCmd(b.id);
@@ -1855,6 +1879,9 @@ function csv(rows) {
     return /[;"\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }).join(';')).join('\r\n');
 }
+
+// Commandes des clients par QR code (3.6.0) : module à part, désactivé tant que le relais n'est pas réglé
+const QR = require('./qr.js')({ db: () => db, routes, E, now, save, saveNow, journal, peut, broadcast, salleNom, envoyerLignes, verifierLignes, topVentes, dateLocale, Doc, imprimer, VERSION });
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
