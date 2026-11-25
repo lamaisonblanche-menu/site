@@ -245,6 +245,7 @@ function topbar() {
   // 3.8.0 : alertes pour la caisse (sauvegarde en échec, bons/tickets non imprimés)
   const al = S.etat && S.etat.alertes;
   if (al && al.sauvegarde) h += `<div class="offline">⚠️ Sauvegarde impossible sur le disque depuis ${hm(al.sauvegarde.depuis)} : n'éteignez pas le PC et prévenez le responsable (${esc(al.sauvegarde.erreur)})</div>`;
+  if (al && al.livraisons) h += `<div class="offline" style="cursor:pointer;background:#1f3a2e" onclick="A.livraisons()">🛵 ${al.livraisons} commande(s) de livraison du site à valider — touchez ici</div>`;
   if (al && al.impressions) h += `<div class="offline" style="cursor:pointer" onclick="A.impressions()">🖨️ ${al.impressions} impression(s) n'ont pas pu sortir — touchez ici pour les réimprimer</div>`;
   return h;
 }
@@ -613,7 +614,7 @@ function admDiag() {
   h += bloc('Réservations du site et Gmail', [ligne('Lecture des réservations', !D.site.lectureActive ? q(false, 'mail non configuré') : D.site.erreur ? q(false, 'erreur : ' + D.site.erreur) : D.site.dernier ? q(true, 'dernière lecture ' + quand(D.site.dernier) + ' · ' + D.site.ajoutees + ' ajoutée(s) depuis le démarrage') : q(null, 'pas encore lue depuis le démarrage')),
     ligne('Envoi des mails', !D.mail.configure ? q(false, 'mail non configuré') : D.mail.erreur ? q(false, 'dernier envoi en échec : ' + D.mail.erreur + ' (' + quand(D.mail.erreurTs) + ')') : D.mail.dernierOk ? q(true, 'dernier envoi réussi ' + quand(D.mail.dernierOk)) : q(null, 'aucun envoi depuis le démarrage')),
     ligne('Mails en attente', D.mail.enAttente ? q(false, D.mail.enAttente + ' mail(s)') : q(true, 'aucun')),
-    ligne('Commandes de livraison du site', q(null, 'elles arrivent sur WhatsApp, pas dans la caisse'))]);
+    ligne('Commandes de livraison du site', D.site.lectureActive ? q(true, 'lues dans Gmail avec les réservations (bannière 🛵 à la caisse)') : q(false, 'mail non configuré : elles n\'arrivent pas'))]);
   h += bloc('Rase', [ligne('Dernière rase', D.rase ? esc(D.rase.date) + ' par ' + esc(D.rase.par) + ' · CA ' + da(D.rase.ca) + ' · écart ' + da(D.rase.ecart) + '<br>' + (D.rase.mailEnvoye ? q(true, 'mail envoyé ' + quand(D.rase.mailEnvoye)) : D.rase.mailErreur ? q(false, 'mail : ' + D.rase.mailErreur) : q(null, 'mail non envoyé')) : q(null, 'aucune')),
     ligne('Rase automatique', D.raseAuto && D.raseAuto.actif ? 'activée à ' + esc(D.raseAuto.heure) : 'désactivée')]);
   h += bloc('Écrans connectés', D.ecrans.length ? D.ecrans.map(e => ligne(esc(e.ip === '127.0.0.1' || e.ip === '::1' ? 'Caisse principale' : e.ip), 'connecté depuis ' + quand(e.depuis))) : [ligne('', q(false, 'aucun écran connecté'))]);
@@ -1347,6 +1348,24 @@ const A = window.A = {
   },
   periode(p) { S.periode = p; A.atab('rapports'); },
   async diagImp() { toast('Interrogation des imprimantes…'); adm.diagImp = await act(() => api('/api/admin/diagnostic/imprimantes', {})); render(); },
+  // 3.8.0 : livraisons commandées sur le site (lues dans Gmail) : le caissier rappelle le client puis crée la commande
+  async livraisons() {
+    const L = await act(() => api('/api/livraisons')); if (!L) return;
+    const st = { a_valider: 'À valider', acceptee: 'Acceptée', refusee: 'Refusée' };
+    modal(mh('Livraisons du site') + (L.length ? L.map(x => `<div style="border-bottom:1px solid #eee;padding:10px 0">
+      <div class="row" style="justify-content:space-between"><div><b>${esc(x.nom)}</b> · <a href="tel:${esc(x.tel)}">${esc(x.tel)}</a><br>${esc(x.adresse)}${x.commune ? ', ' + esc(x.commune) : ''}<br><span class="muted">${esc(x.jour)} · ${esc(x.heure)} · reçue à ${hm(x.recu)}</span></div>
+      <div style="text-align:right"><b>${da(x.sousTotal)}</b><br><span class="muted">+ frais de livraison</span><br><span class="pill ${x.statut === 'a_valider' ? 'warn' : ''}">${st[x.statut] || x.statut}${x.par ? ' · ' + esc(x.par) : ''}</span></div></div>
+      <div style="margin:6px 0">${x.lignes.map(l => `${l.qte} × ${esc(l.nom)} <span class="muted">(${da(l.qte * l.prix)})</span>${l.article ? '' : ' <span class="pill bad">à ajouter à la main</span>'}`).join('<br>')}</div>
+      ${x.note ? `<div class="muted">Remarque : ${esc(x.note)}</div>` : ''}
+      ${x.statut === 'a_valider' ? `<div class="row" style="margin-top:6px"><button class="btn ok" onclick="A.livOk('${x.id}')">Client rappelé : créer la commande</button><button class="btn" onclick="A.livNon('${x.id}')">Refuser</button></div>` : ''}
+    </div>`).join('') : '<p>Aucune commande de livraison depuis 2 jours.</p>'), true);
+    A.livOk = id => act(async () => {
+      const r = await api('/api/livraison/accepter', { id }); closeModal();
+      S.etat.commandes.push(r.commande); S.salle = 'emporter'; A.voir(r.commande.id); S.draft = r.lignes; render();
+      toast(r.manquants.length ? 'À ajouter à la main : ' + r.manquants.join(', ') : 'Vérifiez la commande (cuissons…) puis appuyez sur Envoyer', !!r.manquants.length, 8000);
+    });
+    A.livNon = id => { if (!confirm('Refuser cette commande de livraison ?')) return; act(async () => { await api('/api/livraison/refuser', { id }); A.livraisons(); }); };
+  },
   async impressions() {
     const r = await act(() => api('/api/impressions')); if (!r) return;
     const dessin = () => modal(mh('Impressions non sorties') + (r.echecs.length ? r.echecs.map(x => `<div class="row" style="justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0"><div><b>${esc(x.imprimante)}</b> · ${hm(x.ts)}<br>${esc(x.titre)}<br><span class="muted">${esc(x.erreur || '')}</span></div><div class="row"><button class="btn ok" onclick="A.reimp('${x.id}')">Réimprimer</button><button class="btn" onclick="A.ignimp('${x.id}')">Déjà sorti</button></div></div>`).join('') : '<p>Aucune impression en échec.</p>'), true);

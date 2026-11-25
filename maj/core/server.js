@@ -270,7 +270,7 @@ if (!db.boissons10) {
   setTimeout(() => saveNow(), 0);
 }
 // Réservations (version 3.5.0)
-db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
+db.livraisons = db.livraisons || []; db.reservations = db.reservations || []; db.mailsAttente = db.mailsAttente || []; db.siteVus = db.siteVus || [];
 db.config.raseAuto = db.config.raseAuto || { actif: false, heure: '02:00', extinction: false };
 // Décision du gérant (24/11/2026) : la caisse ne doit jamais arrêter Windows.
 // Neutralise aussi l'ancien réglage conservé dans les données des installations existantes.
@@ -1273,6 +1273,51 @@ function resaDepuisMail(raw) {
   const notes = [propre(champ('Occasion')) && 'Occasion : ' + propre(champ('Occasion')), propre(champ('Remarque')), propre(champ('E-mail')) && 'Mail : ' + propre(champ('E-mail'))].filter(Boolean).join(' · ');
   return { id: (h['message-id'] || sujet + date + heure).replace(/[<>]/g, ''), date, heure, nom: nom.slice(0, 50), tel: propre(champ('T[ée]l[ée]phone') || champ('WhatsApp')).slice(0, 30), couverts: pers, salle, table: '', note: notes.slice(0, 200) };
 }
+// 3.8.0 : commandes de livraison du site (mail Web3Forms « Livraison … ») → liste « à valider » dans la caisse.
+// Rien ne part en cuisine tout seul : le caissier rappelle le client, crée la commande, vérifie et appuie sur Envoyer.
+function livraisonDepuisMail(raw) {
+  const { h, parties } = mimeParties(raw);
+  const sujet = decodeMots(h.subject || '');
+  if (!/^\s*Livraison/i.test(sujet)) return null;
+  const plain = parties.find(p => p.type === 'text/plain'), html = parties.find(p => p.type === 'text/html');
+  const texte = plain && /Commande|Adresse/.test(plain.texte) ? plain.texte : html ? texteDeHtml(html.texte) : (plain ? plain.texte : '');
+  const lignesT = texte.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const champ = nom => {
+    const re = new RegExp('^' + nom + '\\s*:\\s*(.*)$', 'i');
+    for (let i = 0; i < lignesT.length; i++) {
+      const m = lignesT[i].match(re); if (m && m[1]) return m[1].trim();
+      if (new RegExp('^' + nom + '$', 'i').test(lignesT[i]) && lignesT[i + 1]) return lignesT[i + 1];
+    }
+    return '';
+  };
+  const propre = v => (v === '-' ? '' : v);
+  const lignes = [];
+  for (const l of lignesT) {
+    const m = l.replace(/^Commande\s*:\s*/i, '').match(/^(\d{1,2})\s*[×x]\s*(.+?)\s*\(([\d\s\u00a0\u202f.]+)\s*DA\)\s*$/i);
+    if (!m) continue;
+    const qte = +m[1], total = +m[3].replace(/\D/g, '');
+    lignes.push({ qte, nom: m[2].trim().slice(0, 80), prix: qte ? Math.round(total / qte) : total });
+  }
+  if (!lignes.length) return null;
+  const nom = propre(champ('Nom')) || 'Client du site';
+  return {
+    id: (h['message-id'] || sujet).replace(/[<>]/g, ''), nom: nom.slice(0, 50), tel: propre(champ('T[ée]l[ée]phone')).slice(0, 30),
+    adresse: propre(champ('Adresse')).slice(0, 150), commune: propre(champ('Commune / quartier') || champ('Commune')).slice(0, 60),
+    jour: propre(champ('Jour')).slice(0, 40), heure: propre(champ('Heure')).slice(0, 30), note: propre(champ('Remarque')).slice(0, 200),
+    lignes, sousTotal: lignes.reduce((a, l) => a + l.qte * l.prix, 0),
+  };
+}
+const normNom = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+// nom du site → article de la caisse : nom identique, sinon mots principaux identiques ET même prix (jamais un plat au hasard)
+function produitDuSite(nom, prix) {
+  const actifs = db.produits.filter(p => p.actif !== false && p.id !== 'supplement-fixe'), n = normNom(nom);
+  const exact = actifs.filter(p => normNom(p.nom) === n);
+  if (exact.length === 1) return exact[0];
+  const mots = n.split(' ').filter(w => w.length > 2 && !['les', 'aux', 'sur', 'une', 'des', 'sauce', 'avec'].includes(w));
+  const candidats = actifs.filter(p => p.prix === prix).map(p => { const pm = normNom(p.nom).split(' '); return { p, sc: mots.filter(w => pm.some(x => x.slice(0, 5) === w.slice(0, 5))).length / (mots.length || 1) }; }).filter(x => x.sc >= 0.5).sort((a, b) => b.sc - a.sc);
+  if (candidats.length && (candidats.length === 1 || candidats[0].sc > candidats[1].sc)) return candidats[0].p;
+  return null;
+}
 let siteEtat = { dernier: 0, erreur: null, ajoutees: 0 };
 let lectureSite = false;
 async function lireSite() {
@@ -1283,6 +1328,15 @@ async function lireSite() {
     const mails = await imapLire(m, new Date(now() - 4 * 864e5));
     let ajout = 0;
     for (const raw of mails) {
+      let liv = null; try { liv = livraisonDepuisMail(raw); } catch (e) { liv = null; }
+      if (liv) {
+        if (db.siteVus.includes(liv.id)) continue;
+        db.siteVus.push(liv.id); if (db.siteVus.length > 600) db.siteVus = db.siteVus.slice(-400);
+        db.seq.livraison = (db.seq.livraison || 0) + 1;
+        db.livraisons.push({ ...liv, ext: liv.id, id: 'D' + db.seq.livraison, recu: now(), statut: 'a_valider' });
+        if (db.livraisons.length > 300) db.livraisons.splice(0, 50);
+        ajout++; continue;
+      }
       let r; try { r = resaDepuisMail(raw); } catch (e) { r = null; }
       if (!r || db.siteVus.includes(r.id)) continue;
       db.siteVus.push(r.id); if (db.siteVus.length > 600) db.siteVus = db.siteVus.slice(-400);
@@ -1327,7 +1381,7 @@ function etatPublic(u) {
     jour: jourCourant(false) || null,
     options: db.options, top: topVentes(), version: VERSION, qr: QR.etat(u),
     reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
-    alertes: peut(u, 'caissier') ? { sauvegarde: etatSauvegarde.erreur ? { erreur: etatSauvegarde.erreur, depuis: etatSauvegarde.erreurTs } : null, impressions: impressionsEnEchec().length } : null,
+    alertes: peut(u, 'caissier') ? { livraisons: db.livraisons.filter(x => x.statut === 'a_valider' && x.recu > now() - 2 * 864e5).length, sauvegarde: etatSauvegarde.erreur ? { erreur: etatSauvegarde.erreur, depuis: etatSauvegarde.erreurTs } : null, impressions: impressionsEnEchec().length } : null,
     prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
 }
@@ -2014,6 +2068,36 @@ const routes = {
   },
   'GET /api/version': () => ({ version: VERSION }),
   // ---------- 3.8.0 : impressions (historique, réimpression ciblée) et diagnostic
+  'GET /api/livraisons': (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    return db.livraisons.filter(x => x.recu > now() - 2 * 864e5).slice().reverse().map(x => ({ ...x, lignes: x.lignes.map(l => { const p = produitDuSite(l.nom, l.prix); return { ...l, article: p ? p.nom : null }; }) }));
+  },
+  'POST /api/livraison/accepter': (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    const x = db.livraisons.find(k => k.id === b.id); if (!x) E('Commande de livraison introuvable', 404);
+    if (x.statut !== 'a_valider') E('Déjà traitée' + (x.par ? ' par ' + x.par : ''), 409);
+    const auj = dateLocale(now()), hr = String(x.heure).match(/(\d{1,2})\s*h\s*(\d{2})?/i);
+    const jourAuj = !x.jour || new RegExp('(^|\\D)' + new Date().getDate() + '(\\D|$)').test(x.jour);
+    let retrait = null;
+    if (hr && jourAuj) { const d = new Date(); d.setHours(+hr[1], +(hr[2] || 0), 0, 0); retrait = d.getTime(); }
+    const c = routes['POST /api/commande/ouvrir']({ salle: 'emporter', client: { nom: x.nom, tel: x.tel }, retrait }, u);
+    c.note = ('LIVRAISON · ' + [x.adresse, x.commune].filter(Boolean).join(', ') + (x.note ? ' · ' + x.note : '') + (jourAuj ? '' : ' · pour ' + x.jour + ' ' + x.heure)).slice(0, 240);
+    c.livraison = x.id;
+    const lignes = [], manquants = [];
+    for (const l of x.lignes) { const p = produitDuSite(l.nom, l.prix); if (p) lignes.push({ pid: p.id, qte: l.qte, note: '', opts: [], suite: null }); else manquants.push(l.qte + ' × ' + l.nom); }
+    x.statut = 'acceptee'; x.par = u.nom; x.cmdId = c.id; x.ts = now();
+    journal(u, 'livraison du site acceptée', x.nom + ' ' + fmt(x.sousTotal) + ' DA → ' + c.table);
+    save();
+    return { commande: c, lignes, manquants };
+  },
+  'POST /api/livraison/refuser': (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    const x = db.livraisons.find(k => k.id === b.id); if (!x) E('Commande de livraison introuvable', 404);
+    if (x.statut !== 'a_valider') E('Déjà traitée', 409);
+    x.statut = 'refusee'; x.par = u.nom; x.ts = now(); x.motif = String(b.motif || '').slice(0, 120);
+    journal(u, 'livraison du site refusée', x.nom + (x.motif ? ' : ' + x.motif : ''));
+    return {};
+  },
   'GET /api/impressions': (b, u) => {
     if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
     return { echecs: impressionsEnEchec().map(({ data, ...x }) => x), recentes: (db.impressions || []).slice(-80).reverse().map(({ data, ...x }) => x) };

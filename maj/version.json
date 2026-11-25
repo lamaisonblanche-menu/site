@@ -1,7 +1,7 @@
 {
  "version": "3.8.0",
- "date": "2026-11-25T14:27:36.053Z",
- "notes": "Audit : annulation de ticket corrigée, sauvegarde immédiate, impressions en échec réimprimables, écran Diagnostic",
+ "date": "2026-11-25T14:31:58.565Z",
+ "notes": "Audit : annulation de ticket corrigée, sauvegarde immédiate, impressions en échec réimprimables, écran Diagnostic, livraisons du site dans la caisse",
  "fichiers": [
   {
    "chemin": "VERSION",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "f83e29ce939f55e68d343db1291d86a155d5fd8de85ea96da9ad337e84e2de80"
+   "sha256": "7103c577b1e159a0893dc4ea5117f10ae158e13afbad7cb89c2519dddcbaaca9"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "47ef475b19c211371c47bfcf065b5f6737876e5f237190e24ce32e6115dc729e"
+   "sha256": "dc82ad52dcc9c01779aeeb07e5779be1b36b05f3ea7d68bbf774e84553511425"
   },
   {
    "chemin": "suivi.js",
