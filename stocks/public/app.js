@@ -19,7 +19,7 @@ const RST = {brouillon: ['Brouillon', ''], soumise: ['À valider', 'warn'], a_co
   partiellement_payee: ['Partiellement payée', 'gold'], payee: ['Payée', 'ok'], cloturee: ['Clôturée', ''], soumis: ['À valider', 'warn'], approuve: ['Approuvé', 'ok'], rejete: ['Rejeté', 'bad']};
 const tag = s => { const [l, c] = RST[s] || [s, '']; return `<span class="tag ${c}">${esc(l)}</span>`; };
 
-const S = {token: sessionStorage.getItem('mb_stk') || '', session: null, ref: {suppliers: [], items: []}, page: 'tableau', online: true, params: {}};
+const S = {token: localStorage.getItem('mb_stk') || sessionStorage.getItem('mb_stk') || '', session: null, ref: {suppliers: [], items: []}, page: 'tableau', online: true, params: {}};
 const isDir = () => S.session?.user.role === 'direction';
 const isMag = () => S.session?.user.role === 'magasinier';
 
@@ -33,7 +33,9 @@ async function api(path, data, opt = {}) {
       r = await fetch('/api/' + path, {method: data ? 'POST' : 'GET', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token}, body: data ? JSON.stringify(data) : undefined, cache: 'no-store'});
     } catch (e) {
       setOnline(false);
-      if (i + 1 < tries) { await new Promise(res => setTimeout(res, 1200 * (i + 1))); continue; }
+      if (i + 1 < tries && !(data && OFFLINE_OK.includes(path))) { await new Promise(res => setTimeout(res, 1200 * (i + 1))); continue; }
+      if (!data && !opt.raw) { const c = OQ.cacheGet(path); if (c !== undefined) return c; }
+      if (data && OFFLINE_OK.includes(path) && !opt.noQueue) return OQ.add(path, data);
       throw new ApiError('Serveur injoignable : vérifiez le réseau puis réessayez (rien n\'a été enregistré en double).', 0);
     }
     setOnline(true);
@@ -46,9 +48,75 @@ async function api(path, data, opt = {}) {
       if (body.code === 'must_change') forcePassword();
       throw new ApiError(body.erreur || 'Erreur ' + r.status, r.status, body);
     }
+    if (!data && !opt.raw) OQ.cacheSet(path, body);
     return body;
   }
 }
+/* ------------------------------------------------------------------ mode hors ligne (PC magasinier sans Wi-Fi)
+   Réceptions et sorties/retours/pertes saisies sans réseau : gardées sur ce PC (localStorage) puis envoyées
+   automatiquement au retour du réseau, dans l'ordre. Le client_uid empêche tout doublon. */
+const OFFLINE_OK = ['reception', 'mouvement'];
+const OQ = {
+  K: 'mb_file_attente', R: 'mb_refusees', C: 'mb_cache:',
+  list() { try { return JSON.parse(localStorage.getItem(this.K) || '[]'); } catch (e) { return []; } },
+  refused() { try { return JSON.parse(localStorage.getItem(this.R) || '[]'); } catch (e) { return []; } },
+  store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  cacheGet(path) { try { const v = localStorage.getItem(this.C + path); return v ? JSON.parse(v) : undefined; } catch (e) { return undefined; } },
+  cacheSet(path, body) { if (/^(session|referentiel|tableau|receptions|mouvements|demandes|factures|a-payer|inventaires)(\?|$)/.test(path)) this.store(this.C + path, body); },
+  add(path, data) {
+    const note = 'saisi hors ligne le ' + new Date().toLocaleString('fr-FR', {dateStyle: 'short', timeStyle: 'short'});
+    const fld = path === 'reception' ? 'notes' : 'reason';
+    data = Object.assign({}, data, {[fld]: ((data[fld] || '') + (data[fld] ? ' — ' : '') + note).slice(0, 300)});
+    const q = this.list();
+    q.push({path, data, saisi_le: new Date().toLocaleString('fr-FR'), par: S.session?.user.display_name || ''});
+    if (!this.store(this.K, q)) throw new ApiError('Mémoire du PC pleine : impossible de garder la saisie hors ligne.', 0);
+    if (path === 'mouvement') {  // stock affiché diminué / augmenté localement en attendant l'envoi
+      const sign = data.kind === 'retour_service' ? 1 : -1;
+      for (const l of data.lines || []) { const it = itemById(l.item_id); if (it) { const u = it.units.find(x => x.name === l.unit) || {factor: 1}; it.qty += sign * Math.round(parseNum(l.qty) * u.factor * 1000); } }
+      this.cacheSet('referentiel', S.ref);
+    }
+    this.show(); return {hors_ligne: true};
+  },
+  sending: false,
+  async flush() {
+    if (this.sending || !S.token || !this.list().length) return;
+    this.sending = true; let sent = 0;
+    try {
+      let q;
+      while ((q = this.list()).length) {
+        const it = q[0];
+        try { await api(it.path, it.data, {noQueue: true}); sent++; }
+        catch (e) {
+          if (e.status === 0 || e.status === 401 || e.status === 503) break;  // toujours hors ligne ou reconnexion nécessaire : on garde
+          const r = this.refused(); r.push(Object.assign(it, {erreur: e.message})); this.store(this.R, r);
+        }
+        this.store(this.K, this.list().slice(1));
+      }
+    } finally { this.sending = false; this.show(); }
+    if (sent) { toast(`${sent} saisie(s) faite(s) hors ligne envoyée(s) au serveur`, 'ok'); try { await loadRef(); } catch (e) { } if (S.session && !$('#modals .back')) go(S.page, S.params); }
+    if (this.refused().length) toast('Certaines saisies hors ligne ont été refusées : voir le bandeau orange', 'bad');
+  },
+  show() {
+    let b = $('#queuebar'); if (!b) { b = document.createElement('div'); b.id = 'queuebar'; $('#main').prepend(b); }
+    const n = this.list().length, r = this.refused().length;
+    b.className = n || r ? '' : 'hidden';
+    b.innerHTML = (n ? `${n} saisie(s) gardée(s) sur ce PC, envoi automatique dès le retour du Wi-Fi. ` : '') + (r ? `<b>${r} saisie(s) refusée(s) par le serveur.</b> ` : '') + `<button class="btn sm" id="qbSee">Voir</button>`;
+    $('#qbSee').onclick = () => this.modal();
+  },
+  modal() {
+    const lab = it => (it.path === 'reception' ? 'Réception' : KINDS[it.data.kind] || 'Mouvement') + ` — ${esc(it.saisi_le)}` + (it.data.lines ? ` — ${it.data.lines.length} article(s)` : '');
+    const q = this.list(), r = this.refused();
+    const m = modal({title: 'Saisies hors ligne', body: `<h3>En attente d'envoi (${q.length})</h3>${q.map(it => `<div>${lab(it)}</div>`).join('') || '<div class="muted">Aucune</div>'}
+      <h3 style="margin-top:14px">Refusées par le serveur (${r.length})</h3>${r.map((it, i) => `<div class="alertbox bad">${lab(it)}<br>${esc(it.erreur)} <button class="btn sm" data-del="${i}">Retirer</button></div>`).join('') || '<div class="muted">Aucune</div>'}
+      ${r.length ? '<div class="muted small">Ressaisissez une saisie refusée après correction (ex. stock insuffisant), puis retirez-la de la liste.</div>' : ''}`,
+      foot: `<button class="btn dark" id="qSend">Envoyer maintenant</button>`});
+    $$('[data-del]', m).forEach(b => b.onclick = () => { const x = this.refused(); x.splice(+b.dataset.del, 1); this.store(this.R, x); m.close(); this.show(); this.modal(); });
+    $('#qSend', m).onclick = async () => { m.close(); await this.flush(); };
+  },
+};
+window.addEventListener('online', () => OQ.flush());
+setInterval(() => { if (OQ.list().length) OQ.flush(); }, 30000);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 /* Envoi d'une écriture : identifiant unique conservé pour les nouveaux essais (pas de doublon après une coupure). */
 async function save(path, data, btn) {
   if (btn) btn.classList.add('busy');
@@ -59,6 +127,7 @@ function setOnline(v) {
   if (S.online === v) return; S.online = v;
   $('#offline').classList.toggle('hidden', v); $('#netstate').classList.toggle('off', !v);
   $('#netstate span').textContent = v ? 'Connecté' : 'Hors connexion';
+  if (v) OQ.flush();
   if (v && S.session && !$('#modals .back')) go(S.page, S.params);  // retour du réseau : on recharge la page affichée
 }
 setInterval(async () => { if (!S.token) return; try { await fetch('/api/ping', {cache: 'no-store'}); setOnline(true); } catch (e) { setOnline(false); } }, 10000);
@@ -155,12 +224,12 @@ $('#loginForm').onsubmit = async e => {
   e.preventDefault(); $('#lgErr').textContent = '';
   try {
     const r = await api('connexion', {username: $('#lgUser').value.trim(), password: $('#lgPass').value});
-    S.token = r.token; sessionStorage.setItem('mb_stk', r.token); $('#lgPass').value = ''; await start();
+    S.token = r.token; localStorage.setItem('mb_stk', r.token); $('#lgPass').value = ''; await start();
   } catch (err) { $('#lgErr').textContent = err.message; }
 };
 function logout(expired) {
   if (!expired && S.token) fetch('/api/deconnexion', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token}, body: '{}'}).catch(() => {});
-  S.token = ''; S.session = null; sessionStorage.removeItem('mb_stk');
+  S.token = ''; S.session = null; sessionStorage.removeItem('mb_stk'); localStorage.removeItem('mb_stk');
   $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#modals').innerHTML = '';
   if (expired) $('#lgErr').textContent = 'Session terminée : reconnectez-vous.';
 }
@@ -220,6 +289,7 @@ async function start() {
   $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
   await loadRef(); renderNav(); refreshBadges(); setInterval(refreshBadges, 60000);
   if (S.session.user.must_change) forcePassword();
+  OQ.show(); OQ.flush();
   go('tableau');
 }
 
@@ -411,6 +481,7 @@ function receptionForm() {
     btn.classList.add('busy');
     try {
       const r = await api('reception', body);
+      if (r.hors_ligne) { m.close(); toast('Pas de Wi-Fi : réception gardée sur ce PC, elle sera envoyée automatiquement', 'ok'); return; }
       m.close(); toast(r.deja_enregistre ? 'Ce bon avait déjà été enregistré' : `Réception validée — ${da(r.total)}`, 'ok'); await loadRef();
       if (S.page === 'receptions') go('receptions'); receptionDetail(r.id, () => S.page === 'receptions' && go('receptions'));
     } catch (e) {
@@ -494,7 +565,9 @@ function issueForm(kind) {
     const body = {client_uid, kind, lines, service: $('#iSvc', m)?.value, requested_by: $('#iReq', m)?.value, reason: $('#iWhy', m)?.value, supplier_id: $('#iSup', m)?.value};
     const btn = e.currentTarget; btn.classList.add('busy');
     try {
-      const r = await api('mouvement', body); m.close(); await loadRef();
+      const r = await api('mouvement', body);
+      if (r.hors_ligne) { m.close(); toast('Pas de Wi-Fi : saisie gardée sur ce PC, elle sera envoyée automatiquement', 'ok'); if (S.page === 'sorties') go('sorties'); return; }
+      m.close(); await loadRef();
       toast(`${KINDS[kind]} enregistrée — ${da(r.total)}`, 'ok'); if (S.page === 'sorties') go('sorties');
       showDoc('sortie/' + r.id, 'Bon S-' + String(r.id).padStart(5, '0'));
     } catch (er) { m.err(er.message); } finally { btn.classList.remove('busy'); }

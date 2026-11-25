@@ -379,7 +379,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"): path = "/index.html"
         p = (PUBLIC / path.lstrip("/")).resolve()
         if PUBLIC.resolve() not in p.parents or not p.is_file(): return self.out(404, b"Introuvable", "text/plain; charset=utf-8")
-        ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+        ctype = {".js": "application/javascript", ".css": "text/css", ".html": "text/html", ".png": "image/png"}.get(p.suffix.lower()) or mimetypes.guess_type(p.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript",): ctype += "; charset=utf-8"
         self.out(200, p.read_bytes(), ctype)
 

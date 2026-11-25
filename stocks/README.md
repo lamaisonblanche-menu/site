@@ -70,3 +70,11 @@ python server.py --data C:\temp\stocks-test        # http://127.0.0.1:8765 (loca
 - Restaurer des données : `C:\MBStocks\Restaurer une sauvegarde.cmd` (l'état actuel est conservé dans
   `data\avant-restauration-<date>`).
 - La caisse n'est jamais modifiée : aucun retour arrière nécessaire de ce côté.
+
+## Mode hors ligne (v1.1.0)
+Le PC magasinier peut saisir **réceptions et sorties/retours/pertes sans Wi-Fi** : l'application s'ouvre quand même
+(copie gardée par le navigateur, à condition de l'avoir ouverte une fois connecté), les saisies sont gardées sur le PC
+et envoyées automatiquement, dans l'ordre, dès que le serveur répond (au plus tard 30 s après le retour du Wi-Fi).
+Chaque saisie porte la mention « saisi hors ligne le … ». Une saisie refusée à l'envoi (ex. stock insuffisant) est
+listée dans un bandeau orange « Voir » : la ressaisir corrigée puis la retirer. Les autres pages affichent les
+dernières données reçues. Si la session a expiré (12 h), se reconnecter une fois en Wi-Fi : la file est conservée.
