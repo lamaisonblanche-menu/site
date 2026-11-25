@@ -1,11 +1,11 @@
 {
- "version": "3.7.8",
- "date": "2026-11-25T07:36:46.770Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.8.0",
+ "date": "2026-11-25T14:31:58.565Z",
+ "notes": "Audit : annulation de ticket corrigée, sauvegarde immédiate, impressions en échec réimprimables, écran Diagnostic, livraisons du site dans la caisse",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "05785661211541aea0f1a50c5105320c93e34767c5158392da0f50bf9c13c4b4"
+   "sha256": "88206afd2d9b56ca71466c85d1ed1421b1db0e78fa00072697918fb8a9ac54ef"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "42831e452df80807ae10425ef5c814fa3dfcc892b0bedc353e77e6abc88a78d3"
+   "sha256": "7103c577b1e159a0893dc4ea5117f10ae158e13afbad7cb89c2519dddcbaaca9"
   },
   {
    "chemin": "public/index.html",
@@ -49,7 +49,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "afaabfb7fbbcd83ceff8b4d22661b47e1d90a66594fc365f368ce8a3b1b91b72"
+   "sha256": "30c731e7b2621fbb69f244939e06143b79c5ca0435c3b250dcd15a0b6dd57458"
   },
   {
    "chemin": "seed-menu.json",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "37deb83dbfe16b4e02f79a1cfff2eff5863c7e42770e561ff66fb7f1c6f07f88"
+   "sha256": "dc82ad52dcc9c01779aeeb07e5779be1b36b05f3ea7d68bbf774e84553511425"
   },
   {
    "chemin": "suivi.js",
