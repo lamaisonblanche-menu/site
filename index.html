@@ -1288,8 +1288,9 @@ html[lang="ar"] .statement { line-height: 1.6; }
       lsend.disabled = true; lsend.textContent = MB.T("sending");
       var payload = {
         access_key: CONFIG.cle,
-        subject: "Livraison (à valider seulement si reçue sur WhatsApp) : " + nom + ", " + tFr + ", " + jourFr + " " + heureFr,
-        from_name: "Site La Maison Blanche – Livraison",
+        subject: "🛵 LIVRAISON À DOMICILE : " + nom + ", " + tFr + ", " + jourFr + " " + heureFr + " (à valider seulement si reçue sur WhatsApp)",
+        from_name: "LIVRAISON – Site La Maison Blanche",
+        "Type de demande": "🛵 LIVRAISON À DOMICILE (ce n'est pas une réservation de table)",
         "Commande": lignesFr.join("\n"), "Sous-total": tFr + " (hors frais de livraison)", "Paiement": "Espèces à la livraison",
         "Jour": jourFr, "Heure": heureFr, "Langue du client": MB.langName(), "Nom": nom, "Téléphone": tel, "Adresse": adr, "Commune / quartier": com, "Remarque": rem || "-"
       };
