@@ -161,6 +161,8 @@ def change_password(c, u, d):
     return {"ok": True}
 
 
+UNLOCK_HOOK = None  # fourni par server.py : débloque le compte après un nouveau mot de passe
+
 def admin_user(c, u, d):
     need(u, "direction")
     action = d.get("action")
@@ -176,6 +178,7 @@ def admin_user(c, u, d):
         pw = str(d.get("password", "")); check_password_strength(pw); salt = secrets.token_hex(16)
         c.execute("UPDATE users SET salt=?,password_hash=?,must_change=1 WHERE id=?", (salt, hashpass(pw, salt), uid_))
         c.execute("DELETE FROM sessions WHERE user_id=?", (uid_,))
+        if UNLOCK_HOOK: UNLOCK_HOOK(target["username"])
     elif action in ("desactiver", "activer"):
         if uid_ == u["id"]: raise Err("Vous ne pouvez pas désactiver votre propre compte")
         if action == "desactiver" and target["role"] == "direction" and val(c, "SELECT COUNT(*) FROM users WHERE role='direction' AND active=1") <= 1:

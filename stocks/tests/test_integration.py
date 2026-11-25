@@ -314,6 +314,12 @@ class T3Systeme(Base):
         self.assertEqual(call(self.port, "fournisseur", {"name": "Z"}, t)["code"], "must_change")
         self.ok(call(self.port, "mot-de-passe", {"old": "Provisoire-2026", "new": "Nouveau-mdp-99"}, t))
         self.assertEqual(self.login("mag2", "Nouveau-mdp-99")[:0], "")
+        # blocage après 5 essais ratés, levé par un nouveau mot de passe donné par la direction
+        for _ in range(5): call(self.port, "connexion", {"username": "mag2", "password": "mauvais"})
+        bloque = call(self.port, "connexion", {"username": "mag2", "password": "Nouveau-mdp-99"})
+        self.assertEqual(bloque["status"], 429)
+        self.ok(self.d("compte", {"action": "mot_de_passe", "user_id": r["id"], "password": "Provisoire-2027"}))
+        self.assertTrue(self.login("mag2", "Provisoire-2027"))
         self.ok(self.d("compte", {"action": "desactiver", "user_id": r["id"]}))
         self.assertEqual(call(self.port, "connexion", {"username": "mag2", "password": "Nouveau-mdp-99"})["status"], 401)
 

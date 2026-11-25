@@ -25,6 +25,12 @@ ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / "public"
 VERSION = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "1.0.0"
 FAILS = {}; FAIL_LOCK = threading.Lock()
+LOCK_SECONDS = 120  # blocage de 2 minutes après 5 essais ratés
+
+def debloquer(username):
+    with FAIL_LOCK: FAILS.pop("u:" + str(username).strip().lower(), None)
+
+M.UNLOCK_HOOK = debloquer
 LOG_LOCK = threading.Lock()
 NETWORKS = []
 BACKUP_STATE = {"last": None, "error": None}
@@ -356,9 +362,10 @@ class Handler(BaseHTTPRequestHandler):
         t = time.time()
         with FAIL_LOCK:
             for k in (key_ip, key_user):
-                FAILS[k] = [x for x in FAILS.get(k, []) if t - x < 600]
-            if len(FAILS[key_ip]) >= 15 or len(FAILS[key_user]) >= 6:
-                raise M.Err("Trop d'essais : patientez 10 minutes", 429)
+                FAILS[k] = [x for x in FAILS.get(k, []) if t - x < LOCK_SECONDS]
+            if len(FAILS[key_ip]) >= 20 or len(FAILS[key_user]) >= 5:
+                reste = int(LOCK_SECONDS - (t - min(FAILS[key_user] or FAILS[key_ip]))) + 1
+                raise M.Err(f"Trop d'essais : réessayez dans {reste} secondes (ou demandez à la direction un nouveau mot de passe)", 429)
         c = D.connect()
         try:
             u = M.authenticate(c, name, str(d.get("password", "")))
