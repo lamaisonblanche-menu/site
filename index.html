@@ -460,7 +460,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
       <div class="head center">
         <p class="label" data-i18n="l_label">Livraison</p>
         <h2 data-i18n="l_h2">Commander en livraison</h2>
-        <p class="sub" data-i18n="l_sub">Choisissez vos plats, envoyez votre commande, nous vous rappelons pour la confirmer et vous annoncer les frais de livraison. Paiement en espèces à la livraison. Livraison dans toutes les communes d’Alger, de 9 h à 18 h (le vendredi à partir de 16 h).</p>
+        <p class="sub" data-i18n="l_sub">Choisissez vos plats, envoyez votre commande, nous vous rappelons pour la confirmer et vous annoncer les frais de livraison. Paiement en espèces à la livraison. Livraison dans toutes les communes d’Alger, de 9 h à 23 h (le vendredi à partir de 16 h).</p>
       </div>
       <div class="deliv">
         <div>
@@ -648,7 +648,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
       s_label: "Our signatures", s_h2: "The house plates",
       mn_label: "The menu", mn_h2: "Our menu", mn_sub: "Prices in Algerian dinars (DA).", mn_note: "The menu may change with the seasons and what the market brings.",
       l_label: "Delivery", l_h2: "Order for delivery",
-      l_sub: "Choose your dishes and send your order: we call you back to confirm it and tell you the delivery fee. Cash payment on delivery. We deliver to all communes of Algiers, from 9 am to 6 pm (from 4 pm on Fridays).",
+      l_sub: "Choose your dishes and send your order: we call you back to confirm it and tell you the delivery fee. Cash payment on delivery. We deliver to all communes of Algiers, from 9 am to 11 pm (from 4 pm on Fridays).",
       l_your: "Your order", l_empty: "Your basket is empty. Add dishes with the + button.",
       l_subtot: "Subtotal", l_fees: "Delivery fee", l_fees_v: "given by phone", l_pay: "Payment", l_pay_v: "cash on delivery",
       f_name: "Full name", f_tel: "Phone", f_adr: "Delivery address", ph_adr: "Street, number, building, floor",
@@ -707,7 +707,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
       s_label: "أطباقنا المميزة", s_h2: "أطباق الدار",
       mn_label: "القائمة", mn_h2: "قائمة أطباقنا", mn_sub: "الأسعار بالدينار الجزائري (دج).", mn_note: "قد تتغير القائمة حسب المواسم وتوفّر المنتجات.",
       l_label: "التوصيل", l_h2: "اطلب التوصيل",
-      l_sub: "اختر أطباقك وأرسل طلبك، ثم نتصل بك لتأكيده وإعلامك بتكلفة التوصيل. الدفع نقدًا عند الاستلام. التوصيل إلى جميع بلديات الجزائر العاصمة، من 9 صباحًا إلى 6 مساءً (يوم الجمعة ابتداءً من 4 مساءً).",
+      l_sub: "اختر أطباقك وأرسل طلبك، ثم نتصل بك لتأكيده وإعلامك بتكلفة التوصيل. الدفع نقدًا عند الاستلام. التوصيل إلى جميع بلديات الجزائر العاصمة، من 9 صباحًا إلى 11 ليلًا (يوم الجمعة ابتداءً من 4 مساءً).",
       l_your: "طلبك", l_empty: "سلّتك فارغة. أضف الأطباق بالضغط على زر +.",
       l_subtot: "المجموع", l_fees: "تكلفة التوصيل", l_fees_v: "تُعلَن عبر الهاتف", l_pay: "الدفع", l_pay_v: "نقدًا عند الاستلام",
       f_name: "الاسم واللقب", f_tel: "الهاتف", f_adr: "عنوان التوصيل", ph_adr: "الشارع، الرقم، العمارة، الطابق",
@@ -1181,7 +1181,7 @@ html[lang="ar"] .statement { line-height: 1.6; }
 
   /* ---------- Livraison ---------- */
   (function () {
-    var LIV = { debut: "09:00", debutVendredi: "16:00", fin: "18:00", delaiMin: 45, pas: 30, asieDes: "11:00", brunchJusqua: "18:00" };
+    var LIV = { debut: "09:00", debutVendredi: "16:00", fin: "23:00", delaiMin: 45, pas: 30, asieDes: "11:00", brunchJusqua: "18:00" };
     var cart = {}, ltabs = document.getElementById("liv-tabs"), lpanel = document.getElementById("liv-panel");
     var lform = document.getElementById("liv-form"), lok = document.getElementById("liv-ok"), lerr = document.getElementById("l-err");
     var jourIn = document.getElementById("l-jour"), lheure = document.getElementById("l-heure"), lsend = document.getElementById("l-send");
