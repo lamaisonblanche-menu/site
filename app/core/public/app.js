@@ -647,6 +647,7 @@ function admRapports() {
     <div class="card"><div class="k">Tickets · ticket moyen</div><div class="v num">${R.nbTickets} · ${fmt(R.ticketMoyen)}</div></div>
     <div class="card"><div class="k">Couverts</div><div class="v num">${R.couverts}</div></div>
     <div class="card"><div class="k">Remises · offerts</div><div class="v num">${fmt(R.remises)} · ${fmt(R.offert)}</div></div>
+    <div class="card"><div class="k">Table ${esc(S.etat.config.tablePatron)} offerte</div><div class="v num">${fmt(R.patron || 0)}</div></div>
     <div class="card"><div class="k">Sorties de caisse</div><div class="v num">${da(R.sorties)}</div></div>
     <div class="card"><div class="k">Période précédente</div><div class="v num">${da(R.precedent)}</div><div class="muted" style="font-size:13px">${R.precedent ? (R.ca >= R.precedent ? '▲ +' : '▼ ') + Math.round((R.ca - R.precedent) / R.precedent * 100) + ' %' : ''} (${R.precedentDu.slice(8, 10)}/${R.precedentDu.slice(5, 7)} → ${R.precedentAu.slice(8, 10)}/${R.precedentAu.slice(5, 7)})</div></div>
     ${Object.entries(R.tempsPrep || {}).map(([k, v]) => `<div class="card"><div class="k">Préparation ${esc(k)}</div><div class="v num">${v} min</div><div class="muted" style="font-size:13px">temps moyen</div></div>`).join('')}</div>
@@ -755,7 +756,7 @@ function admSalles() {
       <div class="field"><label>Taille des tables : ${s.taille}</label><input type="range" min="4" max="12" step="0.5" value="${s.taille}" onchange="A.sset('taille',+this.value)"></div>
       <div class="field"><label>Forme de la salle (largeur / hauteur) : ${(+s.ratio).toFixed(2)}</label><input type="range" min="0.8" max="2.6" step="0.05" value="${s.ratio}" onchange="A.sset('ratio',+this.value)"></div>
       <label class="chk"><input type="checkbox" ${s.grille ? 'checked' : ''} onchange="A.sset('grille',this.checked?[12,Math.round(12/${+s.ratio})]:null)"> Aligner sur un quadrillage</label>
-      <div class="field"><label>Table de votre consommation (★, comptée à part dans la rase)</label><input value="${esc(c.tablePatron)}" onchange="adm.cfg.tablePatron=this.value"></div>
+      <div class="field"><label>Table de votre consommation (★, toujours offerte, une seule ligne dans la rase)</label><input value="${esc(c.tablePatron)}" onchange="adm.cfg.tablePatron=this.value"></div>
       ${c.salles.length > 1 ? `<button class="btn sm ghost" onclick="A.delSalle()">Supprimer cette salle</button>` : ''}
     </div></div>`;
 }
@@ -1192,7 +1193,8 @@ const A = window.A = {
     if (S.draft.length) return toast('Envoyez d’abord la commande (bouton Commande).', true);
     const lignes = partie || c.lignes.filter(l => !l.annule && !l.paye);
     const total = lignes.reduce((s, l) => s + (l.offert ? 0 : l.qte * l.prix), 0);
-    const st = { mode: mode || 'especes', saisie: '', pays: [], societe: '', reference: '', remise: null, pin: '', imprimer: true, motif: '' };
+    const patron = c.salle !== 'comptoir' && c.salle !== 'emporter' && String(c.table) === String(S.etat.config.tablePatron);
+    const st = { mode: patron ? 'offert' : (mode || 'especes'), saisie: '', pays: [], societe: '', reference: '', remise: null, pin: '', imprimer: true, motif: patron ? 'Table ' + c.table + ' offerte' : '' };
     const net = () => st.mode === 'offert' ? 0 : total - (st.remise ? (st.remise.type === 'pct' ? Math.round(total * st.remise.valeur / 100) : Math.min(total, st.remise.valeur)) : 0);
     const paye = () => st.pays.reduce((s, p) => s + p.montant, 0);
     const reste = () => net() - paye();
@@ -1201,6 +1203,7 @@ const A = window.A = {
     const projete = () => st.mode === 'offert' ? [] : reste() > 0 ? [...st.pays, { mode: st.mode, montant: courant(), societe: st.societe, reference: st.reference }] : st.pays;
     const okValider = () => { if (st.mode === 'offert') return true; const pr = projete(); const s = pr.reduce((a, p) => a + p.montant, 0); const esp = pr.filter(p => p.mode === 'especes').reduce((a, p) => a + p.montant, 0); return s >= net() && s - net() <= esp && !pr.some(p => p.mode === 'societe' && !p.societe); };
     const draw = () => {
+      if (patron) return modal(mh('Table ' + esc(c.table) + ' offerte') + `<div class="amount num">${fmt(total)} <small>DA</small></div><p class="muted" style="text-align:center">La table ${esc(c.table)} est toujours offerte : rien à payer, pas de code, pas comptée dans le chiffre d’affaires.</p><div class="row"><label class="chk" style="margin-left:auto"><input type="checkbox" ${st.imprimer ? 'checked' : ''} onchange="A.ei(this.checked)"> Imprimer le ticket</label></div><div class="mf"><button class="btn" onclick="A.close()">Retour</button><button class="btn ok big" onclick="A.ego()">Valider (offerte)</button></div>`);
       const n = net(), r = reste(), pr = projete(), somme = pr.reduce((a, p) => a + p.montant, 0), rendu = somme - n;
       const billets = [...new Set([Math.max(r, 0), Math.ceil(r / 500) * 500, Math.ceil(r / 1000) * 1000, Math.ceil(r / 2000) * 2000, Math.ceil(r / 5000) * 5000])].filter(x => x >= r && x > 0).slice(0, 4);
       const left = `${partie ? `<p class="pill" style="display:block;text-align:center;padding:6px">Paiement séparé : ${partie.reduce((s, l) => s + l.qte, 0)} article(s)</p>` : ''}
@@ -1262,11 +1265,11 @@ const A = window.A = {
         if (S.view === 'caisse') await loadCaisse();
         refresh();
       };
-      if (st.mode === 'offert' && !st.pin) askPin('Autoriser l’offert', p => { st.pin = p; go(); });
+      if (st.mode === 'offert' && !st.pin && !patron) askPin('Autoriser l’offert', p => { st.pin = p; go(); });
       else go();
     };
     npv.pay = ''; draw();
-    if (avecRemise) A.erem();
+    if (avecRemise && !patron) A.erem();
   },
   np(id, k) {
     let v = npv[id] || '';
@@ -1324,7 +1327,7 @@ const A = window.A = {
         const res = await api('/api/rase', st);
         showErrs(res);
         const z = res.resume, rz = res.rase;
-        const txt = `Rase La Maison Blanche – journée n° ${z.jour.n} du ${new Date(z.jour.ouvert).toLocaleDateString('fr-FR')}\nCA : ${da(z.ca)} (espèces ${da(z.especes)}, chèques ${da(z.cheque)}, TPE ${da(z.tpe)}, sur facture ${da(z.societe)})\nTickets : ${z.nbTickets} – couverts : ${z.couverts}\nTable ${S.etat.config.tablePatron} (patron) : ${da(z.patron)}\nRemises : ${da(z.remises)} – offerts : ${da(z.offert)} – annulations après envoi : ${da(z.totalAnnulations)}\nSorties : ${da(z.totalSorties)}${z.sorties.map(s => '\n  - ' + s.motif + (s.detail ? ' (' + s.detail + ')' : '') + ' : ' + da(s.montant)).join('')}\nEspèces attendues : ${da(rz.attendu)} – comptées : ${da(rz.compte)} – écart : ${da(rz.ecart)}${rz.completePar ? ' (complété par ' + rz.completePar + ')' : ''}\nCaissier : ${rz.par}`;
+        const txt = `Rase La Maison Blanche – journée n° ${z.jour.n} du ${new Date(z.jour.ouvert).toLocaleDateString('fr-FR')}\nCA : ${da(z.ca)} (espèces ${da(z.especes)}, chèques ${da(z.cheque)}, TPE ${da(z.tpe)}, sur facture ${da(z.societe)})\nTickets : ${z.nbTickets} – couverts : ${z.couverts}\nTable ${S.etat.config.tablePatron} offerte : ${da(z.patron)}\nRemises : ${da(z.remises)} – offerts : ${da(z.offert)} – annulations après envoi : ${da(z.totalAnnulations)}\nSorties : ${da(z.totalSorties)}${z.sorties.map(s => '\n  - ' + s.motif + (s.detail ? ' (' + s.detail + ')' : '') + ' : ' + da(s.montant)).join('')}\nEspèces attendues : ${da(rz.attendu)} – comptées : ${da(rz.compte)} – écart : ${da(rz.ecart)}${rz.completePar ? ' (complété par ' + rz.completePar + ')' : ''}\nCaissier : ${rz.par}`;
         modal(mh('Journée clôturée ✓') + `<p>Le rapport Z est imprimé. Voici le résumé à envoyer pour l’appli de gestion :</p><textarea class="copy" id="ztxt" readonly>${esc(txt)}</textarea>
           <div class="mf"><button class="btn" onclick="A.cp()">Copier</button><a class="btn ok" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">Envoyer sur WhatsApp</a></div><div class="mf"><button class="btn ghost" onclick="A.close()">Fermer</button></div>`);
         A.cp = () => { const t = $('#ztxt'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } toast('Copié ✓'); };
@@ -1698,6 +1701,8 @@ Object.assign(A, {
       finally { S.envoiEnCours = false; }
       if (!r) return; S.envoiOperation = null; S.draft = []; showErrs(r); await refresh(); c = cmd(); if (!c) return;
     }
+    // 3.8.2 : la table du patron est toujours offerte
+    if (c.salle !== 'comptoir' && c.salle !== 'emporter' && String(c.table) === String(S.etat.config.tablePatron)) return A.encaisser();
     const n = totalCmd(c);
     let recu = '';
     const ticket = () => localStorage.getItem('mb_ticket') !== '0';

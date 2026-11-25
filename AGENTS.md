@@ -254,3 +254,8 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.8.1 (25/11/2026, Claude) — numéro de table bien visible sur les tickets (demande de Manil)
 - Ticket de caisse et addition : `grosTitre()` imprime « TABLE 17 » (ou « A EMPORTER E3 ») centré, double taille, gras, blanc sur noir (GS B). Salle et couverts passent sur la ligne en dessous. Si l'imprimante ignore GS B, le titre reste en double taille.
 - Site (branche main) : l'objet du mail de livraison est « LIVRAISON À DOMICILE 🛵 : … ». Il doit toujours commencer par « Livraison » (`livraisonDeMail`, test `^\s*Livraison`).
+
+### 3.8.2 (25/11/2026, Claude) — table 18 toujours offerte (demande de Manil)
+- La table du patron (`config.tablePatron`, 18) est offerte automatiquement à l'encaissement (`estTablePatron` dans server.js) : mode `offert`, net 0, aucun code responsable, quel que soit le mode choisi (même l'encaissement rapide en espèces). Comptoir et à emporter non concernés.
+- Pas dans le CA ni dans « Offerts » : une seule ligne « Table 18 offerte » (valeur consommée, `valeurPatron`) dans la rase, le rapport Z/X, le mail et Gestion → Rapports (`rapport().patron`).
+- Écran : fenêtre simple « Table 18 offerte » → « Valider (offerte) ». Test : `app/tests/table-patron.test.js`.

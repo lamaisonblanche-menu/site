@@ -1,11 +1,11 @@
 {
- "version": "3.8.1",
- "date": "2026-11-25T14:34:08.546Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.8.2",
+ "date": "2026-11-25T17:27:46.104Z",
+ "notes": "La table 18 est toujours offerte automatiquement (sans code, hors chiffre d'affaires), une seule ligne dans la rase",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "8366b0a6a2bd18fbaf821765e4908b8408fbafe3ba962e7d6b32b8b9e0486254"
+   "sha256": "3b9bed4047695cc0287c12edc030717a78f663bc4eb8a337ede86792d380d7d7"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "7103c577b1e159a0893dc4ea5117f10ae158e13afbad7cb89c2519dddcbaaca9"
+   "sha256": "68ba583e32a97c3032a3fd2eb8ea818270e36d82fd78a92c9afbd8cd4cc1c186"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "1ee05b8987b853167501fa0d8b067ac85e679b7ef6d7e973d79d310418a046fa"
+   "sha256": "fc0da691b873323f4653bbe54a3cb92d8bced143110d199fb822a14d1e3886ac"
   },
   {
    "chemin": "suivi.js",

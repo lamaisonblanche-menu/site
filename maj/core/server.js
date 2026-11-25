@@ -842,6 +842,9 @@ function additionDoc(cmd) {
   d.cut();
   return d;
 }
+// 3.8.2 : la table du patron (18) est toujours offerte : pas de code, pas dans le CA, une seule ligne dans la rase
+function estTablePatron(c) { return !!c && c.salle !== 'comptoir' && c.salle !== 'emporter' && String(c.table) === String(db.config.tablePatron); }
+function valeurPatron(t) { return t.mode === 'offert' ? t.total : t.net; }
 function totalCmd(cmd) { return cmd.lignes.reduce((s, l) => s + (l.annule || l.offert || l.paye ? 0 : l.qte * l.prix), 0); }
 
 // tables ouvertes sans rien à payer : fermées à la rase (version 3.5.7)
@@ -858,7 +861,7 @@ function resumeJour(j) {
   const sorties = db.sorties.filter(s => s.jour === j.id);
   const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
   const especes = sommeMode(tks, 'especes'), societe = sommeMode(tks, 'societe'), cheque = sommeMode(tks, 'cheque'), tpe = sommeMode(tks, 'tpe');
-  const offert = sum(tks.filter(t => t.mode === 'offert'), t => t.total);
+  const offert = sum(tks.filter(t => t.mode === 'offert' && !t.patron), t => t.total);
   const totalSorties = sum(sorties, s => s.montant);
   const parServeur = {}, parCaissier = {};
   for (const t of tks) { if (t.mode === 'offert') continue; parServeur[t.serveur] = (parServeur[t.serveur] || 0) + t.net; parCaissier[t.caissier] = (parCaissier[t.caissier] || 0) + t.net; }
@@ -868,7 +871,7 @@ function resumeJour(j) {
   const ouvertes = Object.values(db.commandes).filter(c => c.statut === 'ouverte' && c.lignes.some(l => !l.annule && !l.paye));
   return {
     jour: j, nbTickets: tks.length, ca: especes + cheque + tpe + societe, especes, cheque, tpe, societe, offert,
-    remises: sum(tks, t => t.remise || 0), patron: sum(tks.filter(t => t.patron), t => t.net),
+    remises: sum(tks, t => t.remise || 0), patron: sum(tks.filter(t => t.patron), valeurPatron),
     couverts: sum(tks, t => t.couverts || 0),
     sorties, totalSorties, fondCaisse: db.config.fondCaisse,
     attenduTiroir: db.config.fondCaisse + especes - totalSorties,
@@ -881,10 +884,11 @@ function resumeJour(j) {
 function rapport(du, au) {
   const tks = db.tickets.filter(t => !t.annule && t.date >= du && t.date <= au);
   const plats = {}, cats = {}, jours = {}, serveurs = {}, heures = {}, parSociete = {};
-  let ca = 0, especes = 0, cheque = 0, tpe = 0, societe = 0, offert = 0, remises = 0, couverts = 0;
+  let ca = 0, especes = 0, cheque = 0, tpe = 0, societe = 0, offert = 0, patron = 0, remises = 0, couverts = 0;
   for (const t of tks) {
     if (t.mode !== 'offert') { ca += t.net; jours[t.date] = (jours[t.date] || 0) + t.net; serveurs[t.serveur] = (serveurs[t.serveur] || 0) + t.net; const h = new Date(t.ts).getHours(); heures[h] = (heures[h] || 0) + t.net; }
-    if (t.mode === 'offert') offert += t.total;
+    if (t.mode === 'offert' && !t.patron) offert += t.total;
+    if (t.patron) patron += valeurPatron(t);
     for (const p of paiementsDe(t)) { if (p.mode === 'especes') especes += p.montant; else if (p.mode === 'cheque') cheque += p.montant; else if (p.mode === 'tpe') tpe += p.montant; else if (p.mode === 'societe') { societe += p.montant; const k = p.societe || 'Société ?'; const x = parSociete[k] = parSociete[k] || { nom: k, montant: 0, tickets: [] }; x.montant += p.montant; x.tickets.push({ num: t.num, date: t.date, montant: p.montant }); } }
     remises += t.remise || 0; couverts += t.couverts || 0;
     for (const l of t.lignes) {
@@ -907,7 +911,7 @@ function rapport(du, au) {
   return {
     precedent, precedentDu: pdu, precedentAu: pau, tempsPrep,
     parSociete: Object.values(parSociete).sort((a, b) => b.montant - a.montant),
-    du, au, nbTickets: tks.length, ca, especes, cheque, tpe, societe, offert, remises, couverts,
+    du, au, nbTickets: tks.length, ca, especes, cheque, tpe, societe, offert, patron, remises, couverts,
     ticketMoyen: tks.length ? Math.round(ca / tks.length) : 0,
     plats: Object.values(plats).sort((a, b) => b.qte - a.qte),
     categories: cats, jours, serveurs, heures,
@@ -990,7 +994,7 @@ function raseDoc(r, rase) {
   d.lr('Tickets', r.nbTickets); d.lr('Couverts', r.couverts);
   d.bold(1).lr('CHIFFRE D\'AFFAIRES', fmt(r.ca) + ' DA').bold(0);
   d.lr('  dont espèces', fmt(r.especes)); d.lr('  dont chèques', fmt(r.cheque)); d.lr('  dont carte (TPE)', fmt(r.tpe)); d.lr('  dont sur facture', fmt(r.societe));
-  d.lr('Remises', fmt(r.remises)); d.lr('Offerts', fmt(r.offert)); d.lr('Table ' + db.config.tablePatron + ' (patron)', fmt(r.patron));
+  d.lr('Remises', fmt(r.remises)); d.lr('Offerts', fmt(r.offert)); d.lr('Table ' + db.config.tablePatron + ' offerte', fmt(r.patron));
   d.lr('Annulations après envoi', fmt(r.totalAnnulations));
   d.line();
   d.bold(1).t('Par serveur').bold(0); for (const [k, v] of Object.entries(r.parServeur)) d.lr('  ' + k, fmt(v));
@@ -1816,6 +1820,8 @@ const routes = {
       if (!pinAdmin(b.pin)) E('Code du responsable obligatoire pour une remise', 403);
       remise = b.remise.type === 'pct' ? Math.round(total * Math.min(100, +b.remise.valeur) / 100) : Math.min(total, Math.round(+b.remise.valeur));
     }
+    const tablePatron = estTablePatron(c);
+    if (tablePatron) { remise = 0; b.paiements = [{ mode: 'offert', montant: 0 }]; b.motif = 'Table ' + db.config.tablePatron + ' offerte'; }
     // paiements : un seul mode, ou plusieurs (ex. une partie en espèces, le reste par carte)
     let pays = Array.isArray(b.paiements) && b.paiements.length ? b.paiements : [{ mode: b.mode, montant: b.mode === 'especes' ? (+b.recu || 0) : null, societe: b.societe, reference: b.reference }];
     pays = pays.map(p => ({ mode: p.mode, montant: Math.round(+p.montant || 0), societe: String(p.societe || '').trim(), reference: String(p.reference || '').trim().slice(0, 40) }));
@@ -1823,7 +1829,7 @@ const routes = {
     for (const p of pays) if (!MODES[p.mode]) E('Mode de paiement inconnu');
     const offert = pays.some(p => p.mode === 'offert');
     if (offert && pays.length > 1) E('Une table offerte ne peut pas être payée en plus');
-    if (offert && !pinAdmin(b.pin)) E('Code du responsable obligatoire pour offrir la table', 403);
+    if (offert && !tablePatron && !pinAdmin(b.pin)) E('Code du responsable obligatoire pour offrir la table', 403);
     for (const p of pays) if (p.mode === 'societe' && !p.societe) E('Nom de la société obligatoire');
     const net = offert ? 0 : total - remise;
     if (pays.length === 1 && !offert && !(pays[0].montant > 0)) pays[0].montant = net;
@@ -1860,7 +1866,7 @@ const routes = {
       serveur: nomUser(c.serveurId), serveurId: c.serveurId, caissier: u.nom, lignes: lignes.map(l => ({ ...l })), total, remise: offert ? 0 : remise, net,
       mode, paiements, societe: paiements.filter(p => p.mode === 'societe').map(p => p.societe).join(', '), reference: paiements.map(p => p.reference).filter(Boolean).join(', '),
       motif: b.motif || '', recu, rendu: recu ? rendu : 0,
-      patron: c.table === String(db.config.tablePatron), partiel,
+      patron: tablePatron, partiel,
     };
     db.tickets.push(tk);
     if (topCache.ids.length < 16) topCache.ts = 0;
