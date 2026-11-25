@@ -416,6 +416,14 @@ def main():
     a = ap.parse_args()
     if a.data: D.set_paths(a.data)
     D.init()
+    if not a.cmd and not os.environ.get("MB_STOCKS_NO_CATALOGUE"):
+        c = D.connect()
+        try:
+            c.execute("BEGIN IMMEDIATE"); n = M.import_catalogue(c, ROOT / "catalogue_initial.json"); c.execute("COMMIT")
+            if n: log(f"Catalogue de départ : {n} articles ajoutés (sans quantité)")
+        except Exception as e:
+            c.execute("ROLLBACK"); log(f"Catalogue de départ non importé : {e}")
+        finally: c.close()
     cfg = load_config()
     if a.cmd == "creer-compte":
         pw = os.environ.get(a.mot_de_passe_env, "") if a.mot_de_passe_env else getpass.getpass("Mot de passe (10 caractères minimum) : ")

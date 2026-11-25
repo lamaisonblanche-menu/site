@@ -87,3 +87,7 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 - `GET /api/mise-a-jour?verifier=1` compare `VERSION` local et GitHub ; vérification automatique chaque nuit à 4 h (`boucle_auto`).
 - Il suffit donc de pousser sur `feature/gestion-stocks-magasin` et d'incrémenter `stocks/VERSION` : plus besoin d'aller sur SRV MB.
 - Poste magasinier installé le 25/11 (certificat MB, raccourci Edge sur https://192.168.100.29:8765, hosts SRV-MB → IPv4 ; scripts sur la clé USB `E:\Stocks-PC-magasinier`).
+
+## v1.3.0 (25/11/2026)
+- `catalogue_initial.json` : 276 articles de départ (sans quantité) tirés de la carte, importés **une seule fois** au démarrage du serveur (`M.import_catalogue`, drapeau `settings.catalogue_initial_v1`) ; les articles existants ne sont jamais modifiés. Désactivable par `MB_STOCKS_NO_CATALOGUE=1` (tests).
+- Saisie d'un bon de réception : si l'article tapé n'existe pas, bouton « ＋ Créer l'article « … » » qui ouvre la fiche pré-remplie puis met l'article sur la ligne (Wi-Fi nécessaire). Créer une fiche n'ajoute aucune quantité : seul le bon validé fait entrer le stock.

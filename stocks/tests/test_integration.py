@@ -23,7 +23,7 @@ class Srv:
         self.proc = None
 
     def start(self):
-        env = dict(os.environ, MB_STOCKS_NO_BACKUP="1")
+        env = dict(os.environ, MB_STOCKS_NO_BACKUP="1", MB_STOCKS_NO_CATALOGUE="1")
         self.proc = subprocess.Popen([PY, str(ROOT / "server.py"), "--data", str(self.data), "--port", str(self.port)] + self.extra,
                                      env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         ctx = ssl._create_unverified_context()

@@ -246,6 +246,24 @@ def save_item(c, u, d):
     return {"id": iid}
 
 
+def import_catalogue(c, path):
+    """Catalogue de départ (articles sans quantité), importé une seule fois. Les articles déjà présents ne sont pas touchés."""
+    import json
+    from pathlib import Path
+    key = "catalogue_initial_v1"
+    if val(c, "SELECT value FROM settings WHERE key=?", (key,)) or not Path(path).exists(): return 0
+    n = 0
+    for x in json.loads(Path(path).read_text(encoding="utf-8")):
+        name = str(x.get("name", "")).strip()[:100]; base = x.get("base_unit")
+        if not name or base not in D.BASE_UNITS or one(c, "SELECT id FROM items WHERE name=?", (name,)): continue
+        c.execute("INSERT INTO items(name,category,min_qty,location,active,base_unit,created_at) VALUES(?,?,0,'',1,?,?)",
+                  (name, str(x.get("category", ""))[:60], base, now()))
+        n += 1
+    c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, now()))
+    audit(c, None, "catalogue_importe", "item", None, {"articles": n})
+    return n
+
+
 def unit_factor(c, item, unit):
     unit = (unit or item["base_unit"]).strip()
     std = STD_UNITS[item["base_unit"]]

@@ -314,7 +314,7 @@ function lineEditor(host, mode, lines = [], onChange = () => {}) {
     const tot = priced && isFinite(q) && isFinite(pr) ? q * pr * (1 - (isFinite(dsc) ? dsc : 0) / 100) : null;
     const over = mode === 'sortie' && it && isFinite(base) && base * 1000 > it.qty + 1e-6;
     return `<tr data-i="${i}"><td style="width:38%"><input list="dl-items" data-k="item" value="${esc(it ? it.name : l.itemText || '')}" placeholder="Rechercher un article…" class="${l.itemText && !it ? 'bad' : ''}">
-      <div class="hint">${esc(hint)}</div></td>
+      <div class="hint">${esc(hint)}</div>${priced && l.itemText && l.itemText.trim() && !it ? `<button class="btn sm" data-new style="margin-top:4px">＋ Créer l'article « ${esc(l.itemText.trim())} »</button>` : ''}</td>
       <td style="width:13%"><input data-k="qty" inputmode="decimal" value="${esc(l.qty ?? '')}" placeholder="Qté" class="${over ? 'bad' : ''}"></td>
       <td style="width:13%"><select data-k="unit">${units.map(u => opt(u.name, u.name + (u.factor !== 1 && !['g', 'mL', 'cL'].includes(u.name) ? ` (${NB3.format(u.factor)} ${it.base_unit})` : ''), unit)).join('')}</select></td>
       ${priced ? `<td style="width:14%"><input data-k="unit_price" inputmode="decimal" value="${esc(l.unit_price ?? '')}" placeholder="Prix DA / ${esc(unit || 'unité')}"></td>
@@ -357,6 +357,14 @@ function lineEditor(host, mode, lines = [], onChange = () => {}) {
           }
         });
       });
+      const nb = tr.querySelector('[data-new]');
+      if (nb) nb.onclick = () => {
+        if (S.online === false) return toast('Il faut le Wi-Fi pour créer un nouvel article', 'bad');
+        itemForm(null, {name: l.itemText.trim(), onSaved: id => {
+          const it = itemById(id); l.item_id = id; l.itemText = it ? it.name : l.itemText; l.unit = null; render();
+          const nx = host.querySelector(`tr[data-i="${tr.dataset.i}"] [data-k=qty]`); nx && nx.focus();
+        }});
+      };
       tr.querySelector('[data-del]').onclick = () => { L.splice(tr.dataset.i, 1); if (!L.length) L.push({}); render(); };
     });
     host.querySelector('[data-add]').onclick = () => { L.push({}); render(); host.querySelector(`tr[data-i="${L.length - 1}"] [data-k=item]`).focus(); };
@@ -614,10 +622,10 @@ async function itemDetail(id) {
   m.querySelector('[data-a=edit]').onclick = () => { m.close(); itemForm(i); };
 }
 
-function itemForm(it) {
+function itemForm(it, opts = {}) {
   const units = it ? it.custom_units.map(u => ({...u})) : [];
   const m = modal({title: it ? 'Modifier l\'article' : 'Nouvel article', size: 'w2', body: `<div class="fields c3">
-    <label class="f span2">Nom<input id="aName" value="${esc(it?.name || '')}" placeholder="ex. Filet de saumon"></label>
+    <label class="f span2">Nom<input id="aName" value="${esc(it?.name || opts.name || '')}" placeholder="ex. Filet de saumon"></label>
     <label class="f">Catégorie<input id="aCat" list="dl-cats" value="${esc(it?.category || '')}" placeholder="ex. Poissons"></label>
     <label class="f">Unité de stock<select id="aBase" ${it && it.qty ? 'disabled' : ''}>${Object.entries(S.session.base_units).map(([k, l]) => opt(k, `${k} (${l})`, it?.base_unit || 'kg')).join('')}</select></label>
     <label class="f">Seuil d'alerte<input id="aMin" inputmode="decimal" value="${it ? NB3.format(it.min_qty / 1000).replace(/\s/g, '') : ''}" placeholder="0 = aucun"></label>
@@ -640,7 +648,8 @@ function itemForm(it) {
     try {
       const r = await save('article', {id: it?.id, name: $('#aName', m).value, category: $('#aCat', m).value, base_unit: $('#aBase', m).value, min_qty: $('#aMin', m).value || 0,
         location: $('#aLoc', m).value, active: it ? $('#aAct', m).checked : true, units: units.filter(u => u.name || u.factor)}, e.currentTarget);
-      m.close(); toast('Article enregistré', 'ok'); await loadRef(); if (S.page === 'stock') go('stock');
+      m.close(); toast('Article enregistré', 'ok'); await loadRef();
+      if (opts.onSaved) opts.onSaved(r.id); else if (S.page === 'stock') go('stock');
     } catch (er) { m.err(er.message); }
   };
 }

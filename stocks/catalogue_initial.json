@@ -1,0 +1,1382 @@
+[
+{
+"name": "Filet de bœuf (cœur de filet)",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Entrecôte de bœuf",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Côte de bœuf",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Bœuf haché (burger)",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Bœuf pour carpaccio",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Émincé de bœuf",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Souris d'agneau",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Épaule d'agneau (méchoui)",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Foie gras",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Viande fumée (bacon de bœuf)",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Jambon de dinde",
+"category": "Viandes",
+"base_unit": "kg"
+},
+{
+"name": "Filet de poulet",
+"category": "Volailles",
+"base_unit": "kg"
+},
+{
+"name": "Cuisse de poulet",
+"category": "Volailles",
+"base_unit": "kg"
+},
+{
+"name": "Poulet fumé",
+"category": "Volailles",
+"base_unit": "kg"
+},
+{
+"name": "Magret de canard",
+"category": "Volailles",
+"base_unit": "kg"
+},
+{
+"name": "Blanc de dinde",
+"category": "Volailles",
+"base_unit": "kg"
+},
+{
+"name": "Saumon frais (filet)",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Saumon fumé",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Saumon qualité sushi",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Daurade",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Loup de mer (bar)",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Thon",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Crevettes décortiquées",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Gambas",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Crevettes tempura",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Calamars",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Noix de Saint-Jacques",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Moules",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Fruits de mer (mélange)",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Escargots",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Surimi",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Poisson du jour",
+"category": "Poissons et fruits de mer",
+"base_unit": "kg"
+},
+{
+"name": "Beurre doux",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Beurre demi-sel",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Crème fraîche liquide",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Crème épaisse",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Lait entier",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Lait demi-écrémé",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Lait végétal (amande/avoine)",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Burrata",
+"category": "Crémerie et œufs",
+"base_unit": "u"
+},
+{
+"name": "Mozzarella",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Cheddar (cheese)",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Fromage à tartiner (cream cheese)",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Ricotta",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Parmesan",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Gruyère râpé",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Roquefort",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Mascarpone",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Feta",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Yaourt nature",
+"category": "Crémerie et œufs",
+"base_unit": "kg"
+},
+{
+"name": "Chantilly",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Glace vanille",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Glace (autres parfums)",
+"category": "Crémerie et œufs",
+"base_unit": "L"
+},
+{
+"name": "Mochis glacés",
+"category": "Crémerie et œufs",
+"base_unit": "u"
+},
+{
+"name": "Œufs",
+"category": "Crémerie et œufs",
+"base_unit": "u"
+},
+{
+"name": "Avocat",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Citron jaune",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Citron vert",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Orange",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Mangue",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Ananas",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Fraise",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Framboise",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Fruits rouges",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Fruit de la passion",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Banane",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Pomme",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Pomme verte",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Pêche",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Noix de coco",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Dattes",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Kiwi",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Raisin",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Fruits de saison",
+"category": "Fruits",
+"base_unit": "kg"
+},
+{
+"name": "Pommes de terre",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Frites surgelées",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Tomate",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Tomate cerise",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Salade (laitue/romaine)",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Roquette",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Épinards",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Concombre",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Carotte",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Oignon",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Oignon rouge",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Échalote",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Ail",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Poivron",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Courgette",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Aubergine",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Champignons de Paris",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Morilles",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Gingembre",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Chou",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Brocoli",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Haricots verts",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Poireau",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Céleri",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Betterave",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Menthe fraîche",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Persil",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Coriandre",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Basilic",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Ciboulette",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Thym",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Romarin",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Marjolaine",
+"category": "Légumes et herbes",
+"base_unit": "u"
+},
+{
+"name": "Légumes de saison",
+"category": "Légumes et herbes",
+"base_unit": "kg"
+},
+{
+"name": "Farine",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Riz",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Riz à sushi",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Quinoa",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Semoule",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pâtes spaghetti",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pâtes tagliatelles",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pâtes linguine",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pâtes rigatoni",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Nouilles ramen",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Nouilles wok",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Chapelure",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Chapelure panko",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Farine tempura",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Huile de tournesol",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Huile d'olive",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Huile de friture",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Huile de sésame",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Vinaigre",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Vinaigre de riz",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Vinaigre balsamique",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Sel",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Poivre noir",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Poivre vert",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Épices (mélange)",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Paprika",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Curry",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Cumin",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Moutarde",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Mayonnaise",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Ketchup",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Sauce César",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pesto",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Sauce tomate",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Concentré de tomate",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Bouillon (cubes)",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Câpres",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Olives",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Thon en conserve",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Maïs",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Pois chiches",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Lentilles",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Fond de veau",
+"category": "Épicerie salée",
+"base_unit": "kg"
+},
+{
+"name": "Vin blanc sans alcool (cuisine)",
+"category": "Épicerie salée",
+"base_unit": "L"
+},
+{
+"name": "Feuilles de nori",
+"category": "Asiatique",
+"base_unit": "u"
+},
+{
+"name": "Sauce soja",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Sauce soja sucrée",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Mayo japonaise",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Mayo yuzu",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Sauce sriracha",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Wasabi",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Gingembre mariné",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Graines de sésame",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Pâte à gyoza (feuilles)",
+"category": "Asiatique",
+"base_unit": "u"
+},
+{
+"name": "Galettes de riz / nems",
+"category": "Asiatique",
+"base_unit": "u"
+},
+{
+"name": "Oignons frits",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Sauce teriyaki",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Sauce huître",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Lait de coco",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Edamame",
+"category": "Asiatique",
+"base_unit": "kg"
+},
+{
+"name": "Mirin",
+"category": "Asiatique",
+"base_unit": "L"
+},
+{
+"name": "Pain burger (bun)",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Pain de mie",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Pain de mie brioché",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Brioche",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Croissant",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Baguette",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Pain long (long toast)",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Pain sandwich",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Feuilles de brick (bourek)",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "u"
+},
+{
+"name": "Pâte feuilletée",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "kg"
+},
+{
+"name": "Pâte brisée",
+"category": "Boulangerie et viennoiserie",
+"base_unit": "kg"
+},
+{
+"name": "Sucre",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Sucre glace",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Cassonade",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Miel",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Nutella",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Pâte de pistache",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Crème de pistache",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Pistaches",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Beurre de cacahuète",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Cacahuètes",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Amandes",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Noisettes",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Chocolat noir",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Chocolat au lait",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Chocolat blanc",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Cacao en poudre",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Caramel",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Caramel beurre salé",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Levure chimique",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Vanille (extrait)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "L"
+},
+{
+"name": "Gélatine",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Biscuits (boudoirs)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Granola",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Flocons d'avoine",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Kunafa (cheveux d'ange)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Coulis de fruits rouges",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "L"
+},
+{
+"name": "Confiture",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Cookies (pâte)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Meringue",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Pâte à crêpes (préparation)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Pâte à gaufres (préparation)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Pâte à pancakes (préparation)",
+"category": "Pâtisserie et épicerie sucrée",
+"base_unit": "kg"
+},
+{
+"name": "Café en grains",
+"category": "Café et thé",
+"base_unit": "kg"
+},
+{
+"name": "Café capsules",
+"category": "Café et thé",
+"base_unit": "u"
+},
+{
+"name": "Thé (sachets)",
+"category": "Café et thé",
+"base_unit": "u"
+},
+{
+"name": "Infusions (sachets)",
+"category": "Café et thé",
+"base_unit": "u"
+},
+{
+"name": "Matcha",
+"category": "Café et thé",
+"base_unit": "kg"
+},
+{
+"name": "Chocolat en poudre (boisson)",
+"category": "Café et thé",
+"base_unit": "kg"
+},
+{
+"name": "Sirop de vanille",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de caramel",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de caramel beurre salé",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de pistache",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de noisette",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de fraise",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de mangue",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de fruit de la passion",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de coco",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de pêche",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de fruits des bois",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de grenadine",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Sirop de sucre de canne",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Purée de mangue",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Purée de fruit de la passion",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Purée de fraise",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Purée de fruits rouges",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Purée d'ananas",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Jus d'ananas",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Jus d'orange (bouteille)",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Jus de citron (bouteille)",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Ice tea (base)",
+"category": "Bar : sirops et purées",
+"base_unit": "L"
+},
+{
+"name": "Eau minérale petite bouteille",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Eau minérale grande bouteille",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Eau pétillante petite bouteille",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Eau pétillante grande bouteille",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Coca-Cola",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Coca-Cola Light",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Hamoud",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Sprite",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Fanta",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Canette Schweppes",
+"category": "Boissons fraîches",
+"base_unit": "u"
+},
+{
+"name": "Eau gazeuse (soda)",
+"category": "Boissons fraîches",
+"base_unit": "L"
+},
+{
+"name": "Glaçons",
+"category": "Boissons fraîches",
+"base_unit": "kg"
+},
+{
+"name": "Boîtes à emporter",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Boîtes à sushi",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Sacs à emporter",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Gobelets à emporter",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Couvercles gobelets",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Pailles",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Serviettes en papier",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Baguettes chinoises",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Sachets de sauce",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Film alimentaire",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Papier aluminium",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Papier cuisson",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Gants jetables",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Rouleaux de caisse (tickets)",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Sacs poubelle",
+"category": "Emballages et consommables",
+"base_unit": "u"
+},
+{
+"name": "Liquide vaisselle",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Produit lave-vaisselle",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Dégraissant",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Javel",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Désinfectant",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Nettoyant sol",
+"category": "Entretien",
+"base_unit": "L"
+},
+{
+"name": "Essuie-tout",
+"category": "Entretien",
+"base_unit": "u"
+},
+{
+"name": "Éponges",
+"category": "Entretien",
+"base_unit": "u"
+},
+{
+"name": "Savon mains",
+"category": "Entretien",
+"base_unit": "L"
+}
+]
