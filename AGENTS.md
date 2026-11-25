@@ -259,3 +259,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - La table du patron (`config.tablePatron`, 18) est offerte automatiquement à l'encaissement (`estTablePatron` dans server.js) : mode `offert`, net 0, aucun code responsable, quel que soit le mode choisi (même l'encaissement rapide en espèces). Comptoir et à emporter non concernés.
 - Pas dans le CA ni dans « Offerts » : une seule ligne « Table 18 offerte » (valeur consommée, `valeurPatron`) dans la rase, le rapport Z/X, le mail et Gestion → Rapports (`rapport().patron`).
 - Écran : fenêtre simple « Table 18 offerte » → « Valider (offerte) ». Test : `app/tests/table-patron.test.js`.
+
+### 3.9.0 (25/11/2026, Claude) — demandes de Manil
+- Sortie de caisse : un caissier peut la supprimer sans code du responsable (fenêtre « Oui, supprimer »). Le journal garde qui l'a supprimée et qui l'avait saisie. Un serveur ne peut pas.
+- Ruptures du jour obligatoires : le premier caissier connecté de la journée (à partir de 5 h, `jourRuptures()`) voit l'écran `viewRupturesJour` et ne peut rien faire (API → 423 sauf `LIBRE_RUPTURES`) avant `POST /api/ruptures/valider` (`db.rupturesJour` = {date, par, ts, epuises, limites}). Le responsable n'est pas bloqué. À l'installation, la journée en cours est considérée comme faite (pas de blocage en plein service).

@@ -1,11 +1,11 @@
 {
- "version": "3.8.2",
- "date": "2026-11-25T17:28:01.123Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.0",
+ "date": "2026-11-25T21:09:24.578Z",
+ "notes": "Sortie de caisse supprimable par le caissier sans code ; ruptures du jour obligatoires pour le premier caissier",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "3b9bed4047695cc0287c12edc030717a78f663bc4eb8a337ede86792d380d7d7"
+   "sha256": "5c0f9e710d6f59bb59980444f3dc58886fc564a0a2d8a1d534d3296be2c67da8"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "68ba583e32a97c3032a3fd2eb8ea818270e36d82fd78a92c9afbd8cd4cc1c186"
+   "sha256": "8f220e4e891b327bf402bd8ac69457801ac3ad7e666d332e824477b6a6ab803d"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "fc0da691b873323f4653bbe54a3cb92d8bced143110d199fb822a14d1e3886ac"
+   "sha256": "991eddfe6b0e6eb60c1bdd4be74c21be92367e2fcd7ee2b2b0cdb05d6ed7406f"
   },
   {
    "chemin": "suivi.js",

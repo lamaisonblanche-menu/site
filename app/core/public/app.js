@@ -523,15 +523,28 @@ function viewKds() {
       ${attente.length ? `<div class="ksep">En attente de réclame</div>${attente.map(card).join('')}` : ''}
       ${prets.length ? `<div class="ksep">Prêts (20 dernières minutes)</div>${prets.map(card).join('')}` : ''}</div>`;
 }
-function rupturesModal(poste) {
+function rupturesListe(poste) {
   const list = S.etat.produits.filter(p => p.actif && (!poste || poste === 'tous' || (catDe(p).poste === poste)));
   const groupes = S.etat.categories.filter(c => list.some(p => p.cat === c.id));
-  modal(mh('Ruptures et quantités restantes') + `<p class="muted">« Épuisé » bloque l’article pour les serveurs. Une quantité (ex. 5) se décompte toute seule à chaque commande.</p>
-    <div class="rup">${groupes.map(g => `<h4>${esc(g.nom)}</h4>${list.filter(p => p.cat === g.id).map(p => `<div class="rr ${p.stock === 0 ? 'ep' : ''}"><span class="grow">${esc(p.nom)}</span>
+  return `<div class="rup">${groupes.map(g => `<h4>${esc(g.nom)}</h4>${list.filter(p => p.cat === g.id).map(p => `<div class="rr ${p.stock === 0 ? 'ep' : ''}"><span class="grow">${esc(p.nom)}</span>
       <span class="pill ${p.stock === 0 ? 'bad' : p.stock > 0 ? 'warn' : 'ok'}">${p.stock === 0 ? 'épuisé' : p.stock > 0 ? 'reste ' + p.stock : 'disponible'}</span>
       <input type="number" min="0" inputmode="numeric" placeholder="qté" id="st_${p.id}" style="width:70px"><button class="btn sm" onclick="A.stk('${p.id}',$('#st_${p.id}').value)">OK</button>
-      ${p.stock === 0 ? `<button class="btn sm ok" onclick="A.stk('${p.id}',null)">Disponible</button>` : `<button class="btn sm bad" onclick="A.stk('${p.id}',0)">Épuisé</button>`}${p.stock > 0 ? `<button class="btn sm ghost" onclick="A.stk('${p.id}',null)">Illimité</button>` : ''}</div>`).join('')}`).join('')}</div>`, true);
+      ${p.stock === 0 ? `<button class="btn sm ok" onclick="A.stk('${p.id}',null)">Disponible</button>` : `<button class="btn sm bad" onclick="A.stk('${p.id}',0)">Épuisé</button>`}${p.stock > 0 ? `<button class="btn sm ghost" onclick="A.stk('${p.id}',null)">Illimité</button>` : ''}</div>`).join('')}`).join('')}</div>`;
+}
+function rupturesModal(poste) {
+  modal(mh('Ruptures et quantités restantes') + `<p class="muted">« Épuisé » bloque l’article pour les serveurs. Une quantité (ex. 5) se décompte toute seule à chaque commande.</p>
+    ${rupturesListe(poste)}`, true);
   S._rupPoste = poste;
+}
+// 3.9.0 : écran obligatoire pour le premier caissier de la journée
+function viewRupturesJour() {
+  const ep = S.etat.produits.filter(p => p.actif && p.stock === 0).length, lim = S.etat.produits.filter(p => p.actif && p.stock > 0).length;
+  return `<div class="main"><div class="panel"><h3>⛔ Ruptures du jour — obligatoire</h3>
+    <p>Bonjour ${esc(S.etat.user.nom)}. Avant de commencer, indiquez les plats et boissons épuisés aujourd’hui, ou leur quantité restante.</p>
+    <p class="muted">Actuellement : ${ep} épuisé(s), ${lim} en quantité limitée. Vérifiez aussi ceux marqués hier : remettez « Disponible » s’ils sont revenus.</p>
+    <div style="display:flex;gap:10px;margin:12px 0"><button class="btn dark" onclick="A.rupValider()">✓ J’ai vérifié, valider les ruptures du jour</button><button class="btn ghost" onclick="A.logout()">Se déconnecter</button></div>
+    ${rupturesListe('tous')}
+    <div style="margin-top:14px"><button class="btn dark" onclick="A.rupValider()">✓ J’ai vérifié, valider les ruptures du jour</button></div></div></div>`;
 }
 // ------------------------------------------------------------ Caisse
 async function loadCaisse() { S.caisse = await api('/api/caisse').catch(() => S.caisse); }
@@ -1064,7 +1077,8 @@ const A = window.A = {
   },
   servi() { const c = cmd(); act(async () => { await api('/api/commande/servi', { id: c.id }); refresh(); }); },
   ruptures(poste) { rupturesModal(poste); },
-  stk(pid, v) { act(async () => { if (v !== null && (v === '' || isNaN(+v))) return toast('Tapez une quantité', true); const r = await api('/api/produit/stock', { pid, stock: v === null ? null : +v }); const p = prod(pid); p.stock = r.stock; toast(p.nom + ' : ' + (r.stock === null ? 'disponible' : r.stock === 0 ? 'épuisé' : 'reste ' + r.stock)); rupturesModal(S._rupPoste); }); },
+  stk(pid, v) { act(async () => { if (v !== null && (v === '' || isNaN(+v))) return toast('Tapez une quantité', true); const r = await api('/api/produit/stock', { pid, stock: v === null ? null : +v }); const p = prod(pid); p.stock = r.stock; toast(p.nom + ' : ' + (r.stock === null ? 'disponible' : r.stock === 0 ? 'épuisé' : 'reste ' + r.stock)); if (S.etat.rupturesAFaire) render(); else rupturesModal(S._rupPoste); }); },
+  rupValider() { act(async () => { await api('/api/ruptures/valider', {}); await refresh(); toast('Ruptures du jour enregistrées ✓'); }); },
   kPoste(k) { S.kdsPoste = k; localStorage.setItem('mb_kds', k); render(); },
   kPret(id) { act(async () => { await api('/api/kds/pret', { id }); await loadKds(); render(); }); },
   kRappel(id) { act(async () => { await api('/api/kds/rappel', { id }); await loadKds(); render(); }); },
@@ -1287,7 +1301,10 @@ const A = window.A = {
     A.sok = () => act(async () => { await api('/api/sortie', st); closeModal(); toast('Sortie enregistrée ✓'); await loadCaisse(); refresh(); });
     npv.sortie = ''; draw();
   },
-  supSortie(id) { askPin('Supprimer la sortie', p => act(async () => { await api('/api/sortie/supprimer', { id, pin: p }); closeModal(); await loadCaisse(); refresh(); })); },
+  supSortie(id) {
+    modal(mh('Supprimer la sortie') + `<p>Supprimer cette sortie de caisse ?</p><div class="mf"><button class="btn" onclick="A.close()">Non</button><button class="btn dark" onclick="A.supSortieOk('${jsq(id)}')">Oui, supprimer</button></div>`);
+  },
+  supSortieOk(id) { act(async () => { await api('/api/sortie/supprimer', { id }); closeModal(); toast('Sortie supprimée ✓'); await loadCaisse(); refresh(); }); },
   async tiroir() { const r = await act(() => api('/api/tiroir', { motif: 'manuel' })); if (r) showErrs(r); },
   async dup(num) { const r = await act(() => api('/api/ticket/reimprimer', { num })); if (r) { showErrs(r); if (!r.erreurs.length) toast('Duplicata imprimé ✓'); } },
   annTicket(num) {
@@ -1811,6 +1828,7 @@ function render() {
   const app = $('#app');
   let h;
   if (!S.etat || S.view === 'login') h = viewLogin();
+  else if (S.etat.rupturesAFaire) h = viewRupturesJour();
   else if (S.view === 'commande') h = viewCommande();
   else if (S.view === 'caisse') h = viewCaisse();
   else if (S.view === 'admin' && peut('admin')) h = viewAdmin();

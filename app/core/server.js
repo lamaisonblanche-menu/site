@@ -359,6 +359,8 @@ if (!db.supp9) {
   db.supp9 = true;
   setTimeout(() => saveNow(), 0);
 }
+// 3.9.0 : l'obligation des ruptures commence le lendemain de l'installation (pas en plein service)
+if (!db.rupturesJour) { db.rupturesJour = { date: dateLocale(Date.now() - 5 * 3600e3), par: 'installation 3.9.0', ts: Date.now() }; }
 // Carte complétée avec le site (version 3.3.1) : sushis, rolls, lattes, desserts de la carte. Rien n'est supprimé ni modifié.
 if (!db.carte2) {
   const A = {"cats": [["sushis-a-partager", "Sushis à partager", "asiatique", "#f6d6c8", 1, "Asiatique", "asiatique-box", -0.2], ["rolls", "Rolls", "asiatique", "#d6e6f2", 2, "Asiatique", "asiatique-box", -0.1], ["lattes", "Lattes (chauds ou glacés)", "comptoir", "#e8d5c0", 0, "Boissons", "boissons", 0.5]], "prods": [["sushis-a-partager", [["Nems au poulet × 3", 1700], ["Gyoza au poulet × 5", 2200], ["Soupe de gyoza", 2400], ["Crispy rice tempura × 5", 2300], ["Crispy rice avocat × 5", 2400], ["Futomaki × 10", 2500], ["Maki avocat × 12", 1800], ["Maki saumon × 12", 2200], ["Nigiri saumon × 3", 1800]]], ["rolls", [["California saumon avocat × 8", 2400], ["Dragon saumon roll × 8", 2600], ["Rainbow roll × 8", 2800], ["Crunchy saumon roll × 8", 2600], ["Crunchy poulet roll × 8", 2400], ["Flamed roll × 8", 2800], ["Creamy avocado roll × 8", 2400], ["Veggie roll × 8", 2500], ["Maki crispy tartare saumon × 6", 1800], ["Crunch tempura × 8", 2800]]], ["lattes", [["Latte vanille", 750], ["Latte caramel beurre salé", 750], ["Matcha latte vanille", 900], ["Matcha latte fraise", 900], ["Matcha latte pistache", 1000], ["Macchiato", 500], ["Tiramisu latte", 1000], ["Matcha tiramisu latte", 1100]]], ["desserts", [["Profiteroles chocolat", 1200], ["Pavlova", 1000], ["Crème brûlée", 1000], ["Fondant chocolat glace", 1000], ["Nougat glacé fruits rouges", 1200]]]]};
@@ -541,6 +543,10 @@ function userDe(req) {
 }
 // un code OU un badge (lecteur de cartes) identifie la personne
 function parCode(code) { code = String(code || '').trim(); if (!code) return null; return db.users.find(u => u.actif && (u.pin === code || (u.badge && u.badge === code))); }
+// 3.9.0 : le premier caissier de la journée (à partir de 5 h) doit renseigner les ruptures avant de travailler
+function jourRuptures() { return dateLocale(now() - 5 * 3600e3); }
+function rupturesAFaire(u) { return !!(u && u.role === 'caissier' && (db.rupturesJour || {}).date !== jourRuptures()); }
+const LIBRE_RUPTURES = new Set(['POST /api/produit/stock', 'POST /api/ruptures/valider', 'POST /api/logout']);
 function pinAdmin(pin) { const u = parCode(pin); return u && u.role === 'admin' ? u : null; }
 const ROLES = { cuisine: 0, serveur: 1, caissier: 2, admin: 3 };
 function peut(u, role) { return u && ROLES[u.role] >= ROLES[role]; }
@@ -1374,6 +1380,8 @@ function etatPublic(u) {
   if (c.mail) c.mail = { ...c.mail, pass: c.mail.pass ? '••••••••' : '' };
   return {
     user: { id: u.id, nom: u.nom, role: u.role },
+    rupturesAFaire: rupturesAFaire(u),
+    rupturesJour: db.rupturesJour || null,
     config: c,
     raseAutoEtat: (() => {
       const j = jourCourant(false), cfg = db.config.raseAuto || {};
@@ -1675,6 +1683,13 @@ const routes = {
     journal(u, 'rupture / stock', p.nom + ' : ' + (p.stock === null ? 'disponible' : p.stock === 0 ? 'ÉPUISÉ' : 'reste ' + p.stock));
     save(); return { pid: p.id, stock: p.stock };
   },
+  'POST /api/ruptures/valider': (b, u) => {
+    if (!peut(u, 'caissier')) E('Non autorisé', 403);
+    const ep = db.produits.filter(p => p.actif && p.stock === 0).length, lim = db.produits.filter(p => p.actif && p.stock > 0).length;
+    db.rupturesJour = { date: jourRuptures(), par: u.nom, ts: now(), epuises: ep, limites: lim };
+    journal(u, 'ruptures du jour validées', ep + ' épuisé(s), ' + lim + ' en quantité limitée');
+    save(); broadcast(); return db.rupturesJour;
+  },
   'POST /api/commande/reimprimer-bons': async (b, u) => {
     const c = getCmd(b.id);
     const erreurs = [];
@@ -1939,12 +1954,12 @@ const routes = {
     return s;
   },
   'POST /api/sortie/supprimer': (b, u) => {
-    if (!pinAdmin(b.pin)) E('Code du responsable obligatoire', 403);
+    if (!peut(u, 'caissier')) E('Seul un caissier peut supprimer une sortie', 403);
     const i = db.sorties.findIndex(s => s.id === b.id);
     if (i < 0) E('Sortie introuvable');
     const s = db.sorties[i]; const j = db.jours.find(x => x.id === s.jour);
     if (j && j.clos) E('Journée déjà clôturée');
-    db.sorties.splice(i, 1); journal(u, 'suppression sortie', fmt(s.montant) + ' ' + s.motif); save(); return {};
+    db.sorties.splice(i, 1); journal(u, 'suppression sortie', fmt(s.montant) + ' DA ' + s.motif + ' ' + (s.detail || '') + ' (saisie par ' + s.par + ')'); save(); return {};
   },
   'POST /api/rase-auto/reporter': (b, u) => {
     if (!peut(u, 'admin')) E('Seul le responsable peut reporter la rase', 403);
@@ -2393,6 +2408,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST') { derniereActivite = now(); requetesEnCours++; res.on('close', () => { requetesEnCours--; derniereActivite = now(); }); }
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);
+      if (req.method === 'POST' && rupturesAFaire(u) && !LIBRE_RUPTURES.has(key)) E('Renseignez d’abord les ruptures du jour', 423);
       const out = await fn(body, u, req, q);
       // 3.8.0 : toute modification est écrite sur le disque (fsync) AVANT de répondre « c'est fait » à l'écran.
       // Avant, l'écriture partait 150 ms plus tard : une coupure de courant à ce moment perdait l'opération.
