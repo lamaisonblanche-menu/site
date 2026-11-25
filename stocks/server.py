@@ -196,7 +196,7 @@ DOCS = {"demande": DOC.doc_request, "sortie": DOC.doc_issue, "reception": DOC.do
 # ------------------------------------------------------------------ sauvegardes automatiques
 def load_config():
     p = D.DATA / "config.json"
-    try: return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    try: return json.loads(p.read_text(encoding="utf-8-sig")) if p.exists() else {}
     except ValueError: return {}
 
 
