@@ -1,7 +1,7 @@
 {
  "version": "3.8.2",
- "date": "2026-11-25T17:27:46.104Z",
- "notes": "La table 18 est toujours offerte automatiquement (sans code, hors chiffre d'affaires), une seule ligne dans la rase",
+ "date": "2026-11-25T17:28:01.123Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
