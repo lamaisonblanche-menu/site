@@ -35,6 +35,7 @@ Ok "module cryptography (certificats)"
 Etape "2. Copie du logiciel dans $App"
 $tache = Get-ScheduledTask -TaskName "MB Stocks - Serveur" -ErrorAction SilentlyContinue
 if ($tache) { Stop-ScheduledTask -TaskName "MB Stocks - Serveur"; Start-Sleep 2 }
+Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" | Where-Object { $_.CommandLine -like "*MBStocks*server.py*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Force -Path $App, $Data | Out-Null
 robocopy $Source $App /MIR /XD data tests __pycache__ .git /XF *.pyc /NFL /NDL /NJH /NJS /NP | Out-Null
 Ok "fichiers copiés (les données de $Data ne sont jamais écrasées)"

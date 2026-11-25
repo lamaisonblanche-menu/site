@@ -427,8 +427,26 @@ def main():
         ctx.load_cert_chain(cert, key); srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
     if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=backup_loop, daemon=True).start()
     log(f"Stocks La Maison Blanche {VERSION} — {'https' if cert else 'http'}://{host}:{port} — données : {D.DATA}")
+    reload_flag = threading.Event()
+    def watch():  # mise à jour du logiciel : redémarrage automatique dès qu'un fichier .py ou VERSION change
+        files = [p for p in ROOT.glob("*.py")] + [ROOT / "VERSION"]
+        snap = lambda: {str(f): f.stat().st_mtime for f in files if f.exists()}
+        old = snap()
+        while True:
+            time.sleep(5)
+            if snap() != old:
+                time.sleep(3)  # laisser finir la copie de tous les fichiers
+                log("Mise à jour détectée : redémarrage du serveur"); reload_flag.set(); srv.shutdown(); return
+    threading.Thread(target=watch, daemon=True).start()
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
+    if reload_flag.is_set():
+        srv.server_close()
+        if os.name == "nt":
+            import subprocess
+            subprocess.Popen([sys.executable] + sys.argv, cwd=str(ROOT), creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+            os._exit(0)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 if __name__ == "__main__":
