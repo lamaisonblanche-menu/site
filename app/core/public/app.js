@@ -240,7 +240,14 @@ function verifierInactivite() {
 setInterval(verifierInactivite, 1000);
 
 // ------------------------------------------------------------ Barre du haut
-function topbar() { return S.online ? '' : '<div class="offline">Connexion perdue avec la caisse principale… reconnexion en cours</div>'; }
+function topbar() {
+  let h = S.online ? '' : '<div class="offline">Connexion perdue avec la caisse principale… reconnexion en cours</div>';
+  // 3.8.0 : alertes pour la caisse (sauvegarde en échec, bons/tickets non imprimés)
+  const al = S.etat && S.etat.alertes;
+  if (al && al.sauvegarde) h += `<div class="offline">⚠️ Sauvegarde impossible sur le disque depuis ${hm(al.sauvegarde.depuis)} : n'éteignez pas le PC et prévenez le responsable (${esc(al.sauvegarde.erreur)})</div>`;
+  if (al && al.impressions) h += `<div class="offline" style="cursor:pointer" onclick="A.impressions()">🖨️ ${al.impressions} impression(s) n'ont pas pu sortir — touchez ici pour les réimprimer</div>`;
+  return h;
+}
 // barre de navigation à gauche (comme les caisses pro : plus de hauteur pour travailler)
 const ICO = {
   tables: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>',
@@ -571,15 +578,46 @@ function viewCaisse() {
 }
 
 // ------------------------------------------------------------ Gestion (admin)
-const TABS = [['rapports', 'Rapports'], ['carte', 'Carte et prix'], ['equipe', 'Équipe, codes et badges'], ['salles', 'Plans de salle'], ['imprimantes', 'Imprimantes'], ['pointage', 'Pointage'], ['qr', 'Commandes QR'], ['reglages', 'Réglages'], ['journal', 'Journal']];
+const TABS = [['diagnostic', 'Diagnostic'], ['rapports', 'Rapports'], ['carte', 'Carte et prix'], ['equipe', 'Équipe, codes et badges'], ['salles', 'Plans de salle'], ['imprimantes', 'Imprimantes'], ['pointage', 'Pointage'], ['qr', 'Commandes QR'], ['reglages', 'Réglages'], ['journal', 'Journal']];
 let adm = {};
 function viewAdmin() {
   const t = S.adminTab;
   const tabs = TABS.map(([k, n]) => `<button class="tab ${k === t ? 'on' : ''}" onclick="A.atab('${k}')">${n}</button>`).join('');
   let body = '';
-  try { body = ({ rapports: admRapports, carte: admCarte, equipe: admEquipe, salles: admSalles, imprimantes: admImpr, pointage: admPointage, reglages: admReglages, journal: admJournal, qr: admQr })[t](); } catch (e) { body = '<p>Chargement…</p>'; console.error(e); }
+  try { body = ({ rapports: admRapports, carte: admCarte, equipe: admEquipe, salles: admSalles, imprimantes: admImpr, pointage: admPointage, reglages: admReglages, journal: admJournal, qr: admQr, diagnostic: admDiag })[t](); } catch (e) { body = '<p>Chargement…</p>'; console.error(e); }
   if (t === 'salles') return topbar() + `<div class="tbar"><div class="tabs">${tabs}</div></div>${body}`;
   return topbar() + `<div class="main"><div class="tabs" style="margin-bottom:14px">${tabs}</div>${body}</div>`;
+}
+// 3.8.0 : Gestion → Diagnostic (contrôles réels ; « inconnu » quand l'état ne peut pas être vérifié)
+function admDiag() {
+  const D = adm.diag;
+  if (!D) return '<p>Chargement…</p>';
+  const q = (ok, txt) => `<span style="font-weight:700;color:${ok === true ? '#1b7a3d' : ok === false ? '#b3261e' : '#8a6d00'}">${ok === true ? '✔' : ok === false ? '✖' : '?'} ${esc(txt)}</span>`;
+  const quand = ts => ts ? new Date(ts).toLocaleDateString('fr-FR') + ' ' + hm(ts) : 'jamais';
+  const ligne = (k, v) => `<tr><td style="padding:6px 10px;color:#666;white-space:nowrap">${k}</td><td style="padding:6px 10px">${v}</td></tr>`;
+  const bloc = (t, rows) => `<div class="card" style="margin-bottom:12px"><div class="k" style="font-weight:700;margin-bottom:6px">${t}</div><table style="width:100%;border-collapse:collapse">${rows.join('')}</table></div>`;
+  const etatsImp = adm.diagImp || {};
+  const m = D.maj || {};
+  let h = `<div class="row" style="margin-bottom:12px"><button class="btn" onclick="A.atab('diagnostic')">↻ Actualiser</button><button class="btn" onclick="A.diagImp()">🖨️ Interroger les imprimantes</button><span class="muted">Contrôle du ${quand(D.ts)}</span></div>`;
+  h += bloc('Serveur et version', [ligne('Version installée', q(true, D.serveur.version)), ligne('Démarré', quand(D.serveur.demarre)), ligne('Application Windows', D.serveur.dansApplication ? q(true, 'oui') : q(null, 'non (mode test)')),
+    ligne('Mises à jour', !D.maj ? q(null, 'état inconnu (hors application ou pas encore vérifié)') : m.erreur ? q(false, 'dernière vérification en échec : ' + m.erreur + ' (' + quand(m.verifie) + ')') : m.prete ? q(null, 'version ' + m.prete + ' téléchargée, installation dès que la caisse est calme') : q(!!m.verifie, 'à jour · dernière vérification ' + quand(m.verifie)))]);
+  h += bloc('Base de données et sauvegardes', [ligne('Dernière écriture', D.base.erreur ? q(false, 'ÉCHEC : ' + D.base.erreur + ' (' + quand(D.base.erreurTs) + ')') : q(!!D.base.derniereEcriture, quand(D.base.derniereEcriture))),
+    ligne('Taille', D.base.tailleKo === null ? q(false, 'fichier introuvable') : D.base.tailleKo + ' Ko · ' + D.base.tickets + ' tickets · ' + D.base.tablesOuvertes + ' table(s) ouverte(s)'),
+    ligne('Copies quotidiennes', D.base.copies ? q(true, D.base.copies + ' copies, dernière : ' + D.base.derniereCopie + ' (' + quand(D.base.derniereCopieTs) + ')') : q(false, 'aucune copie'))]);
+  h += bloc('Imprimantes', D.imprimantes.map(p => { const e = etatsImp[p.poste]; const der = p.derniere;
+    return ligne(esc(p.nom), esc(p.branchement) + '<br>' + (e ? q(e.etat === 'ok' || e.etat === 'presente' ? true : e.etat === 'inconnu' || e.etat === 'non_configuree' ? null : false, e.detail) + '<br>' : '') +
+      (der ? 'Dernière impression ' + quand(der.ts) + ' : ' + (der.etat === 'echec' ? q(false, 'échec ' + der.erreur) : der.etat === 'transmis' ? q(null, 'transmise (papier non garanti)') : der.etat === 'simule' ? q(null, 'simulée') : q(true, 'imprimée')) : '<span class="muted">aucune impression</span>') + (p.echecs24h ? ' · ' + q(false, p.echecs24h + ' échec(s) en 24 h') : '')); })
+    .concat([ligne('À réimprimer', D.aReimprimer ? q(false, D.aReimprimer + ' impression(s)') + ` <button class="btn" onclick="A.impressions()">Voir</button>` : q(true, 'aucune'))]));
+  const qd = D.qr.etat || {};
+  h += bloc('Commandes QR', [ligne('Relais', !D.qr.actif ? q(null, 'module éteint') : !D.qr.configure ? q(false, 'adresse ou clé manquante') : qd.enLigne ? q(true, 'connecté, dernière synchro ' + quand(qd.derniereSynchro)) : q(false, 'pas de réponse depuis ' + quand(qd.derniereSynchro) + (qd.erreur ? ' · ' + qd.erreur : ''))), ligne('En attente', String(qd.attente || 0))]);
+  h += bloc('Réservations du site et Gmail', [ligne('Lecture des réservations', !D.site.lectureActive ? q(false, 'mail non configuré') : D.site.erreur ? q(false, 'erreur : ' + D.site.erreur) : D.site.dernier ? q(true, 'dernière lecture ' + quand(D.site.dernier) + ' · ' + D.site.ajoutees + ' ajoutée(s) depuis le démarrage') : q(null, 'pas encore lue depuis le démarrage')),
+    ligne('Envoi des mails', !D.mail.configure ? q(false, 'mail non configuré') : D.mail.erreur ? q(false, 'dernier envoi en échec : ' + D.mail.erreur + ' (' + quand(D.mail.erreurTs) + ')') : D.mail.dernierOk ? q(true, 'dernier envoi réussi ' + quand(D.mail.dernierOk)) : q(null, 'aucun envoi depuis le démarrage')),
+    ligne('Mails en attente', D.mail.enAttente ? q(false, D.mail.enAttente + ' mail(s)') : q(true, 'aucun')),
+    ligne('Commandes de livraison du site', q(null, 'elles arrivent sur WhatsApp, pas dans la caisse'))]);
+  h += bloc('Rase', [ligne('Dernière rase', D.rase ? esc(D.rase.date) + ' par ' + esc(D.rase.par) + ' · CA ' + da(D.rase.ca) + ' · écart ' + da(D.rase.ecart) + '<br>' + (D.rase.mailEnvoye ? q(true, 'mail envoyé ' + quand(D.rase.mailEnvoye)) : D.rase.mailErreur ? q(false, 'mail : ' + D.rase.mailErreur) : q(null, 'mail non envoyé')) : q(null, 'aucune')),
+    ligne('Rase automatique', D.raseAuto && D.raseAuto.actif ? 'activée à ' + esc(D.raseAuto.heure) : 'désactivée')]);
+  h += bloc('Écrans connectés', D.ecrans.length ? D.ecrans.map(e => ligne(esc(e.ip === '127.0.0.1' || e.ip === '::1' ? 'Caisse principale' : e.ip), 'connecté depuis ' + quand(e.depuis))) : [ligne('', q(false, 'aucun écran connecté'))]);
+  return h;
 }
 function periode(p) {
   const d = new Date(), t = ymd(d);
@@ -1301,12 +1339,21 @@ const A = window.A = {
     if (t === 'rapports') { const [du, au] = periode(S.periode); S.rapport = await act(() => api(`/api/rapport?du=${du}&au=${au}`)); }
     if (t === 'equipe' && !adm.users) adm.users = await act(() => api('/api/admin/users'));
     if (t === 'journal') adm.journal = await act(() => api('/api/journal'));
+    if (t === 'diagnostic') { adm.diag = await act(() => api('/api/admin/diagnostic')); }
     if (t === 'qr') { adm.qr = await act(() => api('/api/qr/admin')); adm.qrCfg = adm.qr ? JSON.parse(JSON.stringify(adm.qr.config)) : null; }
     if (t === 'reglages') { adm.maj = await api('/api/maj').catch(() => null); if (window.caisseApp) adm.info = await caisseApp.info().catch(() => null); }
     if (t === 'pointage') { const [du, au] = periode(S.periode); adm.pointages = await act(() => api(`/api/admin/pointages?du=${du}&au=${au}`)); }
     render();
   },
   periode(p) { S.periode = p; A.atab('rapports'); },
+  async diagImp() { toast('Interrogation des imprimantes…'); adm.diagImp = await act(() => api('/api/admin/diagnostic/imprimantes', {})); render(); },
+  async impressions() {
+    const r = await act(() => api('/api/impressions')); if (!r) return;
+    const dessin = () => modal(mh('Impressions non sorties') + (r.echecs.length ? r.echecs.map(x => `<div class="row" style="justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0"><div><b>${esc(x.imprimante)}</b> · ${hm(x.ts)}<br>${esc(x.titre)}<br><span class="muted">${esc(x.erreur || '')}</span></div><div class="row"><button class="btn ok" onclick="A.reimp('${x.id}')">Réimprimer</button><button class="btn" onclick="A.ignimp('${x.id}')">Déjà sorti</button></div></div>`).join('') : '<p>Aucune impression en échec.</p>'), true);
+    A.reimp = async id => { const x = await act(() => api('/api/impression/reimprimer', { id })); if (x) toast(x.ok ? 'Réimprimé ✓' : 'Toujours en échec : ' + x.erreurs.join(' '), !x.ok); A.impressions(); };
+    A.ignimp = async id => { await act(() => api('/api/impression/ignorer', { id })); A.impressions(); };
+    dessin();
+  },
   perso(k, v, tab) { const [du, au] = periode(S.periode); S.du = du; S.au = au; S[k] = v; S.periode = 'perso'; A.atab(tab || 'rapports'); },
   cset(i, k, v) { adm.carte.categories[i][k] = v; },
   pset(i, k, v) { adm.carte.produits[i][k] = v; if (k === 'actif') render(); },

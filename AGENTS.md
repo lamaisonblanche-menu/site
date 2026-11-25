@@ -237,3 +237,15 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Relais (dépôt seulement, pas déployé) : contrôle de géolocalisation de 3.6.1 retiré (ni Wi-Fi ni géolocalisation imposés au client). Le Worker en ligne n'avait pas ce contrôle.
 - Tests : `tests-qr/*.js` n'utilisent plus un chemin fixe ; `app/tests/integration.test.js` adapté (un serveur peut valider un QR).
 - Non changé volontairement : un ticket annulé ne remet pas le stock des ruptures (le plat a en général été servi).
+
+### 3.8.0 (25/11/2026, Claude) — reprise de l'audit de ChatGPT (branche `analyse/2026-11-25`, PR à valider par Manil)
+- BUG P1 confirmé et corrigé : `POST /api/ticket/annuler` marquait le ticket annulé AVANT de vérifier si la table pouvait être rouverte → le CA baissait malgré le message d'erreur. Toutes les vérifications passent maintenant avant toute modification.
+- BUG P2 confirmé et corrigé : `POST /api/admin/pointage` écrivait l'heure avant de vérifier (départ avant l'arrivée enregistré). Heures vérifiées avant écriture, y compris pour un ajout.
+- Sauvegarde durable : chaque requête POST (sauf `SANS_ECRITURE`) écrit la base sur le disque (fsync) AVANT de répondre. En cas d'échec : en-tête `X-Sauvegarde: echec`, nouvel essai 2 s plus tard, bannière rouge à la caisse (`etat.alertes.sauvegarde`). `etatSauvegarde` garde le dernier résultat.
+- Impressions : historique `db.impressions` (600 dernières : transmis / imprimé (USB) / simulé / échec). Une impression en échec garde ses données 24 h pour une réimpression ciblée (`POST /api/impression/reimprimer`, une seule fois, 409 sinon) ou « Déjà sorti » (`/api/impression/ignorer`). Bannière « impression(s) n'ont pas pu sortir » pour caissiers et responsable. « Transmis » ne garantit pas le papier.
+- Tables : `ouvrir` et le transfert refusent une salle/table qui n'existe pas sur le plan (comptoir et à emporter inchangés).
+- Mises à jour : `/api/calme` répond non pendant une requête ou une impression en cours. Vérification toujours toutes les 15 min (décision de Manil : pas de nouvel installateur).
+- Gestion → Diagnostic (responsable) : `GET /api/admin/diagnostic` et `POST /api/admin/diagnostic/imprimantes` (questions ESC/POS DLE EOT 1 et 4 aux imprimantes réseau ; sans réponse = « inconnu », jamais « OK » ; USB = présence dans Windows seulement).
+- Commandes QR : NON changé — serveurs et maître d'hôtel valident toujours (Manil a confirmé le 25/11, contrairement à l'audit).
+- Non fait, à décider : HTTPS entre écrans et caisse (demande un nouvel installateur + certificat), codes employés chiffrés (la vérification pendant la frappe a besoin des codes), sauvegarde automatique sur SRV MB (demande une modification de l'appli Rapports), livraisons du site (arrivent sur WhatsApp, pas dans la caisse).
+- Tests : `app/tests/audit-3.8.test.js` (base isolée, 13 groupes de scénarios).

@@ -373,5 +373,7 @@ module.exports = function qrCommandes(K) {
   init();
   setInterval(() => { sync().catch(() => {}); }, 3000);
   setInterval(() => { try { tablesQr(); } catch (e) {} }, 60000);
-  return { etat, sync, service, carte, tablesQr, recevoir, estEssai, _etatSync: etatSync };
+  // 3.8.0 : état réel du relais pour Gestion → Diagnostic
+  function diag() { return { derniereSynchro: etatSync.ok || null, dernierEssai: etatSync.essai || null, erreur: etatSync.erreur || '', enLigne: now() - etatSync.ok < 20000, attente: D().qrInbox.filter(x => x.statut === 'attente').length }; }
+  return { etat, sync, service, carte, tablesQr, recevoir, estEssai, diag, _etatSync: etatSync };
 };

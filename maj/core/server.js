@@ -440,6 +440,8 @@ if (!db.carte8) {
   setTimeout(() => saveNow(), 0);
 }
 let saveTimer = null;
+let requetesEnCours = 0;
+const SANS_ECRITURE = new Set(['POST /api/login', 'POST /api/code-valide', 'POST /api/pointage/autoriser', 'POST /api/admin/mail-test', 'POST /api/admin/test-impression', 'POST /api/rapport-x', 'POST /api/qr/test', 'POST /api/admin/diagnostic/imprimantes']);
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(sauverSansPlanter, 150);
@@ -458,7 +460,13 @@ function renommer(de, vers) {
     }
   }
 }
+// 3.8.0 : état de la dernière sauvegarde, montré à la caisse et dans Gestion → Diagnostic
+const etatSauvegarde = { ok: 0, erreur: null, erreurTs: 0, echecs: 0 };
 function saveNow() {
+  try { ecrireBase(); etatSauvegarde.ok = Date.now(); etatSauvegarde.erreur = null; etatSauvegarde.echecs = 0; }
+  catch (e) { etatSauvegarde.erreur = e.message; etatSauvegarde.erreurTs = Date.now(); etatSauvegarde.echecs++; throw e; }
+}
+function ecrireBase() {
   const limite = Date.now() - 60 * 864e5;
   if (db.bons.length > 5000) db.bons = db.bons.filter(b => b.ts > limite);
   const tmp = DB_FILE + '.tmp';
@@ -617,7 +625,31 @@ function imprimantesWindows() {
       (err, out) => resolve(String(out || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean)));
   });
 }
+// 3.8.0 : historique des impressions (gardé sur disque) — chaque bon/ticket est noté : transmis, simulé ou en échec.
+// « Transmis » = l'imprimante réseau a reçu les données ; le papier n'est pas garanti (voir Diagnostic → état).
+// Les impressions en échec gardent leurs données pour une réimpression ciblée, une seule fois.
+let impressionsEnCours = 0;
 function imprimer(poste, doc) {
+  impressionsEnCours++;
+  const p = db.config.imprimantes[poste];
+  if (!Array.isArray(db.impressions)) db.impressions = [];
+  db.seq.impression = (db.seq.impression || 0) + 1;
+  const lignesDoc = doc.txt.filter(x => x && x.trim() && x !== '[LOGO]'), cle = lignesDoc.find(x => /TABLE|EMPORTER|COMPTOIR|Ticket|TICKET|RASE|RAPPORT|ANNULATION|RÉCLAME|ADDITION/.test(x));
+  const titre = [lignesDoc[0], cle && cle !== lignesDoc[0] ? cle : ''].filter(Boolean).map(x => x.trim()).join(' · ').slice(0, 80);
+  const rec = { id: 'I' + db.seq.impression, ts: now(), poste, imprimante: p ? p.nom : poste, titre, etat: 'en_cours' };
+  db.impressions.push(rec);
+  if (db.impressions.length > 600) db.impressions.splice(0, 100);
+  return imprimerBrut(poste, doc).then(r => {
+    rec.etat = r.simule ? 'simule' : r.ok ? (p && p.type === 'usb' ? 'imprime' : 'transmis') : 'echec';
+    rec.fin = now();
+    if (!r.ok) { rec.erreur = r.erreur; rec.data = doc.buf().toString('base64'); }
+    const vieux = db.impressions.filter(x => x.data && x.ts < now() - 864e5); for (const x of vieux) delete x.data;
+    return r;
+  }, e => { rec.etat = 'echec'; rec.erreur = e.message; rec.data = doc.buf().toString('base64'); return { ok: false, erreur: e.message }; })
+    .finally(() => { impressionsEnCours--; save(); });
+}
+function impressionsEnEchec() { return (db.impressions || []).filter(x => x.etat === 'echec' && !x.reimprime && !x.ignore && x.ts > now() - 864e5); }
+function imprimerBrut(poste, doc) {
   const p = db.config.imprimantes[poste];
   if (p && p.type === 'usb' && p.windows) return imprimerUSB(p, doc.buf());
   if (!p || !p.ip) return imprimerReseau(p, poste, doc);
@@ -629,6 +661,27 @@ function imprimer(poste, doc) {
   return r;
 }
 const filesReseau = {};
+// 3.8.0 : état réel d'une imprimante réseau (commandes ESC/POS DLE EOT 1 et 4). Si l'imprimante ne répond pas
+// à ces questions, l'état est « inconnu » : on ne l'annonce jamais « OK » sans réponse.
+function etatImprimanteReseau(p) {
+  return new Promise(resolve => {
+    const sock = net.connect({ host: p.ip, port: +p.port || 9100 });
+    let fini = false, recu = Buffer.alloc(0), connecte = false;
+    const fin = r => { if (fini) return; fini = true; try { sock.destroy(); } catch (e) {} resolve(r); };
+    const conclure = () => {
+      if (!connecte) return fin({ etat: 'injoignable', detail: 'ne répond pas sur le réseau (éteinte, câble, adresse ?)' });
+      if (recu.length < 2) return fin({ etat: 'inconnu', detail: 'joignable, mais ne donne pas son état (papier non vérifiable)' });
+      const s1 = recu[0], s4 = recu[1], pb = [];
+      if (s1 & 0x08) pb.push('hors ligne (capot ouvert ou erreur)');
+      if ((s4 & 0x60) === 0x60) pb.push('PLUS DE PAPIER'); else if ((s4 & 0x0c) === 0x0c) pb.push('papier presque fini');
+      fin(pb.length ? { etat: 'probleme', detail: pb.join(', ') } : { etat: 'ok', detail: 'prête, papier présent' });
+    };
+    sock.setTimeout(2500, conclure);
+    sock.on('error', () => fin({ etat: 'injoignable', detail: 'ne répond pas sur le réseau (éteinte, câble, adresse ?)' }));
+    sock.on('connect', () => { connecte = true; sock.write(Buffer.from([0x10, 0x04, 0x01, 0x10, 0x04, 0x04])); });
+    sock.on('data', d => { recu = Buffer.concat([recu, d]); if (recu.length >= 2) conclure(); });
+  });
+}
 function imprimerReseau(p, poste, doc) {
   return new Promise((resolve) => {
     if (!p || !p.ip) {
@@ -857,7 +910,14 @@ function rapport(du, au) {
   };
 }
 // ---- envoi de mails (Gmail, avec un mot de passe d'application), sans module externe
-function envoyerMail(dest, sujet, texte) {
+// 3.8.0 : dernier résultat d'envoi de mail (Diagnostic)
+const etatMail = { ok: 0, erreur: null, erreurTs: 0 };
+async function envoyerMail(dest, sujet, texte) {
+  const r = await envoyerMailBrut(dest, sujet, texte);
+  if (r && r.ok) { etatMail.ok = now(); etatMail.erreur = null; } else { etatMail.erreur = (r && r.erreur) || 'échec'; etatMail.erreurTs = now(); }
+  return r;
+}
+function envoyerMailBrut(dest, sujet, texte) {
   const m = db.config.mail || {};
   return new Promise(resolve => {
     let fini = false, buf = '', etape = 0;
@@ -1267,6 +1327,7 @@ function etatPublic(u) {
     jour: jourCourant(false) || null,
     options: db.options, top: topVentes(), version: VERSION, qr: QR.etat(u),
     reservations: db.reservations.filter(r => r.date === dateLocale(now()) && ['a_confirmer', 'prevue'].includes(r.statut)).map(resaPublic),
+    alertes: peut(u, 'caissier') ? { sauvegarde: etatSauvegarde.erreur ? { erreur: etatSauvegarde.erreur, depuis: etatSauvegarde.erreurTs } : null, impressions: impressionsEnEchec().length } : null,
     prets: db.bons.filter(b => b.etat === 'pret' && db.commandes[b.cmdId] && db.commandes[b.cmdId].statut === 'ouverte').map(b => ({ id: b.id, cmdId: b.cmdId, poste: (db.config.imprimantes[b.poste] || {}).nom || b.poste, pretTs: b.pretTs, lignes: b.lignes.map(l => l.qte + ' ' + l.nom) })),
   };
 }
@@ -1437,6 +1498,12 @@ const routes = {
     // numéro du jour pour les commandes à emporter : E1, E2…
     if (salle === 'emporter') { const jj = jourCourant(true); table = 'E' + (Object.values(db.commandes).filter(x => x.salle === 'emporter' && x.jour === jj.id).length + 1); }
     if (!table) E('Table manquante');
+    // 3.8.0 : la salle et la table doivent exister sur le plan (sauf comptoir et à emporter)
+    if (salle !== 'emporter' && salle !== 'comptoir') {
+      const sl = db.config.salles.find(x => x.id === salle);
+      if (!sl) E('Salle inconnue');
+      if (!(sl.tables || []).some(t => String(t.n) === table) && !Object.values(db.commandes).some(c => c.statut === 'ouverte' && c.salle === salle && c.table === table)) E('La table ' + table + ' n\'existe pas en ' + sl.nom);
+    }
     const ex = Object.values(db.commandes).find(c => c.statut === 'ouverte' && c.salle === salle && c.table === table && salle !== 'comptoir');
     if (ex) return getCmd(ex.id);
     // table réservée (bloquée 30 min avant) : seul un caissier peut l'ouvrir
@@ -1571,7 +1638,7 @@ const routes = {
     const pr = db.produits.find(p => p.id === l.pid); if (pr && pr.stock !== null && pr.stock !== undefined) pr.stock += q;
     for (const k of postesDe(l.pid)) { db.seq.bon++; db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: k, ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] }); }
     journal(u, 'annulation article', 'Table ' + c.table + ' : ' + q + ' ' + l.nom + ' (' + b.motif + ') autorisé par ' + chef.nom);
-    save();
+    save(); saveNow();
     const d = new Doc();
     d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t('Table ' + c.table + ' - ' + heure(now())).line();
     d.size(3).bold(1).t(q + '  ' + l.nom).size(0).bold(0).t('Motif : ' + b.motif).cut();
@@ -1598,6 +1665,7 @@ const routes = {
     if (b.salle && b.table) {
       const t = String(b.table);
       const occ = Object.values(db.commandes).find(x => x.statut === 'ouverte' && x.id !== c.id && x.salle === b.salle && x.table === t);
+      if (!occ && b.salle !== 'emporter' && b.salle !== 'comptoir') { const sl = db.config.salles.find(x => x.id === b.salle); if (!sl) E('Salle inconnue'); if (!(sl.tables || []).some(k => String(k.n) === t)) E('La table ' + t + ' n\'existe pas en ' + sl.nom); }
       if (occ) {
         if (b.confirmerFusion !== true) E('La table est occupée. Confirmez le regroupement.', 409);
         // fusion des deux tables
@@ -1779,14 +1847,14 @@ const routes = {
     const j = db.jours.find(x => x.id === tk.jour);
     if (j && j.clos) E('La journée de ce ticket est déjà clôturée');
     if (!b.motif) E('Motif obligatoire');
-    tk.annule = { par: chef.nom, motif: b.motif, ts: now() };
-    if (b.rouvrir) {
-      const c = db.commandes[tk.cmdId];
-      if (c) {
-        if (c.statut !== 'ouverte' && Object.values(db.commandes).some(x => x.statut === 'ouverte' && x.salle === c.salle && x.table === c.table && x.id !== c.id)) E('La table ' + c.table + ' est de nouveau occupée : impossible de la rouvrir. Annulez sans rouvrir.');
-        for (const l of c.lignes) if (l.paye === tk.num) l.paye = null;
-        c.statut = 'ouverte'; delete c.ticket;
-      }
+    // 3.8.0 : toutes les vérifications AVANT de toucher aux données. Avant, le ticket était marqué annulé puis
+    // l'erreur « table occupée » partait : le CA baissait alors que l'écran disait que rien n'était fait.
+    const c = b.rouvrir ? db.commandes[tk.cmdId] : null;
+    if (c && c.statut !== 'ouverte' && Object.values(db.commandes).some(x => x.statut === 'ouverte' && x.salle === c.salle && x.table === c.table && x.id !== c.id)) E('La table ' + c.table + ' est de nouveau occupée : impossible de la rouvrir. Annulez sans rouvrir.');
+    tk.annule = { par: chef.nom, motif: String(b.motif).slice(0, 120), ts: now() };
+    if (c) {
+      for (const l of c.lignes) if (l.paye === tk.num) l.paye = null;
+      c.statut = 'ouverte'; delete c.ticket; delete c.ferme;
     }
     journal(u, 'annulation ticket', 'Ticket ' + tk.num + ' ' + fmt(tk.net) + ' DA (' + b.motif + ') par ' + chef.nom + (b.rouvrir ? ', table rouverte' : ''));
     save(); return {};
@@ -1924,20 +1992,100 @@ const routes = {
   },
   'POST /api/admin/pointage': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    // 3.8.0 : horaires vérifiés AVANT d'écrire (avant, un départ avant l'arrivée était quand même enregistré)
+    const ok = t => Number.isSafeInteger(t) && t > 1.5e12 && t < now() + 864e5;
     if (b.nouveau) {
       const x = db.users.find(k => k.id === b.userId); if (!x) E('Personne inconnue');
-      db.seq.pointage++; db.pointages.push({ id: 'P' + db.seq.pointage, userId: x.id, nom: x.nom, in: +b.in, out: b.out ? +b.out : null, corrige: u.nom });
+      const tin = +b.in, tout = b.out ? +b.out : null;
+      if (!ok(tin) || (tout !== null && !ok(tout))) E('Heure invalide');
+      if (tout !== null && tout < tin) E('Le départ est avant l\'arrivée');
+      db.seq.pointage++; db.pointages.push({ id: 'P' + db.seq.pointage, userId: x.id, nom: x.nom, in: tin, out: tout, corrige: u.nom });
     } else {
       const i = db.pointages.findIndex(p => p.id === b.id); if (i < 0) E('Pointage introuvable');
       if (b.supprimer) db.pointages.splice(i, 1);
-      else { const p = db.pointages[i]; if (b.in) p.in = +b.in; p.out = b.out ? +b.out : null; p.corrige = u.nom; if (p.out && p.out < p.in) E('Le départ est avant l\'arrivée'); }
+      else {
+        const p = db.pointages[i], tin = b.in ? +b.in : p.in, tout = b.out ? +b.out : null;
+        if (!ok(tin) || (tout !== null && !ok(tout))) E('Heure invalide');
+        if (tout !== null && tout < tin) E('Le départ est avant l\'arrivée');
+        p.in = tin; p.out = tout; p.corrige = u.nom;
+      }
     }
     journal(u, 'pointage corrigé', b.id || 'ajout'); save(); return {};
   },
   'GET /api/version': () => ({ version: VERSION }),
+  // ---------- 3.8.0 : impressions (historique, réimpression ciblée) et diagnostic
+  'GET /api/impressions': (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    return { echecs: impressionsEnEchec().map(({ data, ...x }) => x), recentes: (db.impressions || []).slice(-80).reverse().map(({ data, ...x }) => x) };
+  },
+  'POST /api/impression/reimprimer': async (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    const rec = (db.impressions || []).find(x => x.id === b.id);
+    if (!rec) E('Impression introuvable', 404);
+    if (rec.reimprime) E('Déjà réimprimé à ' + heure(rec.reimprime.ts) + ' par ' + rec.reimprime.par + ' : vérifiez à l\'imprimante avant de recommencer', 409);
+    if (rec.etat !== 'echec' || !rec.data) E('Cette impression n\'est pas en échec');
+    rec.reimprime = { ts: now(), par: u.nom };
+    const buf = Buffer.from(rec.data, 'base64');
+    const doc = { txt: ['(réimpression) ' + rec.titre], buf: () => buf, texte: () => '(réimpression) ' + rec.titre + '\n' };
+    journal(u, 'réimpression', rec.imprimante + ' : ' + rec.titre);
+    const r = await imprimer(rec.poste, doc);
+    if (!r.ok) delete rec.reimprime; else delete rec.data;
+    return { ok: r.ok, erreurs: r.ok ? [] : [r.erreur] };
+  },
+  'POST /api/impression/ignorer': (b, u) => {
+    if (!peut(u, 'caissier')) E('Réservé à la caisse', 403);
+    const rec = (db.impressions || []).find(x => x.id === b.id); if (!rec) E('Impression introuvable', 404);
+    rec.ignore = { ts: now(), par: u.nom }; delete rec.data;
+    journal(u, 'impression en échec ignorée', rec.imprimante + ' : ' + rec.titre);
+    return {};
+  },
+  'GET /api/admin/diagnostic': (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    let taille = null, sauvegardes = [];
+    try { taille = fs.statSync(DB_FILE).size; } catch (e) {}
+    try { sauvegardes = fs.readdirSync(BACKUPS).filter(f => f.endsWith('.json')).sort(); } catch (e) {}
+    const derniereCopie = sauvegardes.length ? sauvegardes[sauvegardes.length - 1] : null;
+    let copieTs = null; try { if (derniereCopie) copieTs = fs.statSync(path.join(BACKUPS, derniereCopie)).mtimeMs; } catch (e) {}
+    const imps = db.impressions || [];
+    const imprimantes = Object.entries(db.config.imprimantes).map(([k, p]) => {
+      const der = imps.filter(x => x.poste === k && x.etat !== 'en_cours').slice(-1)[0] || null;
+      const echec24 = imps.filter(x => x.poste === k && x.etat === 'echec' && x.ts > now() - 864e5).length;
+      return { poste: k, nom: p.nom, branchement: p.type === 'usb' ? 'USB « ' + (p.windows || '?') + ' »' : p.ip ? 'Réseau ' + p.ip + ':' + (p.port || 9100) : 'non configurée (impressions simulées)',
+        derniere: der ? { ts: der.ts, etat: der.etat, erreur: der.erreur || '' } : null, echecs24h: echec24 };
+    });
+    const qrc = db.config.qr || {};
+    const derRase = db.jours.filter(x => x.rase).slice(-1)[0] || null;
+    const ecrans = [...clients].map(r => { const q = r.__info || {}; return { ip: q.ip || '?', depuis: q.ts || null }; });
+    return {
+      ts: now(), serveur: { version: VERSION, demarre: now() - Math.round(process.uptime() * 1000), node: process.version, systeme: process.platform, memoireMo: Math.round(process.memoryUsage().rss / 1048576), dansApplication: !!process.send },
+      maj: majEtat,
+      base: { tailleKo: taille === null ? null : Math.round(taille / 1024), derniereEcriture: etatSauvegarde.ok || null, erreur: etatSauvegarde.erreur, erreurTs: etatSauvegarde.erreurTs || null, copies: sauvegardes.length, derniereCopie, derniereCopieTs: copieTs, tickets: db.tickets.length, tablesOuvertes: Object.values(db.commandes).filter(c => c.statut === 'ouverte').length },
+      imprimantes, aReimprimer: impressionsEnEchec().length,
+      qr: { actif: !!qrc.actif, configure: !!(qrc.relais && qrc.secret), etat: QR.diag ? QR.diag() : null },
+      site: { ...siteEtat, lectureActive: !!(db.config.mail && db.config.mail.actif && db.config.mail.pass) },
+      mail: { actif: !!(db.config.mail && db.config.mail.actif), configure: !!(db.config.mail && db.config.mail.user && db.config.mail.pass), dernierOk: etatMail.ok || null, erreur: etatMail.erreur, erreurTs: etatMail.erreurTs || null, enAttente: db.mailsAttente.length },
+      rase: derRase ? { date: derRase.date, ts: derRase.rase.ts, par: derRase.rase.par, ca: derRase.rase.ca, ecart: derRase.rase.ecart, mailEnvoye: derRase.mailEnvoye || null, mailErreur: derRase.mailErreur || null } : null,
+      raseAuto: db.config.raseAuto || null,
+      ecrans,
+    };
+  },
+  'POST /api/admin/diagnostic/imprimantes': async (b, u) => {
+    if (!peut(u, 'admin')) E('Réservé au responsable', 403);
+    const res = {};
+    let win = null;
+    for (const [k, p] of Object.entries(db.config.imprimantes)) {
+      if (p.type === 'usb') {
+        if (win === null) win = await imprimantesWindows();
+        res[k] = process.platform !== 'win32' ? { etat: 'inconnu', detail: 'vérifiable seulement sur le PC Windows de la caisse' }
+          : win.includes(p.windows) ? { etat: 'presente', detail: 'connue de Windows (l\'état du papier n\'est pas lisible en USB)' } : { etat: 'absente', detail: 'introuvable dans Windows : vérifiez le nom' };
+      } else if (p.ip) res[k] = await etatImprimanteReseau(p);
+      else res[k] = { etat: 'non_configuree', detail: 'pas d\'adresse : les bons sont simulés' };
+    }
+    return res;
+  },
   // « calme » = aucune table ouverte et personne n'a touché la caisse depuis 3 minutes (pour installer une mise à jour)
   // 3.4.0 : les tables ouvertes n'empêchent plus la mise à jour (elles sont gardées) ; il suffit que personne n'ait touché la caisse depuis 3 min
-  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000; if (calme) { saveNow(); sauverSessions(); } return { calme }; },
+  'GET /api/calme': () => { const calme = now() - derniereActivite > 180000 && impressionsEnCours === 0 && requetesEnCours === 0; if (calme) { saveNow(); sauverSessions(); } return { calme }; },
   'GET /api/maj': (b, u) => { if (!peut(u, 'caissier')) E('Réservé à la caisse et au responsable', 403); return { version: VERSION, app: !!process.send, etat: majEtat }; },
   'POST /api/maj/verifier': (b, u) => { if (!peut(u, 'caissier')) E('Réservé à la caisse et au responsable', 403); if (process.send) process.send({ type: 'verifier' }); return {}; },
   'POST /api/maj/installer': (b, u) => {
@@ -2109,7 +2257,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/suivi/')) return rapportsBureau(req, res, db.suiviBureau?.cle, '/suivi');
     if (url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-      res.write('retry: 2000\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
+      res.write('retry: 2000\n\n'); res.__info = { ip: String(req.socket.remoteAddress || '').replace('::ffff:', ''), ts: now() }; clients.add(res); req.on('close', () => clients.delete(res)); return;
     }
     if (url.pathname.startsWith('/export/')) {
       // jeton passé dans l'URL pour les téléchargements
@@ -2146,10 +2294,16 @@ const server = http.createServer(async (req, res) => {
       if (!fn) E('Inconnu', 404);
       const body = req.method === 'POST' ? await lireCorps(req) : {};
       const publique = key === 'POST /api/login' || key === 'POST /api/pointage' || key === 'POST /api/pointage/autoriser' || key === 'POST /api/code-valide' || key === 'GET /api/version' || key === 'GET /api/calme';
-      if (req.method === 'POST') derniereActivite = now();
+      if (req.method === 'POST') { derniereActivite = now(); requetesEnCours++; res.on('close', () => { requetesEnCours--; derniereActivite = now(); }); }
       const u = publique ? null : userDe(req);
       if (!publique && !u) E('Session expirée, reconnectez-vous', 401);
       const out = await fn(body, u, req, q);
+      // 3.8.0 : toute modification est écrite sur le disque (fsync) AVANT de répondre « c'est fait » à l'écran.
+      // Avant, l'écriture partait 150 ms plus tard : une coupure de courant à ce moment perdait l'opération.
+      if (req.method === 'POST' && !SANS_ECRITURE.has(key)) {
+        clearTimeout(saveTimer); saveTimer = null;
+        try { saveNow(); } catch (e) { console.error('Sauvegarde impossible : ' + e.message); saveTimer = setTimeout(sauverSansPlanter, 2000); res.setHeader('X-Sauvegarde', 'echec'); broadcast(); }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(JSON.stringify(out));
     }
