@@ -80,3 +80,10 @@ Le responsable attend un logiciel complet, fiable et beau, pas un tableau de bor
 
 ## MISE À JOUR 25/11/2026 15h30 (Claude)
 Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `stocks/RAPPORT_AUDIT_CLAUDE.md`. Mode d emploi : `stocks/README.md`. Tests : `cd stocks && python -m unittest discover -s tests -v` (19/19 OK). Non installé sur SRV MB, en attente de l accord du gérant.
+
+
+## Mise à jour à distance (v1.2.0, 25/11/2026)
+- Réglages › « Mettre à jour maintenant » (direction) : `POST /api/mise-a-jour` → `majlogiciel.lancer()` télécharge le zip de la branche, vérifie (compile des .py), copie dans `C:\MBStocks\app` sauf `data/tests/__pycache__`, puis le serveur se redémarre seul (surveillance des .py dans `server.py`).
+- `GET /api/mise-a-jour?verifier=1` compare `VERSION` local et GitHub ; vérification automatique chaque nuit à 4 h (`boucle_auto`).
+- Il suffit donc de pousser sur `feature/gestion-stocks-magasin` et d'incrémenter `stocks/VERSION` : plus besoin d'aller sur SRV MB.
+- Poste magasinier installé le 25/11 (certificat MB, raccourci Edge sur https://192.168.100.29:8765, hosts SRV-MB → IPv4 ; scripts sur la clé USB `E:\Stocks-PC-magasinier`).

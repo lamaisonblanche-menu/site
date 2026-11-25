@@ -19,6 +19,7 @@ import stockdb as D
 import metier as M
 import documents as DOC
 import backup as B
+import majlogiciel as MAJ
 from stockdb import rows, one, val
 
 ROOT = Path(__file__).resolve().parent
@@ -193,6 +194,10 @@ def get_routes(c, u, path, q):
     if path == "/api/sauvegardes":
         M.need(u, "direction")
         return {"list": B.listing(backup_dirs())[:60], "state": BACKUP_STATE, "dirs": [str(x) for x in backup_dirs()]}
+    if path == "/api/mise-a-jour":
+        M.need(u, "direction")
+        if q.get("verifier"): MAJ.version_disponible()
+        return MAJ.etat()
     raise M.Err("Page inconnue", 404)
 
 
@@ -307,6 +312,11 @@ class Handler(BaseHTTPRequestHandler):
                     if path == "/api/sauvegarde":
                         M.need(u, "direction"); res = run_backup("manuelle")
                         return self.out(200, {"files": res["files"]})
+                    if path == "/api/mise-a-jour":
+                        M.need(u, "direction")
+                        with D.WRITE_LOCK:
+                            c.execute("BEGIN IMMEDIATE"); D.audit(c, u["id"], "mise_a_jour", "logiciel", None, {"depuis": VERSION}); c.execute("COMMIT")
+                        return self.out(200, MAJ.lancer(log))
                     fn = POST.get(path)
                     if not fn: raise M.Err("Action inconnue", 404)
                     if u["must_change"] and path != "/api/mot-de-passe": raise M.Err("Changez d'abord votre mot de passe provisoire", 403, "must_change")
@@ -433,6 +443,7 @@ def main():
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.load_cert_chain(cert, key); srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
     if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=backup_loop, daemon=True).start()
+    if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=MAJ.boucle_auto, args=(log,), daemon=True).start()
     log(f"Stocks La Maison Blanche {VERSION} — {'https' if cert else 'http'}://{host}:{port} — données : {D.DATA}")
     reload_flag = threading.Event()
     def watch():  # mise à jour du logiciel : redémarrage automatique dès qu'un fichier .py ou VERSION change

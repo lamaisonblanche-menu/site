@@ -30,6 +30,7 @@ SRV MB (Windows 11)                                   PC magasinier
 | `stockdb.py` | schéma versionné (migrations), déclencheurs d'immuabilité, journal chaîné |
 | `documents.py` | documents imprimables / PDF (Edge sans fenêtre) et exports CSV (Excel FR) |
 | `backup.py` | sauvegarde, vérification, restauration |
+| `majlogiciel.py` | mise à jour à distance : bouton « Mettre à jour » (Réglages, direction) → téléchargement de la branche GitHub, remplacement du code (jamais `data`), redémarrage automatique ; vérification chaque nuit à 4 h |
 | `public/` | interface (HTML/CSS/JS sans framework) |
 | `outils/creer_certificats.py` | autorité privée + certificat HTTPS |
 | `installation/` | installateurs Windows (serveur, poste), restauration, désinstallation |

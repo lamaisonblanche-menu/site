@@ -1050,8 +1050,37 @@ PAGES.reglages = async v => {
   const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   v.innerHTML = `<div class="card" style="max-width:640px"><div class="hd"><h2>Semaine de travail</h2></div><div class="bd"><label class="f">Premier jour de la semaine (rapports et demandes hebdomadaires)
     <select id="wsS">${days.map((d, i) => opt(i, d, S.session.settings.week_start)).join('')}</select></label><button class="btn dark" id="wsOk" style="margin-top:12px">Enregistrer</button></div></div>
-    <div class="card" style="max-width:640px"><div class="bd small muted">Version ${esc(S.session.version)} · PDF serveur : ${S.session.pdf ? 'disponible (Edge)' : 'indisponible — utilisez Imprimer › Enregistrer en PDF'}</div></div>`;
+    <div class="card" style="max-width:640px"><div class="hd"><h2>Mise à jour du logiciel</h2></div><div class="bd">
+    <div class="small muted" style="margin-bottom:10px">Version installée : <b>${esc(S.session.version)}</b> · PDF serveur : ${S.session.pdf ? 'disponible (Edge)' : 'indisponible — utilisez Imprimer › Enregistrer en PDF'}</div>
+    <div id="majInfo" class="small" style="margin-bottom:10px">Vérification de la version disponible…</div>
+    <div class="row"><button class="btn" id="majCheck">Vérifier</button><button class="btn dark" id="majGo">Mettre à jour maintenant</button></div>
+    <p class="small muted" style="margin:10px 0 0">Le serveur télécharge la dernière version depuis GitHub, l'installe et redémarre tout seul (environ 30 s). Les données ne sont jamais touchées. Une vérification automatique a lieu chaque nuit à 4 h.</p></div></div>`;
   $('#wsOk').onclick = async () => { try { await api('reglages', {week_start: $('#wsS').value}); S.session.settings.week_start = +$('#wsS').value; toast('Réglage enregistré', 'ok'); } catch (e) { toast(e.message, 'bad'); } };
+  const majShow = st => {
+    const el = $('#majInfo'); if (!el) return;
+    if (st.en_cours) { el.innerHTML = `⏳ Mise à jour en cours : ${esc(st.etape)}…`; return; }
+    if (st.erreur) { el.innerHTML = `<span style="color:var(--bad)">Échec : ${esc(st.erreur)}</span>`; return; }
+    if (st.disponible === null && st.verifie) { el.innerHTML = `GitHub injoignable depuis SRV MB (${esc(st.verifie)})`; return; }
+    if (!st.disponible) { el.textContent = 'Version disponible : inconnue'; return; }
+    el.innerHTML = st.disponible === st.locale ? `✔ À jour (${esc(st.locale)}) · vérifié ${esc(st.verifie)}` : `Nouvelle version disponible : <b>${esc(st.disponible)}</b> (installée : ${esc(st.locale)})`;
+  };
+  const majCheck = async () => { try { majShow(await api('mise-a-jour?verifier=1')); } catch (e) { $('#majInfo').textContent = e.message; } };
+  $('#majCheck').onclick = majCheck;
+  $('#majGo').onclick = async e => {
+    if (!confirm('Mettre à jour le logiciel maintenant ? Le serveur sera indisponible environ 30 secondes.')) return;
+    e.target.classList.add('busy');
+    try {
+      majShow(await api('mise-a-jour', {}));
+      const v0 = S.session.version; let n = 0;
+      const t = setInterval(async () => {
+        n++;
+        try { const st = await api('mise-a-jour'); if (st.erreur) { majShow(st); clearInterval(t); e.target.classList.remove('busy'); return; } majShow(st); } catch (er) { }
+        try { const p = await (await fetch('/api/ping', {cache: 'no-store'})).json(); if (p.version !== v0) { clearInterval(t); toast('Mise à jour installée : version ' + p.version, 'ok'); setTimeout(() => location.reload(), 1500); } } catch (er) { }
+        if (n > 90) { clearInterval(t); e.target.classList.remove('busy'); toast('La mise à jour prend plus de temps que prévu : vérifiez dans quelques minutes', 'bad'); }
+      }, 2000);
+    } catch (er) { toast(er.message, 'bad'); e.target.classList.remove('busy'); }
+  };
+  majCheck();
 };
 
 /* ------------------------------------------------------------------ démarrage */
