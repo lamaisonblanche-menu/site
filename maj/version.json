@@ -1,11 +1,11 @@
 {
- "version": "3.8.0",
- "date": "2026-11-25T14:32:30.461Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.8.1",
+ "date": "2026-11-25T14:33:56.349Z",
+ "notes": "Le numéro de table est écrit en très gros sur les tickets de caisse et les additions",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "88206afd2d9b56ca71466c85d1ed1421b1db0e78fa00072697918fb8a9ac54ef"
+   "sha256": "8366b0a6a2bd18fbaf821765e4908b8408fbafe3ba962e7d6b32b8b9e0486254"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "dc82ad52dcc9c01779aeeb07e5779be1b36b05f3ea7d68bbf774e84553511425"
+   "sha256": "1ee05b8987b853167501fa0d8b067ac85e679b7ef6d7e973d79d310418a046fa"
   },
   {
    "chemin": "suivi.js",

@@ -797,13 +797,18 @@ function lignesTicket(d, lignes, sansPayees) {
 // paiements d'un ticket (les anciens tickets n'ont qu'un mode)
 function paiementsDe(t) { return t.paiements || [{ mode: t.mode, montant: t.mode === 'offert' ? 0 : t.net, societe: t.societe, reference: t.reference }]; }
 const sommeMode = (tks, m) => tks.reduce((s, t) => s + paiementsDe(t).filter(p => p.mode === m).reduce((a, p) => a + p.montant, 0), 0);
+// Titre très visible sur les tickets et additions : double taille, gras, blanc sur noir (GS B)
+function grosTitre(d, texte) {
+  d.center(1).size(2).bold(1).raw(0x1d, 0x42, 1).t(' ' + texte + ' ').raw(0x1d, 0x42, 0).bold(0).size(0).center(0);
+}
 function ticketDoc(tk, duplicata) {
   const d = new Doc();
   enteteTicket(d);
   if (duplicata) d.center(1).bold(1).t('*** DUPLICATA ***').bold(0).center(0);
   d.t('Ticket n° ' + tk.num + '   ' + dateH(tk.ts));
-  if (tk.salle === 'emporter') d.bold(1).t('A EMPORTER ' + tk.table + (tk.client && tk.client.nom ? ' - ' + tk.client.nom : '')).bold(0);
-  else d.tGras(salleNom(tk.salle) + ' - ', 'Table ' + tk.table, ' - ' + (tk.couverts || 1) + ' couv.');
+  // 3.7.9 : numéro de table en très gros, centré, blanc sur noir (demande de Manil)
+  if (tk.salle === 'emporter') { grosTitre(d, 'A EMPORTER ' + tk.table); if (tk.client && tk.client.nom) d.center(1).bold(1).t(tk.client.nom).bold(0).center(0); }
+  else { grosTitre(d, 'TABLE ' + tk.table); d.center(1).t(salleNom(tk.salle) + ' - ' + (tk.couverts || 1) + ' couv.').center(0); }
   d.t('Serveur : ' + tk.serveur + '   Caisse : ' + tk.caissier);
   d.line();
   lignesTicket(d, tk.lignes);
@@ -823,7 +828,8 @@ function additionDoc(cmd) {
   const d = new Doc();
   enteteTicket(d);
   d.center(1).bold(1).t('ADDITION').bold(0).center(0);
-  d.t((cmd.salle === 'emporter' ? 'A emporter ' + cmd.table + (cmd.client && cmd.client.nom ? ' - ' + cmd.client.nom : '') : salleNom(cmd.salle) + ' - Table ' + cmd.table) + '   ' + dateH(now()));
+  grosTitre(d, cmd.salle === 'emporter' ? 'A EMPORTER ' + cmd.table : 'TABLE ' + cmd.table);
+  d.center(1).t((cmd.salle === 'emporter' ? (cmd.client && cmd.client.nom ? cmd.client.nom + '   ' : '') : salleNom(cmd.salle) + '   ') + dateH(now())).center(0);
   d.t('Serveur : ' + nomUser(cmd.serveurId));
   d.line();
   lignesTicket(d, cmd.lignes, true);
