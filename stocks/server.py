@@ -20,6 +20,7 @@ import metier as M
 import documents as DOC
 import backup as B
 import majlogiciel as MAJ
+import controle as CTL
 from stockdb import rows, one, val
 
 ROOT = Path(__file__).resolve().parent
@@ -201,6 +202,9 @@ def get_routes(c, u, path, q):
         M.need(u, "direction")
         if q.get("verifier"): MAJ.version_disponible()
         return MAJ.etat()
+    if path == "/api/sante":
+        M.need(u, "direction")
+        return dict(sante_now(c), mise_a_jour_refusee=MAJ.ETAT.get("refusee"))
     raise M.Err("Page inconnue", 404)
 
 
@@ -230,6 +234,27 @@ def run_backup(label="auto"):
         return res
     except Exception as e:
         BACKUP_STATE["error"] = str(e); log("ÉCHEC sauvegarde : " + str(e)); raise
+
+
+def sante_now(c):
+    lst = B.listing([D.DATA / "sauvegardes"])
+    return CTL.sante(c, lst[0]["date"] if lst else None)
+
+
+def sante_loop():
+    """Contrôle de santé 2 minutes après le démarrage puis toutes les 6 heures : tout problème est noté dans le journal."""
+    time.sleep(120)
+    while True:
+        try:
+            c = D.connect()
+            try: r = sante_now(c)
+            finally: c.close()
+            if not r["ok"]: log("ALERTE santé : " + " | ".join(r["problemes"]))
+        except Exception as e: log("Contrôle de santé impossible : " + str(e))
+        time.sleep(6 * 3600)
+
+
+CLIENT_ERRS = []
 
 
 def backup_loop():
@@ -319,7 +344,13 @@ class Handler(BaseHTTPRequestHandler):
                         M.need(u, "direction")
                         with D.WRITE_LOCK:
                             c.execute("BEGIN IMMEDIATE"); D.audit(c, u["id"], "mise_a_jour", "logiciel", None, {"depuis": VERSION}); c.execute("COMMIT")
-                        return self.out(200, MAJ.lancer(log))
+                        return self.out(200, MAJ.lancer(log, avant=lambda: run_backup("avant-maj")))
+                    if path == "/api/erreur-client":
+                        t = time.time(); CLIENT_ERRS[:] = [x for x in CLIENT_ERRS if t - x < 3600]
+                        if len(CLIENT_ERRS) < 30:
+                            CLIENT_ERRS.append(t)
+                            log("ERREUR écran (" + u["username"] + ") " + " | ".join(str(d.get(k, ""))[:400].replace("\n", " ") for k in ("message", "page", "source", "appareil")))
+                        return self.out(200, {"ok": True})
                     fn = POST.get(path)
                     if not fn: raise M.Err("Action inconnue", 404)
                     if u["must_change"] and path != "/api/mot-de-passe": raise M.Err("Changez d'abord votre mot de passe provisoire", 403, "must_change")
@@ -371,7 +402,8 @@ class Handler(BaseHTTPRequestHandler):
     def login(self, d):
         ip = self.client_address[0]
         name = str(d.get("username", "")).strip().lower()[:60]
-        key_ip, key_user = "ip:" + ip, "u:" + name
+        fwd = (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()[:60]
+        key_ip, key_user = "ip:" + (fwd if fwd and ipaddress.ip_address(ip).is_loopback else ip), "u:" + name
         t = time.time()
         with FAIL_LOCK:
             for k in (key_ip, key_user):
@@ -470,18 +502,38 @@ def main():
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.load_cert_chain(cert, key); srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
     if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=backup_loop, daemon=True).start()
-    if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=MAJ.boucle_auto, args=(log,), daemon=True).start()
+    if not os.environ.get("MB_STOCKS_NO_BACKUP"):
+        threading.Thread(target=MAJ.boucle_auto, args=(log,), kwargs={"avant": lambda: run_backup("avant-maj")}, daemon=True).start()
+        threading.Thread(target=sante_loop, daemon=True).start()
+        try: CTL.garder_version(ROOT, VERSION)  # ce code a démarré : c'est la dernière version qui marche
+        except Exception as e: log("Copie de la version en cours impossible : " + str(e))
     log(f"Stocks La Maison Blanche {VERSION} — {'https' if cert else 'http'}://{host}:{port} — données : {D.DATA}")
     reload_flag = threading.Event()
-    def watch():  # mise à jour du logiciel : redémarrage automatique dès qu'un fichier .py ou VERSION change
-        files = [p for p in ROOT.glob("*.py")] + [ROOT / "VERSION"]
-        snap = lambda: {str(f): f.stat().st_mtime for f in files if f.exists()}
+    def watch():  # mise à jour du logiciel : essai de la nouvelle version, puis redémarrage automatique
+        files = lambda: [p for p in ROOT.glob("*.py")] + [ROOT / "VERSION"]
+        snap = lambda: {str(f): (f.stat().st_mtime, f.stat().st_size) for f in files() if f.exists()}
         old = snap()
         while True:
             time.sleep(5)
-            if snap() != old:
-                time.sleep(3)  # laisser finir la copie de tous les fichiers
-                log("Mise à jour détectée : redémarrage du serveur"); reload_flag.set(); srv.shutdown(); return
+            cur = snap()
+            if cur == old: continue
+            while True:  # attendre que la copie soit vraiment finie (plus aucun changement pendant 6 s)
+                time.sleep(6); nxt = snap()
+                if nxt == cur: break
+                cur = nxt
+            ok, msg = CTL.essai(ROOT, D.DB_PATH)
+            if snap() != cur: continue  # encore des fichiers en cours de copie : on recommence
+            if not ok:
+                log("MISE À JOUR REFUSÉE (la version reçue ne démarre pas) : " + msg)
+                MAJ.ETAT["refusee"] = datetime.now().strftime("%Y-%m-%d %H:%M") + " — " + msg
+                try:
+                    if CTL.restaurer_version(ROOT, VERSION): log(f"Version {VERSION} remise en place : le logiciel continue de fonctionner")
+                except Exception as e: log("Remise en place impossible : " + str(e))
+                old = snap(); continue
+            if not os.environ.get("MB_STOCKS_NO_BACKUP"):
+                try: run_backup("avant-maj")
+                except Exception: pass
+            log("Mise à jour vérifiée : redémarrage du serveur"); reload_flag.set(); srv.shutdown(); return
     threading.Thread(target=watch, daemon=True).start()
     try: srv.serve_forever()
     except KeyboardInterrupt: pass

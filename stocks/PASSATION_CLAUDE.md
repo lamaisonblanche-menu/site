@@ -101,3 +101,11 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 - Accès à distance : Tailscale sur SRV MB (compte maisonblanchehydra@gmail.com), `tailscale serve --bg https+insecure://localhost:8765` → https://srv-mb.tailf1bd67.ts.net (les requêtes arrivent de 127.0.0.1, donc acceptées).
 - v1.5.1 : bouton « Entrer comme magasinier (sans mot de passe) » sur l'écran de connexion, à la demande de la direction (`magasinier_direct` dans `/api/connexion`). Refusé depuis l'accès Tailscale (en-tête `Tailscale-User-Login`, bouton masqué sur *.ts.net) et hors réseaux autorisés ; journalisé `connexion_sans_mdp`. La direction garde son mot de passe.
 - v1.5.2 : depuis l'installation de Tailscale, « srv-mb » se résout en 100.x (MagicDNS) → « Poste non autorisé ». Les plages Tailscale (100.64.0.0/10, fd7a:115c:a1e0::/48) sont acceptées ; l'entrée magasinier sans mot de passe y reste refusée.
+
+## v1.6.0 (25/11/2026) — prévention des pannes (`controle.py`)
+- **Essai avant installation** : toute nouvelle version (bouton, mise à jour de nuit, ou fichiers déposés dans `C:\MBStocks\app`) est d'abord essayée dans un processus à part : compilation, import de tous les modules, migrations sur une **copie** de la base. Refusée → rien n'est changé (`MISE À JOUR REFUSÉE` dans le journal, bandeau sur le tableau de bord de la direction) et les fichiers de la version qui tourne sont remis (`data/versions/code-<version>.zip`, 5 dernières gardées).
+- Le serveur attend la fin de la copie (aucun changement pendant 6 s) avant de redémarrer ; sauvegarde `avant-maj` avant chaque redémarrage de mise à jour.
+- Secours : déposer un fichier vide `FORCER_MAJ` dans le dossier de l'appli fait passer la version sans essai (une fois).
+- **Contrôle de santé** (`GET /api/sante`, direction ; aussi 2 min après démarrage puis toutes les 6 h dans le journal) : intégrité de la base, journal chaîné, stock = dernier mouvement, clés étrangères, disque, âge de la dernière sauvegarde.
+- **Erreurs d'écran** : toute erreur JavaScript sur un poste/téléphone est envoyée à `POST /api/erreur-client` et notée dans le journal (`ERREUR écran`), 30/h max.
+- Limite d'essais de connexion comptée par appareil d'origine derrière Tailscale (`X-Forwarded-For`).

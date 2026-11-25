@@ -412,7 +412,13 @@ PAGES.tableau = async v => {
   const maxc = Math.max(1, ...w.consommation.map(x => x.total));
   const colors = {cuisine: '#b8955a', asiatique: '#b3261e', brunch: '#2f7d4f', comptoir: '#1f3b5c'};
   const todo = [];
+  let sante = '';
   if (isDir()) {
+    try {
+      const h = await api('sante');
+      if (!h.ok) sante += `<div class="alertbox bad"><b>À vérifier sur le serveur :</b><br>${h.problemes.map(esc).join('<br>')}</div>`;
+      if (h.mise_a_jour_refusee) sante += `<div class="alertbox warn">Une mise à jour défectueuse a été refusée automatiquement (${esc(h.mise_a_jour_refusee)}). Le logiciel continue avec la version précédente.</div>`;
+    } catch (e) { }
     if (dm.soumise) todo.push(`<b>${dm.soumise}</b> demande(s) de paiement à valider`);
     if (dm.approuvee || dm.partiellement_payee) todo.push(`<b>${(dm.approuvee || 0) + (dm.partiellement_payee || 0)}</b> demande(s) approuvée(s) : paiements à confirmer`);
     if (t.inventaires_a_valider) todo.push(`<b>${t.inventaires_a_valider}</b> inventaire(s) à valider`);
@@ -422,7 +428,7 @@ PAGES.tableau = async v => {
   }
   if (t.bons_sans_facture) todo.push(`<b>${t.bons_sans_facture}</b> bon(s) de livraison sans facture rapprochée`);
   if (t.factures_sans_bon) todo.push(`<b>${t.factures_sans_bon}</b> facture(s) sans bon de livraison rapproché`);
-  v.innerHTML = `
+  v.innerHTML = sante + `
   ${isMag() ? `<div class="qa" style="margin-bottom:18px">
     <button data-go="receptions" data-new="1"><span>⇩</span><b>Nouvelle réception</b><small>Bon de livraison fournisseur</small></button>
     <button data-go="sorties" data-new="sortie"><span>⇧</span><b>Nouvelle sortie</b><small>Cuisine, asiatique, brunch, bar</small></button>
@@ -1150,4 +1156,17 @@ PAGES.reglages = async v => {
 (() => {
   const t = () => document.body.classList.toggle('menu');
   document.getElementById('burger').onclick = t; document.getElementById('scrim').onclick = t;
+})();
+
+/* ------------------------------------------------------------------ prévention : toute erreur d'écran est notée dans le journal du serveur */
+(() => {
+  const seen = new Set();
+  const send = (message, source) => {
+    message = String(message || '').slice(0, 400);
+    if (!message || seen.has(message) || seen.size >= 8 || !S.token) return; seen.add(message);
+    fetch('/api/erreur-client', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token},
+      body: JSON.stringify({message, source: String(source || '').slice(0, 300), page: S.page || '', appareil: navigator.userAgent.slice(0, 160)})}).catch(() => {});
+  };
+  window.addEventListener('error', e => send(e.message, (e.filename || '').split('/').pop() + ':' + e.lineno + ':' + e.colno));
+  window.addEventListener('unhandledrejection', e => { const r = e.reason; if (r instanceof ApiError) return; send(r && r.message || r, r && r.stack ? String(r.stack).split('\n')[1] : ''); });
 })();

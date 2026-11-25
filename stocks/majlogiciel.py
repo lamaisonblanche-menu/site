@@ -15,7 +15,7 @@ SOUS_DOSSIER = "stocks"
 URL_VERSION = f"https://raw.githubusercontent.com/{DEPOT}/{BRANCHE}/{SOUS_DOSSIER}/VERSION"
 URL_ZIP = f"https://codeload.github.com/{DEPOT}/zip/refs/heads/{BRANCHE}"
 EXCLUS = {"data", "tests", "__pycache__", ".git"}  # jamais touchés dans le dossier de l'application
-ETAT = {"en_cours": False, "etape": "", "erreur": None, "fin": None, "disponible": None, "verifie": None}
+ETAT = {"en_cours": False, "etape": "", "erreur": None, "fin": None, "disponible": None, "verifie": None, "refusee": None}
 _LOCK = threading.Lock()
 
 
@@ -47,7 +47,7 @@ def _plus_recente(a, b):
     return n(a) > n(b)
 
 
-def _installer(log):
+def _installer(log, avant=None):
     log("Mise à jour : téléchargement de GitHub (" + BRANCHE + ")")
     ETAT["etape"] = "téléchargement"
     with _ouvrir(URL_ZIP, 120) as r: data = r.read(80_000_000)
@@ -69,6 +69,20 @@ def _installer(log):
         rel = m[len(prefixe):]
         if rel.split("/")[0] in EXCLUS: continue
         dest = tmp / rel; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(z.read(m))
+    # essai complet de la nouvelle version AVANT de toucher au logiciel installé (modules + migrations sur une copie de la base)
+    ETAT["etape"] = "essai de la version " + nouvelle
+    try:
+        import controle, stockdb
+        ok, msg = controle.essai(tmp, stockdb.DB_PATH)
+    except ImportError: ok, msg = True, "ok"
+    if not ok:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise RuntimeError(f"version {nouvelle} refusée, rien n'a été changé : {msg}")
+    if avant:
+        ETAT["etape"] = "sauvegarde avant mise à jour"
+        try: avant()
+        except Exception as e: log("Sauvegarde avant mise à jour impossible : " + str(e))
+    ETAT["etape"] = "installation " + nouvelle
     # copie en deux temps : d'abord tout sauf les .py, puis les .py + VERSION (le serveur redémarre dès qu'ils changent)
     fichiers = sorted(p for p in tmp.rglob("*") if p.is_file())
     tardifs = [p for p in fichiers if p.suffix == ".py" or p.name == "VERSION"]
@@ -81,7 +95,7 @@ def _installer(log):
     return nouvelle
 
 
-def lancer(log):
+def lancer(log, avant=None):
     """Démarre la mise à jour en arrière-plan. Retourne l'état immédiatement."""
     with _LOCK:
         if ETAT["en_cours"]: return dict(ETAT)
@@ -89,7 +103,7 @@ def lancer(log):
 
     def run():
         try:
-            v = _installer(log); ETAT["fin"] = v
+            v = _installer(log, avant); ETAT["fin"] = v
         except Exception as e:
             ETAT["erreur"] = str(e)[:300]; log("ÉCHEC mise à jour : " + str(e))
         finally: ETAT["en_cours"] = False
@@ -97,7 +111,7 @@ def lancer(log):
     return dict(ETAT)
 
 
-def boucle_auto(log, heure=4):
+def boucle_auto(log, heure=4, avant=None):
     """Chaque nuit à `heure` h : si GitHub publie une version plus récente, l'installe tout seul."""
     time.sleep(60)
     fait = None
@@ -108,7 +122,7 @@ def boucle_auto(log, heure=4):
                 fait = n.date()
                 v = version_disponible()
                 if v and _plus_recente(v, version_locale()):
-                    log(f"Mise à jour automatique : {version_locale()} -> {v}"); lancer(log)
+                    log(f"Mise à jour automatique : {version_locale()} -> {v}"); lancer(log, avant)
         except Exception: pass
         time.sleep(600)
 
