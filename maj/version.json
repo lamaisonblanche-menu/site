@@ -1,11 +1,11 @@
 {
- "version": "3.9.0",
- "date": "2026-11-25T21:09:36.031Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.1",
+ "date": "2026-11-25T21:15:07.526Z",
+ "notes": "Bons de cuisine plus fiables : nouvel essai automatique, plus de bons perdus à la fermeture, imprimantes en parallèle",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "5c0f9e710d6f59bb59980444f3dc58886fc564a0a2d8a1d534d3296be2c67da8"
+   "sha256": "b43b810226c9625fdb0d7aad91c019a8423b40c4a3d7a80562c3725ee7df7919"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "991eddfe6b0e6eb60c1bdd4be74c21be92367e2fcd7ee2b2b0cdb05d6ed7406f"
+   "sha256": "b511ef596a2d829a2d7cd12181cce1a5c34ecf08f51f00dbd57ab685f0efbad5"
   },
   {
    "chemin": "suivi.js",

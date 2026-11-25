@@ -635,7 +635,7 @@ function imprimantesWindows() {
 // « Transmis » = l'imprimante réseau a reçu les données ; le papier n'est pas garanti (voir Diagnostic → état).
 // Les impressions en échec gardent leurs données pour une réimpression ciblée, une seule fois.
 let impressionsEnCours = 0;
-function imprimer(poste, doc) {
+function imprimer(poste, doc, opts) {
   impressionsEnCours++;
   const p = db.config.imprimantes[poste];
   if (!Array.isArray(db.impressions)) db.impressions = [];
@@ -643,6 +643,8 @@ function imprimer(poste, doc) {
   const lignesDoc = doc.txt.filter(x => x && x.trim() && x !== '[LOGO]'), cle = lignesDoc.find(x => /TABLE|EMPORTER|COMPTOIR|Ticket|TICKET|RASE|RAPPORT|ANNULATION|RÉCLAME|ADDITION/.test(x));
   const titre = [lignesDoc[0], cle && cle !== lignesDoc[0] ? cle : ''].filter(Boolean).map(x => x.trim()).join(' · ').slice(0, 80);
   const rec = { id: 'I' + db.seq.impression, ts: now(), poste, imprimante: p ? p.nom : poste, titre, etat: 'en_cours' };
+  if (opts && opts.auto) rec.auto = true;
+  if (opts && opts.cmd) rec.cmd = opts.cmd;
   db.impressions.push(rec);
   if (db.impressions.length > 600) db.impressions.splice(0, 100);
   return imprimerBrut(poste, doc).then(r => {
@@ -654,7 +656,7 @@ function imprimer(poste, doc) {
   }, e => { rec.etat = 'echec'; rec.erreur = e.message; rec.data = doc.buf().toString('base64'); return { ok: false, erreur: e.message }; })
     .finally(() => { impressionsEnCours--; save(); });
 }
-function impressionsEnEchec() { return (db.impressions || []).filter(x => x.etat === 'echec' && !x.reimprime && !x.ignore && x.ts > now() - 864e5); }
+function impressionsEnEchec() { return (db.impressions || []).filter(x => x.etat === 'echec' && !x.auto && !x.reimprime && !x.ignore && x.ts > now() - 864e5); }
 function imprimerBrut(poste, doc) {
   const p = db.config.imprimantes[poste];
   if (p && p.type === 'usb' && p.windows) return imprimerUSB(p, doc.buf());
@@ -667,6 +669,26 @@ function imprimerBrut(poste, doc) {
   return r;
 }
 const filesReseau = {};
+// 3.9.1 : un bon de cuisine/bar/asiatique en échec est réessayé tout seul toutes les 20 s pendant 10 min,
+// avec « BON EN RETARD » en haut. Après 10 min, il reste dans les alertes pour une réimpression à la main.
+let reessaiBons = false;
+async function reessayerBons() {
+  if (reessaiBons) return; reessaiBons = true;
+  try {
+    for (const rec of impressionsEnEchec()) {
+      if (rec.poste === 'ticket' || !rec.data || rec.ts < now() - 10 * 60000) continue;
+      const p = db.config.imprimantes[rec.poste]; if (!p || !p.ip) continue;
+      rec.reimprime = { ts: now(), par: 'automatique' };
+      const entete = Buffer.from('\x1b@\x1ba\x01\x1bE\x01\x1d!\x11BON EN RETARD\n\x1d!\x00Envoye a ' + heure(rec.ts) + '\n\x1bE\x00\x1ba\x00\n', 'latin1');
+      const buf = Buffer.concat([entete, Buffer.from(rec.data, 'base64')]);
+      const doc = { txt: ['(auto) ' + rec.titre], buf: () => buf, texte: () => '(auto) ' + rec.titre + '\n' };
+      const r = await imprimer(rec.poste, doc, { auto: true });
+      if (r.ok) { delete rec.data; journal(null, 'réimpression automatique', rec.imprimante + ' : ' + rec.titre); broadcast(); }
+      else delete rec.reimprime;
+    }
+  } catch (e) { console.error(e); } finally { reessaiBons = false; }
+}
+setInterval(reessayerBons, 20000);
 // 3.8.0 : état réel d'une imprimante réseau (commandes ESC/POS DLE EOT 1 et 4). Si l'imprimante ne répond pas
 // à ces questions, l'état est « inconnu » : on ne l'annonce jamais « OK » sans réponse.
 function etatImprimanteReseau(p) {
@@ -689,18 +711,33 @@ function etatImprimanteReseau(p) {
   });
 }
 function imprimerReseau(p, poste, doc) {
-  return new Promise((resolve) => {
-    if (!p || !p.ip) {
-      const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
-      fs.writeFileSync(f, doc.texte(), 'utf8');
-      return resolve({ ok: true, simule: true });
-    }
+  if (!p || !p.ip) {
+    const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
+    fs.writeFileSync(f, doc.texte(), 'utf8');
+    return Promise.resolve({ ok: true, simule: true });
+  }
+  // 3.9.1 : si l'imprimante n'a pas pu être jointe (rien n'a été envoyé), on réessaie 2 fois tout seul (après 1,5 s puis 4 s).
+  // Aucun risque de bon en double : on ne réessaie que si la connexion n'a jamais été établie.
+  const buf = doc.buf();
+  const essai = n => essaiReseau(p, buf).then(r => (r.ok || r.connecte || n >= 2) ? r : new Promise(ok => setTimeout(ok, n ? 4000 : 1500)).then(() => essai(n + 1)));
+  return essai(0).then(({ connecte, ...r }) => r);
+}
+function essaiReseau(p, buf) {
+  return new Promise(resolve => {
     const sock = net.connect({ host: p.ip, port: +p.port || 9100 });
-    let fini = false;
-    const fin = (r) => { if (fini) return; fini = true; try { sock.destroy(); } catch (e) {} resolve(r); };
-    sock.setTimeout(5000, () => fin({ ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') ne répond pas' }));
-    sock.on('error', (e) => fin({ ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') : ' + e.code }));
-    sock.on('connect', () => sock.end(doc.buf(), () => setTimeout(() => fin({ ok: true }), 200)));
+    let fini = false, connecte = false, ecrit = false, attente = null;
+    const fin = r => { if (fini) return; fini = true; clearTimeout(attente); try { sock.destroy(); } catch (e) {} resolve({ ...r, connecte }); };
+    // 3.9.1 : on lit (et jette) ce que l'imprimante renvoie. Avant, ces octets restaient non lus et la fermeture brutale
+    // de la connexion 200 ms après l'envoi (RST) pouvait faire jeter le bon par l'imprimante : bon « transmis » mais jamais sorti.
+    sock.on('data', () => {});
+    sock.setTimeout(5000, () => fin(ecrit ? { ok: true } : { ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') ne répond pas' }));
+    sock.on('error', e => fin(ecrit ? { ok: true } : { ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') : ' + e.code }));
+    sock.on('connect', () => {
+      connecte = true;
+      sock.end(buf, () => { ecrit = true; attente = setTimeout(() => fin({ ok: true }), 2000); });
+    });
+    // l'imprimante ferme elle-même la connexion quand elle a tout reçu : c'est la fin propre
+    sock.on('close', () => fin(ecrit ? { ok: true } : { ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') : connexion coupée pendant l\'envoi' }));
   });
 }
 const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -1489,8 +1526,10 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
   save();
   if (opt.durable) saveNow();
   const erreurs = [], echecs = [];
-  for (const { poste, doc } of bonsAImprimer) {
-    const r = await imprimer(poste, doc);
+  // 3.9.1 : toutes les imprimantes en même temps (une imprimante lente ou éteinte ne retarde plus les bons des autres)
+  const resultats = await Promise.all(bonsAImprimer.map(({ poste, doc }) => imprimer(poste, doc, { cmd: c.id })));
+  for (let i = 0; i < bonsAImprimer.length; i++) {
+    const { poste } = bonsAImprimer[i], r = resultats[i];
     if (r.simule && opt.signalerSimulation) {
       erreurs.push('Impression simulée pour ' + poste + ' : configurez une imprimante');
       echecs.push(poste);
@@ -1696,8 +1735,10 @@ const routes = {
     for (const poste of postesBons()) {
       const ls = c.lignes.filter(l => !l.annule && postesDe(l.pid).includes(poste));
       if (!ls.length) continue;
-      const r = await imprimer(poste, bon(poste, c, ls, '** RÉIMPRESSION **'));
+      const r = await imprimer(poste, bon(poste, c, ls, '** RÉIMPRESSION **'), { cmd: c.id });
       if (!r.ok) erreurs.push(r.erreur);
+      // 3.9.1 : les bons en échec de cette table sont réglés par cette réimpression (pas de double bon automatique)
+      else for (const x of impressionsEnEchec()) if (x.cmd === c.id && x.poste === poste) { x.reimprime = { ts: now(), par: u.nom }; delete x.data; }
     }
     return { erreurs };
   },

@@ -263,3 +263,9 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.9.0 (25/11/2026, Claude) — demandes de Manil
 - Sortie de caisse : un caissier peut la supprimer sans code du responsable (fenêtre « Oui, supprimer »). Le journal garde qui l'a supprimée et qui l'avait saisie. Un serveur ne peut pas.
 - Ruptures du jour obligatoires : le premier caissier connecté de la journée (à partir de 5 h, `jourRuptures()`) voit l'écran `viewRupturesJour` et ne peut rien faire (API → 423 sauf `LIBRE_RUPTURES`) avant `POST /api/ruptures/valider` (`db.rupturesJour` = {date, par, ts, epuises, limites}). Le responsable n'est pas bloqué. À l'installation, la journée en cours est considérée comme faite (pas de blocage en plein service).
+
+### 3.9.1 (25/11/2026, Claude) — bons qui n'arrivent pas ou arrivent en retard
+- `essaiReseau` : on lit et jette ce que renvoie l'imprimante, et on attend qu'elle ferme la connexion (2 s max) au lieu de tout couper 200 ms après l'envoi. Avant : octets d'état non lus + fermeture brutale (RST) → l'imprimante pouvait jeter le bon alors qu'il était noté « transmis ».
+- Imprimante injoignable (connexion jamais établie) : 2 nouveaux essais automatiques (1,5 s puis 4 s). Jamais de nouvel essai si la connexion a été établie (pas de doublon).
+- « Envoyer » imprime sur toutes les imprimantes en même temps (`Promise.all`) : une imprimante en panne ne retarde plus les autres.
+- `reessayerBons()` toutes les 20 s : un bon (hors ticket) en échec depuis moins de 10 min est réimprimé seul avec « BON EN RETARD / Envoyé à HH:MM » en tête (`rec.auto` pour la copie, exclue des alertes). Après 10 min, il reste dans les alertes pour la main. `rec.cmd` = id de la commande ; « Réimprimer les bons » d'une table règle ses échecs (pas de double bon).
