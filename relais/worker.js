@@ -121,7 +121,7 @@ export class Relais {
     const e = await this.charger();
     if (!e.carte) return json({ erreur: 'Carte indisponible pour le moment' }, 503);
     const { essais, ...carte } = e.carte;
-    return json({ ...carte, positionRequise: true, suiviSuggestions: true, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
+    return json({ ...carte, positionRequise: false, suiviSuggestions: true, service: e.service, caisseEnLigne: this.enLigne() }, 200, { 'Cache-Control': 'private, max-age=5' });
   }
   async suggestion(req) {
     const b = await req.json().catch(() => ({})), e = await this.charger();
@@ -209,8 +209,8 @@ export class Relais {
     if (!this.enLigne()) return json({ erreur: 'La commande en ligne est indisponible pour le moment. Un serveur prendra votre commande.' }, 503);
     const type = b.type === 'addition' ? 'addition' : 'commande';
     if (type === 'commande' && e.service && !e.service.ouvert) return json({ erreur: e.service.message || 'Les commandes sont fermées pour le moment.' }, 409);
-    const erreurPosition = verifierPosition(b.position);
-    if (erreurPosition) return json({ erreur: erreurPosition }, 403);
+    // Décision du gérant : ni Wi-Fi ni géolocalisation imposés au client (le contrôle de position de 3.6.1 est retiré).
+    // verifierPosition() reste disponible si un jour on veut le réactiver.
     const maint = Date.now();
     if (type === 'addition' && e.additions?.[b.t] && maint - e.additions[b.t] < 60000) {
       return json({ erreur: 'Une addition a déjà été demandée pour cette table. Patientez une minute.' }, 429);

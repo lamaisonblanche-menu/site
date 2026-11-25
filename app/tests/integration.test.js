@@ -80,8 +80,8 @@ test('Parcours HTTP complet isolé : connexion, commande, supplément, encaissem
     assert.equal((await api('/api/maj/installer', {})).status, 200);
     assert.equal((await api('/api/admin/users')).status, 403);
     token = serveur.data.token;
-    assert.equal((await api('/api/qr/accepter', { id: 'exemple' })).status, 403);
-    assert.equal((await api('/api/qr/refuser', { id: 'exemple' })).status, 403);
+    assert.equal((await api('/api/qr/accepter', { id: 'exemple' })).status, 404); // 3.7.8 : un serveur peut valider (demande introuvable ici)
+    assert.equal((await api('/api/qr/refuser', { id: 'exemple' })).status, 404);
     token = responsable;
     const badQty = await api('/api/commande/envoyer', { id, lignes: [{ pid: product.id, qte: 100 }] });
     assert.equal(badQty.status, 400);

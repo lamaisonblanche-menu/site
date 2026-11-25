@@ -1,11 +1,11 @@
 {
- "version": "3.7.7",
- "date": "2026-11-24T15:39:10.846Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.7.8",
+ "date": "2026-11-25T07:36:25.712Z",
+ "notes": "Corrections : ruptures gardées en enregistrant la carte, commandes QR validables par les serveurs, regroupement de tables sans bons en double, rase automatique même avec une table oubliée ou un PC éteint, articles gardés après rechargement de l'écran, impressions une par une",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "d0c6e5ceb9efa6e1d67eededf866d8e540b780fba2c94c2892f9161f5e0a9651"
+   "sha256": "05785661211541aea0f1a50c5105320c93e34767c5158392da0f50bf9c13c4b4"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "a288bd83fced1cf4876a52f05f97a44bfdc7fd807298537bdeff6d19c20deaf4"
+   "sha256": "42831e452df80807ae10425ef5c814fa3dfcc892b0bedc353e77e6abc88a78d3"
   },
   {
    "chemin": "public/index.html",
@@ -49,7 +49,7 @@
   },
   {
    "chemin": "qr.js",
-   "sha256": "f39c64c8f018891d323df6b055e43bcd7fb0e6fb240525d7c45e675f9f6342af"
+   "sha256": "afaabfb7fbbcd83ceff8b4d22661b47e1d90a66594fc365f368ce8a3b1b91b72"
   },
   {
    "chemin": "seed-menu.json",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "e613f6f0a4b8a63dbfe3d9101291d6c15cb288771517581e3fd2b4625ed0982a"
+   "sha256": "37deb83dbfe16b4e02f79a1cfff2eff5863c7e42770e561ff66fb7f1c6f07f88"
   },
   {
    "chemin": "suivi.js",

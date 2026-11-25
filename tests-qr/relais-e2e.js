@@ -6,7 +6,7 @@ const ok=(c,m)=>{console.log((c?'  OK  ':'  ÉCHEC ')+m);if(!c)process.exitCode=
 const api=async(p,b,t)=>{const r=await fetch('http://localhost:'+PORT+p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json','X-Token':t||''},body:b?JSON.stringify(b):undefined});const j=await r.json();if(!r.ok)throw new Error(j.erreur);return j;};
 const tel=async(p,b)=>{const r=await fetch(REL+p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json',Origin:ORI},body:b?JSON.stringify(b):undefined});return {st:r.status,cors:r.headers.get('access-control-allow-origin'),j:await r.json().catch(()=>null)};};
 (async()=>{
-  const srv=spawn('node',['/home/claude/site-caisse/app/core/server.js'],{env:{...process.env,CAISSE_DATA:DATA,PORT}});
+  const srv=spawn('node',[require('path').join(__dirname, '..', 'app/core/server.js')],{env:{...process.env,CAISSE_DATA:DATA,PORT}});
   await wait(1500);
   const adm=(await api('/api/login',{pin:'1234'})).token, s=(await api('/api/login',{pin:'2000'})).token;
   let r=await fetch(REL+'/caisse/sync',{method:'POST',headers:{Authorization:'Bearer faux'},body:'{}'});ok(r.status===401,'mauvaise clé refusée');

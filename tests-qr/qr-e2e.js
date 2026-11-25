@@ -16,7 +16,7 @@ http.createServer((req, res) => {
   });
 }).listen(RP);
 let srv;
-function start() { srv = spawn('node', ['app/core/server.js'], { cwd: '/home/claude/site-caisse', env: { ...process.env, CAISSE_DATA: DATA, PORT } }); srv.stdout.on('data', () => {}); srv.stderr.on('data', d => process.stderr.write('[srv] ' + d)); return wait(1500); }
+function start() { srv = spawn('node', ['app/core/server.js'], { cwd: require('path').join(__dirname, '..'), env: { ...process.env, CAISSE_DATA: DATA, PORT } }); srv.stdout.on('data', () => {}); srv.stderr.on('data', d => process.stderr.write('[srv] ' + d)); return wait(1500); }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function api(p, body, tok) { const r = await fetch('http://localhost:' + PORT + p, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Token': tok || '' }, body: body ? JSON.stringify(body) : undefined }); const j = await r.json(); if (!r.ok) throw new Error(r.status + ' ' + j.erreur); return j; }
 const ok = (c, m) => { console.log((c ? '  OK  ' : '  ÉCHEC ') + m); if (!c) process.exitCode = 1; };

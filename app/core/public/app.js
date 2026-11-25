@@ -199,7 +199,14 @@ function logout(expired) {
   S.envoiOperation = null;
   closeModal(); render();
 }
-const brouillonsVerrouilles = new Map();
+// 3.7.8 : les articles pas encore envoyés sont gardés sur l'écran même s'il se recharge (mise à jour, F5) :
+// avant, ils n'étaient qu'en mémoire et disparaissaient sans prévenir. Gardés 12 h au plus.
+const brouillonsVerrouilles = (() => {
+  const CLE = 'mb_brouillons', m = new Map();
+  try { for (const [k, v] of Object.entries(JSON.parse(localStorage.getItem(CLE) || '{}'))) if (v && Date.now() - (v.ts || 0) < 12 * 3600000) m.set(k, v); } catch (e) {}
+  const ecrire = () => { try { localStorage.setItem(CLE, JSON.stringify(Object.fromEntries(m))); } catch (e) {} };
+  return { get: k => m.get(k), set: (k, v) => { m.set(k, { ...v, ts: Date.now() }); ecrire(); }, delete: k => { m.delete(k); ecrire(); } };
+})();
 let lastTouch = Date.now();
 function touch() { lastTouch = Date.now(); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, touch, true));
@@ -260,7 +267,7 @@ function rail() {
 // ------------------------------------------------------------ Plans de salle
 function cmdsSalle(id) { return S.etat.commandes.filter(c => c.salle === id); }
 function totalCmd(c) { return c.lignes.reduce((s, l) => s + (l.annule || l.offert || l.paye ? 0 : l.qte * l.prix), 0); }
-const enAttente = c => c.lignes.filter(l => !l.annule && !l.paye && l.suite > (c.suite || 0));
+const enAttente = c => c.lignes.filter(l => !l.annule && !l.paye && !l.lance && l.suite > (c.suite || 0));
 const dureeTxt = ts => { const m = Math.round((Date.now() - ts) / 60000); return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0'); };
 
 function planHtml(salle, edit) {
@@ -373,7 +380,7 @@ function viewCommande() {
   const att = enAttente(c);
   const blocs = suites.map(s => {
     const xs = items.filter(x => x.s === s);
-    const attente = s > (c.suite || 0) && s > 0 && xs.some(x => x.sent && !x.l.annule && !x.l.paye);
+    const attente = s > (c.suite || 0) && s > 0 && xs.some(x => x.sent && !x.l.annule && !x.l.paye && !x.l.lance);
     return `${suites.length > 1 || attente ? `<div class="ts ${attente ? 'att' : ''}">${SUITE_NOM(s)}${attente ? ' · en attente' : ''}</div>` : ''}${xs.map(x => x.sent ? ligneS(x.l) : ligneD(x.d, x.i)).join('')}`;
   }).join('');
   const totDraft = S.draft.reduce((s, d) => s + d.qte * prixDraft(d), 0);
@@ -623,7 +630,10 @@ function admRapports() {
 }
 const postes = () => Object.entries((adm.cfg || S.etat.config).imprimantes).filter(([k]) => k !== 'ticket');
 function admCarte() {
-  if (!adm.carte) adm.carte = { categories: JSON.parse(JSON.stringify(S.etat.categories)), produits: JSON.parse(JSON.stringify(S.etat.produits)), options: JSON.parse(JSON.stringify(S.etat.options || [])) };
+  // 3.7.8 : « base » = la carte telle qu'elle était à l'ouverture de l'onglet. Le serveur garde ce qui a changé entre-temps
+  // (rupture mise par la cuisine, plat ajouté par une mise à jour) quand le responsable n'y a pas touché.
+  if (!adm.carte) adm.carte = { categories: JSON.parse(JSON.stringify(S.etat.categories)), produits: JSON.parse(JSON.stringify(S.etat.produits)), options: JSON.parse(JSON.stringify(S.etat.options || [])),
+    base: { produits: Object.fromEntries(S.etat.produits.map(p => [p.id, { stock: p.stock === undefined ? null : p.stock, prix: p.prix }])), categories: S.etat.categories.map(c => c.id) } };
   const C = adm.carte;
   const optHtml = `<div class="panel"><h3>Options des plats <span class="muted" style="font-size:14px;font-family:var(--f-b)">cuisson, accompagnement, suppléments payants…</span><button class="btn sm" onclick="A.addOpt()">+ Groupe d’options</button></h3>
     ${C.options.map((g, gi) => `<div class="og"><div class="row"><input class="hin" value="${esc(g.nom)}" onchange="A.oset(${gi},'nom',this.value)">
@@ -1110,7 +1120,7 @@ const A = window.A = {
     A.tt = t => act(async () => {
       const occupee = S.etat.commandes.some(k => k.salle === salle && k.table === t && k.id !== c.id);
       if (occupee && !confirm('Regrouper ces deux tables ?')) return;
-      const r = await api('/api/commande/modifier', { id: c.id, salle, table: t, confirmerFusion: occupee }); closeModal(); S.cmdId = r.id; S.salle = salle; toast('Table transférée ✓'); refresh(); });
+      const r = await api('/api/commande/modifier', { id: c.id, salle, table: t, confirmerFusion: occupee }); closeModal(); S.cmdId = r.id; S.salle = salle; if (r.erreurs && r.erreurs.length) showErrs(r); else toast('Table transférée ✓'); refresh(); });
     draw();
   },
   couverts() { const c = cmd(); let n = c.couverts; const draw = () => modal(mh('Couverts') + `<div class="qty"><button onclick="A.cv(-1)">−</button><span>${n}</span><button onclick="A.cv(1)">+</button></div><div class="mf"><button class="btn dark" onclick="A.ok()">OK</button></div>`); A.cv = d => { n = Math.max(1, n + d); draw(); }; A.ok = () => act(async () => { await api('/api/commande/modifier', { id: c.id, couverts: n }); closeModal(); refresh(); }); draw(); },
@@ -1682,7 +1692,7 @@ function qrSurveiller() {
   S.qr.vus = ids;
 }
 function qrWidget() {
-  if (!peut('caissier')) return '';
+  if (!peut('serveur')) return '';
   const q = S.etat && S.etat.qr;
   if (!q || !q.actif || S.view === 'login') return '';
   const att = q.attente.filter(x => x.statut === 'attente' || x.statut === 'traitement');

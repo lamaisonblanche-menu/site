@@ -442,8 +442,21 @@ if (!db.carte8) {
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 150);
+  saveTimer = setTimeout(sauverSansPlanter, 150);
   broadcast();
+}
+// 3.7.8 : une sauvegarde bloquée un instant (antivirus, indexation Windows) ne fait plus planter la caisse :
+// on réessaie 2 s plus tard. Avant, l'erreur arrêtait le serveur en plein service.
+function sauverSansPlanter() {
+  try { saveNow(); } catch (e) { console.error('Sauvegarde impossible, nouvel essai dans 2 s : ' + e.message); clearTimeout(saveTimer); saveTimer = setTimeout(sauverSansPlanter, 2000); }
+}
+function renommer(de, vers) {
+  for (let i = 0; ; i++) {
+    try { return fs.renameSync(de, vers); } catch (e) {
+      if (i >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      const fin = Date.now() + 60 * (i + 1); while (Date.now() < fin) { /* courte attente */ }
+    }
+  }
 }
 function saveNow() {
   const limite = Date.now() - 60 * 864e5;
@@ -452,7 +465,7 @@ function saveNow() {
   const data = JSON.stringify(db);
   const fd = fs.openSync(tmp, 'w');
   try { fs.writeFileSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-  fs.renameSync(tmp, DB_FILE);
+  renommer(tmp, DB_FILE);
   const b = path.join(BACKUPS, 'caisse-' + dateLocale(Date.now()) + '.json');
   if (!fs.existsSync(b)) {
     fs.copyFileSync(DB_FILE, b);
@@ -607,6 +620,16 @@ function imprimantesWindows() {
 function imprimer(poste, doc) {
   const p = db.config.imprimantes[poste];
   if (p && p.type === 'usb' && p.windows) return imprimerUSB(p, doc.buf());
+  if (!p || !p.ip) return imprimerReseau(p, poste, doc);
+  // 3.7.8 : une seule impression à la fois par imprimante réseau. Beaucoup d'imprimantes de bons n'acceptent qu'une
+  // connexion : deux écrans qui envoyaient en même temps au même poste pouvaient faire échouer un des deux bons.
+  const cle = p.ip + ':' + (+p.port || 9100);
+  const r = (filesReseau[cle] || Promise.resolve()).then(() => imprimerReseau(p, poste, doc));
+  filesReseau[cle] = r.then(() => new Promise(ok => setTimeout(ok, 150)), () => {});
+  return r;
+}
+const filesReseau = {};
+function imprimerReseau(p, poste, doc) {
   return new Promise((resolve) => {
     if (!p || !p.ip) {
       const f = path.join(PRINTS, new Date().toISOString().replace(/[:.]/g, '-') + '-' + poste + '.txt');
@@ -674,14 +697,14 @@ function bon(poste, cmd, lignes, titre, infos) {
   d.line();
   const suites = [...new Set(lignes.map(l => l.suite || 0))].sort((a, b) => a - b);
   for (const s of suites) {
-    const attente = s > (cmd.suite || 0) && s > 0;
+    const attente = s > (cmd.suite || 0) && s > 0 && lignes.some(l => (l.suite || 0) === s && !l.lance);
     if (suites.length > 1 || attente) d.center(1).bold(1).t('--- ' + SUITES[s].toUpperCase() + (attente ? ' : ATTENDRE LA RÉCLAME' : '') + ' ---').bold(0).center(0);
     for (const l of lignes.filter(l => (l.suite || 0) === s)) lignesBon(d, l);
   }
   // commande commune asiatique + gastro/brunch : la partie de l'autre cuisine, pour information
   for (const [autre, ls] of Object.entries(infos || {})) {
     d.line('-').center(1).bold(1).t('POUR INFO - FAIT PAR ' + ((db.config.imprimantes[autre] || {}).nom || autre).toUpperCase()).bold(0).center(0);
-    for (const l of ls) { d.t(l.qte + '  ' + l.nom + (l.suite > (cmd.suite || 0) ? ' (' + SUITES[l.suite] + ', attendre)' : '')); for (const o of l.opts || []) d.t('    + ' + optBon(o)); }
+    for (const l of ls) { d.t(l.qte + '  ' + l.nom + (l.suite > (cmd.suite || 0) && !l.lance ? ' (' + SUITES[l.suite] + ', attendre)' : '')); for (const o of l.opts || []) d.t('    + ' + optBon(o)); }
   }
   d.line();
   d.cut();
@@ -870,7 +893,8 @@ function envoyerMail(dest, sujet, texte) {
 // la rase au format de l'appli de gestion (collection « caisse »)
 function raseAppli(j, r, rase) {
   return {
-    id: 'J' + j.date, date: j.date, source: 'caisse', ca: r.ca, especes: r.especes, tpe: r.tpe, cheque: r.cheque, societe: r.societe, nbTickets: r.nbTickets, couverts: r.couverts,
+    // 3.7.8 : deux rases le même jour ne s'écrasent plus dans l'appli de gestion (la 2e reçoit le numéro de journée)
+    id: 'J' + j.date + (db.jours.some(x => x !== j && x.date === j.date && x.rase && x.n < j.n) ? '-' + j.n : ''), date: j.date, source: 'caisse', ca: r.ca, especes: r.especes, tpe: r.tpe, cheque: r.cheque, societe: r.societe, nbTickets: r.nbTickets, couverts: r.couverts,
     theorique: rase.attendu, compte: rase.compte, ecart: rase.ecart, caissier: rase.par,
     sorties: r.sorties.map(s => ({ montant: s.montant, note: [s.motif, s.detail].filter(Boolean).join(' - ') + (s.par ? ' (' + s.par + ')' : ''), type: /influen/i.test(s.motif) ? 'influenceuse' : 'depense', pj: null })),
     totalSorties: r.totalSorties, explication: rase.commentaire || '', parQui: rase.completePar || '', complete: !!(rase.ecart && rase.completePar),
@@ -966,11 +990,16 @@ async function envoyerAttente() {
   envoiEnCours = true;
   try {
     db.mailsAttente = db.mailsAttente.filter(x => x.important || now() - x.ts < 2 * 864e5);
-    while (db.mailsAttente.length) {
+    // 3.7.8 : un mail refusé (adresse, contenu) passe en fin de file au lieu de bloquer tous les suivants ;
+    // sans internet, on s'arrête au premier échec et on réessaie dans 5 min.
+    let essais = db.mailsAttente.length;
+    while (db.mailsAttente.length && essais-- > 0) {
       const x = db.mailsAttente[0];
       const r = await envoyerMail(x.dest, x.sujet, x.texte);
-      if (!r.ok) break;
-      db.mailsAttente.shift(); save();
+      if (r.ok) { db.mailsAttente.shift(); save(); continue; }
+      if (/internet|réponse du serveur mail|mot de passe/i.test(r.erreur || '')) break;
+      x.echecs = (x.echecs || 0) + 1; x.erreur = r.erreur;
+      db.mailsAttente.push(db.mailsAttente.shift()); save();
     }
   } catch (e) {} finally { envoiEnCours = false; }
 }
@@ -988,7 +1017,9 @@ async function verifierRaseAuto() {
   // 3.7.7 : la rase automatique ne se fait que la nuit (jusqu'à 6 h après l'heure réglée, donc avant l'ouverture).
   // Avant : si le PC était éteint à 2 h ou si une table restait ouverte, elle se déclenchait en plein service le lendemain
   // et mélangeait les ventes du matin avec la journée de la veille. Hors de cette fenêtre, la rase se fait à la main.
-  if (now() > debut + 6 * 3600000) return;
+  // 3.7.8 : plus de limite de 6 h. Si le PC était éteint à l'heure de la rase, elle se fait dès qu'il redémarre,
+  // tant qu'aucun ticket n'a été encaissé depuis l'heure de la rase (sinon les ventes du jour seraient mélangées : rase à la main).
+  if (db.tickets.some(t => t.jour === j.id && t.ts > debut)) return;
   const echeance = debut + raseAutoReport * 1800000;
   if (now() < echeance) {
     if (echeance - now() <= 300000 && raseAutoAverti !== String(echeance)) {
@@ -999,7 +1030,11 @@ async function verifierRaseAuto() {
     return;
   }
   const r = resumeJour(j);
-  if (r.tablesOuvertes) {
+  // 3.7.8 : une table oubliée ne bloque plus la rase toute la nuit. Elle est reportée de 30 min en 30 min jusqu'à 3 h
+  // après l'heure réglée (5 h pour une rase à 2 h), puis elle se fait quand même : la table reste ouverte et sera encaissée
+  // sur la journée suivante (comme une rase « forcée » à la main). Avant, la rase n'avait jamais lieu.
+  const forcer = r.tablesOuvertes && now() >= debut + 3 * 3600000;
+  if (r.tablesOuvertes && !forcer) {
     raseAutoReport++;
     journal(null, 'rase automatique reportée', r.tablesOuvertes + ' table(s) ouvertes ; report 30 minutes');
     save();
@@ -1008,7 +1043,7 @@ async function verifierRaseAuto() {
   raseAutoBusy = true;
   try {
     const z = { ts: now(), par: 'Rase automatique', automatique: true, compte: null,
-      attendu: r.aRemettre, ecart: null, completePar: '', commentaire: 'Comptage physique à effectuer',
+      attendu: r.aRemettre, ecart: null, completePar: '', commentaire: 'Comptage physique à effectuer' + (forcer ? ' — ' + r.tablesOuvertes + ' table(s) encore ouverte(s) (' + fmt(r.montantOuvert) + ' DA), à encaisser sur la journée suivante' : ''),
       ca: r.ca, especes: r.especes, cheque: r.cheque, tpe: r.tpe,
       societe: r.societe, sorties: r.totalSorties, nbTickets: r.nbTickets };
     j.rase = z; j.clos = now();
@@ -1035,7 +1070,7 @@ async function verifierRaseAuto() {
     }
     if (!db.mailsAttente.some(x => x.raseAuto === j.id)) j.mailEnvoye = now(); else j.mailErreur = 'Pas encore envoyée (internet ?) : elle partira toute seule';
     db.extinctionNuit = dateLocale(now());
-    journal(null, 'rase automatique', 'Sauvegarde validée, extinction ' + (cfg.extinction ? 'programmée' : 'désactivée'));
+    journal(null, 'rase automatique', 'Sauvegarde validée (le PC reste allumé)');
     saveNow();
     // Aucun arrêt de Windows après la rase automatique.
   } catch (e) {
@@ -1221,7 +1256,7 @@ function etatPublic(u) {
       if (!cfg.actif || !j || j.clos || j.rase) return null;
       const d = new Date(), [h, m] = String(cfg.heure || '02:00').split(':').map(Number);
       const base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
-      if (j.ouvert > base || now() > base + 6 * 3600000) return null;
+      if (j.ouvert > base || db.tickets.some(t => t.jour === j.id && t.ts > base)) return null;
       const ts = base + raseAutoReport * 1800000;
       return { ts, dansCinqMinutes: ts - now() <= 300000, report: raseAutoReport };
     })(),
@@ -1297,7 +1332,7 @@ async function envoyerLignes(c, lignes, u, opt = {}) {
   const suiteAvant = c.lignes.some(l => l.envoye);
   c.lignes.push(...nouvelles);
   // la première suite commandée part tout de suite, les suivantes attendent la réclame
-  const actives = c.lignes.filter(l => !l.annule && !l.paye && l.suite > 0).map(l => l.suite);
+  const actives = c.lignes.filter(l => !l.annule && !l.paye && !l.lance && l.suite > 0).map(l => l.suite);
   if (actives.length) c.suite = Math.max(c.suite || 0, Math.min(...actives));
   if (opt.couverts) c.couverts = +opt.couverts;
   creerBons(c, nouvelles);
@@ -1444,7 +1479,7 @@ const routes = {
   },
   'POST /api/commande/reclamer': async (b, u) => {
     const c = getCmd(b.id);
-    const att = c.lignes.filter(l => !l.annule && !l.paye && l.suite > (c.suite || 0));
+    const att = c.lignes.filter(l => !l.annule && !l.paye && !l.lance && l.suite > (c.suite || 0));
     if (!att.length) E('Rien en attente pour cette table');
     const s = Math.min(...att.map(l => l.suite));
     c.suite = s;
@@ -1556,7 +1591,7 @@ const routes = {
     save();
     return c;
   },
-  'POST /api/commande/modifier': (b, u) => {
+  'POST /api/commande/modifier': async (b, u) => {
     const c = getCmd(b.id);
     if (b.salle && b.table && !peut(u, 'caissier')) E('Seul un caissier peut transférer ou regrouper une table', 403);
     if (b.couverts) c.couverts = Math.max(1, +b.couverts);
@@ -1566,11 +1601,39 @@ const routes = {
       if (occ) {
         if (b.confirmerFusion !== true) E('La table est occupée. Confirmez le regroupement.', 409);
         // fusion des deux tables
+        // 3.7.8 : les suites des deux tables sont gardées. Avant, un plat déjà lancé sur la table regroupée repassait
+        // « en attente » (la table d'arrivée avait une suite plus petite) et la réclame le refaisait imprimer en cuisine.
+        const aLancer = [];
+        for (const l of c.lignes) {
+          if (l.annule || l.paye) continue;
+          const lanceeAvant = l.lance || (l.suite || 0) <= (c.suite || 0);
+          if (lanceeAvant && (l.suite || 0) > (occ.suite || 0)) l.lance = true;
+          if (!lanceeAvant && (l.suite || 0) <= (occ.suite || 0)) aLancer.push(l); // en attente ici, mais déjà réclamé sur l'autre table
+        }
         occ.lignes.push(...c.lignes); occ.couverts += c.couverts; c.statut = 'fusionnee'; c.lignes = []; c.fusionDans = occ.id;
         // 3.7.7 : les bons (écran cuisine, « prêt », réclame) suivent la table regroupée
         for (const bn of db.bons) if (bn.cmdId === c.id) { bn.cmdId = occ.id; bn.table = occ.table; bn.salle = occ.salle; }
         journal(u, 'fusion tables', c.table + ' -> ' + t);
-        save(); return occ;
+        if (aLancer.length) {
+          const ids = new Set(aLancer.map(l => l.id));
+          for (const bn of db.bons) if (bn.cmdId === occ.id && bn.etat === 'attente' && bn.lignes.some(x => ids.has(x.id))) { bn.etat = 'a_faire'; bn.ts = now(); bn.reclame = true; }
+        }
+        save();
+        if (aLancer.length) {
+          const erreurs = [];
+          for (const poste of postesBons()) {
+            const lp = aLancer.filter(l => postesDe(l.pid).includes(poste));
+            if (!lp.length) continue;
+            const d = new Doc();
+            d.center(1).size(2).bold(1).t('RÉCLAME').size(0).bold(0).center(0).line('=');
+            d.size(2).bold(1).t(titreCmd(occ)).size(0).bold(0).t('Tables regroupées   ' + heure(now())).line();
+            for (const l of lp) lignesBon(d, l);
+            d.line().cut();
+            const r = await imprimer(poste, d); if (!r.ok) erreurs.push(r.erreur);
+          }
+          if (erreurs.length) return { ...occ, erreurs };
+        }
+        return occ;
       }
       journal(u, 'transfert table', salleNom(c.salle) + ' ' + c.table + ' -> ' + salleNom(b.salle) + ' ' + t);
       c.salle = b.salle; c.table = t;
@@ -1929,6 +1992,24 @@ const routes = {
   'POST /api/admin/carte': (b, u) => {
     if (!peut(u, 'admin')) E('Réservé au responsable', 403);
     if (!Array.isArray(b.categories) || !Array.isArray(b.produits)) E('Données invalides');
+    // 3.7.8 : l'écran Carte envoie la carte copiée à son ouverture (« base »). Ce qui a changé depuis sur la caisse
+    // sans que le responsable y touche est gardé : rupture/stock mis par la cuisine, prix changé par une mise à jour,
+    // familles et articles ajoutés pendant ce temps. Avant, « Enregistrer » remettait en vente un plat épuisé.
+    const base = b.base && typeof b.base === 'object' ? b.base : null;
+    const avant = new Map(db.produits.map(p => [p.id, p]));
+    const categoriesAvant = db.categories.slice();
+    if (base && base.produits) {
+      for (const p of b.produits) {
+        const x = avant.get(p.id), o = base.produits[p.id];
+        if (!x || !o) continue;
+        const stockLu = p.stock === '' || p.stock === undefined ? null : p.stock;
+        if (String(stockLu) === String(o.stock)) p.stock = x.stock === undefined ? null : x.stock;
+        if (+p.prix === +o.prix) p.prix = x.prix;
+      }
+      const connusCat = new Set(base.categories || []);
+      for (const c of categoriesAvant) if (!connusCat.has(c.id) && !b.categories.some(k => k.id === c.id)) b.categories.push(c);
+      for (const x of avant.values()) if (!QR.estEssai(x.id) && !base.produits[x.id] && !b.produits.some(p => p.id === x.id)) b.produits.push(x);
+    }
     if (Array.isArray(b.options)) db.options = b.options.filter(g => g.nom && Array.isArray(g.choix)).map((g, i) => ({ id: g.id || ('o' + now() + i), nom: String(g.nom).slice(0, 30), obligatoire: !!g.obligatoire, multiple: !!g.multiple, choix: g.choix.filter(ch => ch.nom).map(ch => ({ nom: String(ch.nom).slice(0, 30), prix: Math.max(0, Math.round(+ch.prix || 0)) })) }));
     const gids = new Set(db.options.map(g => g.id));
     db.categories = b.categories.map((c, i) => ({ id: c.id || ('c' + now() + i), nom: String(c.nom), poste: postesBons().includes(c.poste) ? c.poste : postesBons()[0], couleur: /^#[0-9a-f]{6}$/i.test(c.couleur) ? c.couleur : '#efe3cc', suite: Math.max(0, Math.min(5, parseInt(c.suite, 10) || 0)), univers: String(c.univers || 'La carte').slice(0, 20), ordre: i }));

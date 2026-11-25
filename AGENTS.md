@@ -224,3 +224,16 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Rase automatique : seulement dans les 6 h qui suivent l'heure réglée (avant l'ouverture). Avant, si le PC était éteint à 2 h ou qu'une table restait ouverte, elle se déclenchait en plein service le lendemain et mettait les ventes du matin dans la journée de la veille.
 - Regroupement de tables : les bons (écran cuisine, « prêt », réclame) suivent la table regroupée (`fusionDans`).
 
+
+### 3.7.8 (25/11/2026, Claude) — analyse complète et corrections (demande de Manil : « corrige tout »)
+- Carte : l'écran envoie `base` (stock et prix de chaque article à l'ouverture de l'onglet). `POST /api/admin/carte` garde le stock/prix actuel quand le responsable n'y a pas touché, et garde les familles/articles ajoutés entre-temps. Avant, « Enregistrer » remettait en vente un plat mis en rupture par la cuisine.
+- Commandes QR : de nouveau visibles et validables par les serveurs et le maître d'hôtel (`peut(u, 'serveur')` dans qr.js, `qrWidget`) — demande initiale du gérant ; 3.7.4 les avait réservées aux caissiers.
+- Regroupement de tables : champ ligne `lance` (déjà lancée en cuisine sur l'ancienne table) ignoré par la réclame, `enAttente` et les suites actives ; une ligne en attente sur l'ancienne table mais déjà réclamée sur la table d'arrivée part tout de suite (bon « RÉCLAME — Tables regroupées »). Avant, la réclame réimprimait des plats déjà faits.
+- Rase automatique : plus de fenêtre de 6 h. Elle se fait dès le démarrage du PC s'il était éteint à l'heure réglée, tant qu'aucun ticket n'a été encaissé depuis cette heure. Une table oubliée la reporte de 30 min en 30 min jusqu'à +3 h, puis la rase se fait quand même (table laissée ouverte, encaissée sur la journée suivante, signalée dans le commentaire de la rase). Journal : « le PC reste allumé » (l'extinction reste désactivée, décision du gérant du 24/11).
+- Écrans : articles non envoyés gardés dans `localStorage` (`mb_brouillons`, 12 h) : ils survivent à un rechargement (mise à jour, F5) après la veille.
+- Impression réseau : une seule impression à la fois par imprimante (`filesReseau`, clé ip:port). Acceptation QR : `signalerSimulation` (une imprimante sans adresse n'est plus comptée « imprimée »).
+- Sauvegarde : `sauverSansPlanter()` (nouvel essai 2 s plus tard) et `renommer()` (réessais EPERM/EBUSY de Windows) : une sauvegarde bloquée ne fait plus planter le serveur.
+- Mails : un mail refusé passe en fin de file au lieu de bloquer les suivants. Rase envoyée à l'appli : identifiant `J<date>-<n>` pour une 2e rase le même jour (plus d'écrasement).
+- Relais (dépôt seulement, pas déployé) : contrôle de géolocalisation de 3.6.1 retiré (ni Wi-Fi ni géolocalisation imposés au client). Le Worker en ligne n'avait pas ce contrôle.
+- Tests : `tests-qr/*.js` n'utilisent plus un chemin fixe ; `app/tests/integration.test.js` adapté (un serveur peut valider un QR).
+- Non changé volontairement : un ticket annulé ne remet pas le stock des ruptures (le plat a en général été servi).
