@@ -189,6 +189,22 @@ class T1Stocks(Base):
         self.assertEqual(self.stock(it)[0], 18500)
 
 
+class T4AchatsDivers(Base):
+    def test_01_bon_divers_sans_stock_puis_paiement(self):
+        s = self.supplier("Divers test"); it = self.item("Sel fin")
+        r = self.ok(self.m("reception", {"supplier_id": s, "number": "D-01", "doc_date": date.today().isoformat(), "client_uid": U(), "divers": True,
+                                         "misc_lines": [{"label": "Sacs poubelle", "amount": "1500"}, {"label": "Réparation robinet", "amount": "2000,50"}],
+                                         "invoice": {"number": "", "amount": ""}}))
+        self.assertEqual(r["total"], 350050); self.assertIn("invoice_id", r)
+        b = self.m(f"reception/{r['id']}")
+        self.assertEqual(len(b["misc_lines"]), 2); self.assertEqual(b["lines"], []); self.assertEqual(b["divers"], 1)
+        self.assertEqual(self.stock(it), (0, 0))
+        self.assertEqual(self.m("reception", {"supplier_id": s, "number": "D-02", "doc_date": date.today().isoformat(), "client_uid": U(), "divers": True, "misc_lines": []})["status"], 400)
+        self.assertEqual(self.m("reception", {"supplier_id": s, "number": "D-03", "doc_date": date.today().isoformat(), "client_uid": U(), "divers": True, "misc_lines": [{"label": "x", "amount": "0"}]})["status"], 400)
+        st, body, _ = call(self.port, f"doc/reception/{r['id']}", token=self.mag, raw=True)
+        self.assertEqual(st, 200); self.assertIn("Sacs poubelle", body.decode())
+
+
 class T2Paiements(Base):
     def invoice(self, sup, num, amount, doc_date=None, **kw):
         return self.ok(self.m("facture", {"supplier_id": sup, "number": num, "amount": amount, "doc_date": doc_date or date.today().isoformat(), "client_uid": U(), **kw}))["id"]
@@ -401,7 +417,6 @@ class T4Pannes(Base):
         self.ok(self.receive(s, "P1", [{"item_id": it, "qty": 5, "unit_price": 100}]))
         # coupure brutale du serveur (comme une coupure de courant) puis redémarrage
         self.srv.stop(kill=True)
-        r = call(self.port, "tableau", token=self.mag) if False else None
         with self.assertRaises(Exception): urllib.request.urlopen(f"http://127.0.0.1:{self.port}/api/ping", timeout=1)
         self.srv.start()
         # la session survit au redémarrage, les données sont intactes

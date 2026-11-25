@@ -468,7 +468,8 @@ function receptionForm() {
   const m = modal({title: 'Nouvelle réception', size: 'w3', body: `
     <div class="fields c4"><label class="f span2">Fournisseur<div class="row" style="flex-wrap:nowrap"><select id="rSup">${supplierOptions('')}</select><button class="btn sm" id="rNewSup" title="Nouveau fournisseur">＋</button></div></label>
     <label class="f">N° du bon de livraison<input id="rNum" placeholder="ex. BL-2026-0153"></label><label class="f">Date du bon<input type="date" id="rDate" value="${today()}" max="${today()}"></label></div>
-    <h3 style="margin:18px 0 6px;font-size:17px">Articles reçus</h3><div id="rLines"></div>
+    <label class="row" style="gap:8px;margin-top:14px"><input type="checkbox" id="rDiv"> <span><b>Achat divers</b> — bon sans article de stock (matériel, pressing, prestations, petits achats…)</span></label>
+    <h3 id="rLinesT" style="margin:18px 0 6px;font-size:17px">Articles reçus</h3><div id="rLines"></div><div id="rMisc" class="hidden"></div>
     <div class="fields c2" style="margin-top:14px"><label class="f">Notes<textarea id="rNotes" placeholder="Remarques sur la livraison (facultatif)"></textarea></label>
     <div class="col"><label class="row" style="gap:8px"><input type="checkbox" id="rInv"> <span>Ce bon vaut <b>facture</b> (enregistrer la facture en même temps)</span></label>
       <div id="rInvF" class="fields c2 hidden"><label class="f">N° de facture<input id="riNum" placeholder="même n° que le bon si vide"></label><label class="f">Échéance<input type="date" id="riDue"></label>
@@ -476,14 +477,24 @@ function receptionForm() {
       <div class="muted small">Après validation, vous pourrez joindre la photo ou le scan du bon.</div></div></div>`,
     foot: `<button class="btn" data-a="cancel">Annuler</button><button class="btn dark lg" data-a="ok">Valider la réception</button>`});
   const ed = lineEditor($('#rLines', m), 'reception');
+  const misc = miscEditor($('#rMisc', m));
+  const isDiv = () => $('#rDiv', m).checked;
+  const setDiv = on => {
+    $('#rDiv', m).checked = on; $('#rLines', m).classList.toggle('hidden', on); $('#rMisc', m).classList.toggle('hidden', !on);
+    $('#rLinesT', m).textContent = on ? 'Achats divers (hors stock)' : 'Articles reçus';
+  };
+  $('#rDiv', m).onchange = e => setDiv(e.target.checked);
+  $('#rSup', m).addEventListener('change', e => { const s = (S.ref.suppliers || []).find(x => String(x.id) === e.target.value); if (s && /^divers/i.test(s.name)) setDiv(true); });
   $('#rInv', m).onchange = e => $('#rInvF', m).classList.toggle('hidden', !e.target.checked);
   $('#rNewSup', m).onclick = () => supplierForm(null, s => { $('#rSup', m).innerHTML = supplierOptions(s.id); });
   m.querySelector('[data-a=cancel]').onclick = () => m.close();
   const client_uid = uid();
   const send = async (btn, extra = {}) => {
     m.err('');
-    let lines; try { lines = ed.payload(); } catch (e) { return m.err(e.message); }
+    let lines = [], misc_lines = [];
+    try { if (isDiv()) misc_lines = misc.payload(); else lines = ed.payload(); } catch (e) { return m.err(e.message); }
     const body = {client_uid, supplier_id: $('#rSup', m).value, number: $('#rNum', m).value, doc_date: $('#rDate', m).value, notes: $('#rNotes', m).value, lines, ...extra};
+    if (isDiv()) { body.divers = true; body.misc_lines = misc_lines; }
     if (!body.supplier_id) return m.err('Choisissez le fournisseur');
     if ($('#rInv', m).checked) body.invoice = {number: $('#riNum', m).value, due_date: $('#riDue', m).value, amount: $('#riAmt', m).value};
     btn.classList.add('busy');
@@ -502,6 +513,35 @@ function receptionForm() {
   m.querySelector('[data-a=ok]').onclick = e => send(e.currentTarget);
 }
 
+/* lignes libres d'un achat divers : désignation + montant */
+function miscEditor(host) {
+  const L = [{label: '', amount: ''}];
+  function render() {
+    host.innerHTML = `<table class="lines"><thead><tr><th>Désignation</th><th>Montant (DA)</th><th></th></tr></thead><tbody>
+      ${L.map((l, i) => `<tr data-i="${i}"><td style="width:66%"><input data-k="label" value="${esc(l.label)}" placeholder="ex. sacs poubelle, réparation, pressing…"></td>
+      <td><input data-k="amount" inputmode="decimal" value="${esc(l.amount)}" placeholder="Montant"></td><td style="width:34px"><button class="del" data-del title="Retirer la ligne">×</button></td></tr>`).join('')}</tbody></table>
+      <div class="row" style="margin-top:8px"><button class="btn sm" data-add>＋ Ajouter une ligne</button></div>
+      <div class="totbar"><span class="muted">${L.length} ligne(s)</span><span>Total du bon <span class="big" data-total></span></span></div>`;
+    host.querySelectorAll('input').forEach(inp => inp.oninput = () => { L[+inp.closest('tr').dataset.i][inp.dataset.k] = inp.value; total(); });
+    host.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { L.splice(+b.closest('tr').dataset.i, 1); if (!L.length) L.push({label: '', amount: ''}); render(); });
+    host.querySelector('[data-add]').onclick = () => { L.push({label: '', amount: ''}); render(); host.querySelector(`tr[data-i="${L.length - 1}"] input`).focus(); };
+    total();
+  }
+  function total() { const t = L.reduce((a, l) => a + (isFinite(parseNum(l.amount)) ? parseNum(l.amount) : 0), 0); host.querySelector('[data-total]').textContent = NB.format(Math.round(t * 100) / 100) + ' DA'; }
+  render();
+  return {
+    payload() {
+      const out = L.filter(l => l.label.trim() || String(l.amount).trim());
+      if (!out.length) throw new Error('Ajoutez au moins une ligne (désignation et montant)');
+      out.forEach((l, i) => {
+        if (!l.label.trim()) throw new Error(`Ligne ${i + 1} : écrivez la désignation`);
+        const a = parseNum(l.amount); if (!isFinite(a) || a <= 0) throw new Error(`Ligne ${i + 1} : montant invalide`);
+      });
+      return out.map(l => ({label: l.label.trim(), amount: parseNum(l.amount)}));
+    }
+  };
+}
+
 async function receptionDetail(id, after) {
   const r = await api('reception/' + id);
   const m = modal({title: `Bon ${esc(r.number)} — ${esc(r.supplier)}`, size: 'w2', body: `
@@ -509,7 +549,9 @@ async function receptionDetail(id, after) {
     ${r.duplicate_reason ? `<div class="alertbox warn">Enregistré malgré un doublon probable : ${esc(r.duplicate_reason)}</div>` : ''}
     <dl class="kv"><dt>Date du bon</dt><dd>${fd(r.doc_date)}</dd><dt>Saisi par</dt><dd>${esc(r.who)} le ${fd(r.created_at)}</dd>
     <dt>Facture</dt><dd>${r.invoices.filter(i => i.status === 'active').map(i => `<span class="tag ok">${esc(i.number)} · ${da(i.amount)}</span>`).join(' ') || '<span class="tag warn">non rapproché</span>'}</dd>${r.notes ? `<dt>Notes</dt><dd>${esc(r.notes)}</dd>` : ''}</dl>
-    <table class="t" style="margin-top:14px"><thead><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire</th><th class="r">Remise</th><th class="r">Montant</th></tr></thead><tbody>
+    ${r.misc_lines && r.misc_lines.length ? `<table class="t" style="margin-top:14px"><thead><tr><th>Désignation <span class="tag">achat divers · hors stock</span></th><th class="r">Montant</th></tr></thead><tbody>
+    ${r.misc_lines.map(l => `<tr><td>${esc(l.label)}</td><td class="r">${da(l.amount)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${da(r.total)}</td></tr></tfoot></table>` : ''}
+    <table class="t ${r.misc_lines && r.misc_lines.length ? 'hidden' : ''}" style="margin-top:14px"><thead><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire</th><th class="r">Remise</th><th class="r">Montant</th></tr></thead><tbody>
     ${r.lines.map(l => `<tr><td>${esc(l.name)}</td><td class="r">${NB3.format(l.qty_entered)} ${esc(l.unit_name)}${l.unit_name !== l.base_unit ? `<div class="muted small">${qf(l.qty, l.base_unit)}</div>` : ''}</td><td class="r">${da(l.unit_price)}</td><td class="r">${l.discount_pct ? l.discount_pct + ' %' : ''}</td><td class="r">${da(l.total)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="4">Total</td><td class="r">${da(r.total)}</td></tr></tfoot></table>
     <h3 style="margin:16px 0 8px;font-size:16px">Justificatifs</h3>${attachBlock(r.attachments, 'reception', r.id, r.status === 'validee', () => { m.close(); receptionDetail(id, after); })}`,

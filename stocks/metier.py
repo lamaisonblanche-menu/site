@@ -246,6 +246,26 @@ def save_item(c, u, d):
     return {"id": iid}
 
 
+FOURNISSEURS_INITIAUX = ["Cité Hayat", "Boucherie Mohamed", "Boucherie Tizi", "Asiatique", "Saumon fumé", "Okka Abdelaziz (poissonnier)",
+                         "Boustane fruits et légumes", "Boulangerie", "Burrata", "Louda sirop", "Supérette", "Fontaine fraîche", "Achat resto",
+                         "Cotex", "Pressing", "Prestations", "Divers matériel", "Divers"]
+
+
+def import_fournisseurs(c):
+    """Fournisseurs habituels du restaurant, ajoutés une seule fois (ceux qui existent déjà ne sont pas touchés)."""
+    key = "fournisseurs_initiaux_v1"
+    if val(c, "SELECT value FROM settings WHERE key=?", (key,)): return 0
+    n = 0
+    for name in FOURNISSEURS_INITIAUX:
+        if one(c, "SELECT id FROM suppliers WHERE name=?", (name,)): continue
+        notes = "Achats divers (bons sans article de stock)" if name.startswith("Divers") else ""
+        c.execute("INSERT INTO suppliers(name,contact,phone,notes,active,created_at) VALUES(?,'','',?,1,?)", (name, notes, now()))
+        n += 1
+    c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, now()))
+    audit(c, None, "fournisseurs_importes", "supplier", None, {"fournisseurs": n})
+    return n
+
+
 def import_catalogue(c, path):
     """Catalogue de départ (articles sans quantité), importé une seule fois. Les articles déjà présents ne sont pas touchés."""
     import json
@@ -336,6 +356,17 @@ def receipt_lines_input(c, lines):
     return out
 
 
+def misc_lines_input(lines):
+    """Achat divers : lignes libres (désignation + montant), sans article ni mouvement de stock."""
+    if not isinstance(lines, list) or not lines: raise Err("Ajoutez au moins une ligne (désignation et montant)")
+    if len(lines) > 100: raise Err("Trop de lignes")
+    out = []
+    for i, x in enumerate(lines, 1):
+        if not isinstance(x, dict): raise Err(f"Ligne {i} invalide")
+        out.append(dict(label=text(x, "label", 120, label=f"Désignation ligne {i}"), amount=money(x.get("amount"), f"Montant ligne {i}")))
+    return out
+
+
 def duplicate_check(c, table, supplier, key, total, doc_date, d, label):
     if one(c, f"SELECT id FROM {table} WHERE supplier_id=? AND number_key=? AND status IN ('validee','active')", (supplier, key)):
         raise Err(f"Doublon : ce {label} existe déjà pour ce fournisseur", 409, "doublon")
@@ -361,18 +392,22 @@ def create_receipt(c, u, d):
     if not key: raise Err("N° du bon invalide")
     doc_date = day(d, "doc_date", "Date du bon")
     if doc_date > date.today().isoformat(): raise Err("La date du bon ne peut pas être dans le futur")
-    lines = receipt_lines_input(c, d.get("lines"))
-    total = sum(x["total"] for x in lines)
+    divers = bool(d.get("divers"))
+    if divers: misc, lines = misc_lines_input(d.get("misc_lines")), []
+    else: misc, lines = [], receipt_lines_input(c, d.get("lines"))
+    total = sum(x["total"] for x in lines) + sum(x["amount"] for x in misc)
     dup = duplicate_check(c, "receipts", sup, key, total, doc_date, d, "bon")
     inv = d.get("invoice") if isinstance(d.get("invoice"), dict) else None
-    c.execute("INSERT INTO receipts(supplier_id,number,number_key,doc_date,status,total,notes,duplicate_reason,created_by,created_at,client_uid) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-              (sup, number, key, doc_date, "validee", total, text(d, "notes", 500, False), dup, u["id"], now(), uid(d)))
+    c.execute("INSERT INTO receipts(supplier_id,number,number_key,doc_date,status,total,notes,duplicate_reason,created_by,created_at,client_uid,divers) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+              (sup, number, key, doc_date, "validee", total, text(d, "notes", 500, False), dup, u["id"], now(), uid(d), 1 if divers else 0))
     rid = val(c, "SELECT last_insert_rowid()")
+    for x in misc:
+        c.execute("INSERT INTO receipt_misc_lines(receipt_id,label,amount) VALUES(?,?,?)", (rid, x["label"], x["amount"]))
     for x in lines:
         c.execute("INSERT INTO receipt_lines(receipt_id,item_id,qty_entered,unit_name,factor,qty,unit_price,discount_pct,total) VALUES(?,?,?,?,?,?,?,?,?)",
                   (rid, x["item"]["id"], float(x["dq"]), x["unit"], float(x["factor"]), x["milli"], x["price"], float(x["disc"]), x["total"]))
         move(c, u, x["item"]["id"], "reception", x["milli"], x["total"], None, "reception", rid)
-    audit(c, u["id"], "reception_validee", "receipt", rid, {"supplier": s["name"], "number": number, "total": total, "lignes": len(lines), "doublon_force": dup})
+    audit(c, u["id"], "reception_validee", "receipt", rid, {"supplier": s["name"], "number": number, "total": total, "lignes": len(lines) + len(misc), "divers": divers, "doublon_force": dup})
     out = {"id": rid, "total": total}
     if inv:  # le bon vaut facture
         amount = money(inv.get("amount"), "Montant de la facture") if inv.get("amount") not in (None, "") else total

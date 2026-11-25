@@ -162,7 +162,15 @@ CREATE TRIGGER no_del_rl BEFORE DELETE ON receipt_lines BEGIN SELECT RAISE(ABORT
 CREATE TRIGGER no_upd_rl BEFORE UPDATE ON receipt_lines BEGIN SELECT RAISE(ABORT,'Ligne immuable'); END;
 """
 
-MIGRATIONS = [SCHEMA_V1]  # ajouter ici les migrations suivantes (jamais modifier une migration publiée)
+SCHEMA_V2 = """
+ALTER TABLE receipts ADD COLUMN divers INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE receipt_misc_lines(
+  id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL REFERENCES receipts(id), label TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0));
+CREATE TRIGGER no_del_rml BEFORE DELETE ON receipt_misc_lines BEGIN SELECT RAISE(ABORT,'Suppression interdite'); END;
+CREATE TRIGGER no_upd_rml BEFORE UPDATE ON receipt_misc_lines BEGIN SELECT RAISE(ABORT,'Ligne immuable'); END;
+"""
+
+MIGRATIONS = [SCHEMA_V1, SCHEMA_V2]  # ajouter ici les migrations suivantes (jamais modifier une migration publiée)
 
 DEFAULT_SETTINGS = {
     "week_start": "0",            # 0 = dimanche … 6 = samedi (semaine algérienne : dimanche → samedi)

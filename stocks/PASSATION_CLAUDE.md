@@ -91,3 +91,7 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 ## v1.3.0 (25/11/2026)
 - `catalogue_initial.json` : 276 articles de départ (sans quantité) tirés de la carte, importés **une seule fois** au démarrage du serveur (`M.import_catalogue`, drapeau `settings.catalogue_initial_v1`) ; les articles existants ne sont jamais modifiés. Désactivable par `MB_STOCKS_NO_CATALOGUE=1` (tests).
 - Saisie d'un bon de réception : si l'article tapé n'existe pas, bouton « ＋ Créer l'article « … » » qui ouvre la fiche pré-remplie puis met l'article sur la ligne (Wi-Fi nécessaire). Créer une fiche n'ajoute aucune quantité : seul le bon validé fait entrer le stock.
+
+## 1.4.0 (25/11/2026, Claude) — fournisseurs + achats divers (demande de Manil)
+- `M.import_fournisseurs` (au démarrage, une seule fois, clé `fournisseurs_initiaux_v1`) : 18 fournisseurs habituels (liste des achats du restaurant, dont « Divers » et « Divers matériel »). Ceux qui existent déjà ne sont pas touchés.
+- Migration SQL V2 : `receipts.divers` + table `receipt_misc_lines` (désignation, montant, immuable). Case « Achat divers » sur le bon : lignes libres sans article ni mouvement de stock ; compté dans les achats, factures et demandes de paiement comme un bon normal. Choisir un fournisseur dont le nom commence par « Divers » coche la case tout seul.

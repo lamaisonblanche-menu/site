@@ -125,6 +125,7 @@ def get_routes(c, u, path, q):
         r = one(c, "SELECT r.*,s.name supplier,u.display_name who FROM receipts r JOIN suppliers s ON s.id=r.supplier_id JOIN users u ON u.id=r.created_by WHERE r.id=?", (m[1],))
         if not r: raise M.Err("Bon introuvable", 404)
         r["lines"] = rows(c, "SELECT l.*,i.name,i.base_unit FROM receipt_lines l JOIN items i ON i.id=l.item_id WHERE receipt_id=? ORDER BY l.id", (m[1],))
+        r["misc_lines"] = rows(c, "SELECT * FROM receipt_misc_lines WHERE receipt_id=? ORDER BY id", (m[1],))
         r["invoices"] = rows(c, "SELECT i.id,i.number,i.amount,i.status FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE ir.receipt_id=?", (m[1],))
         r["attachments"] = M.attachments_for(c, "reception", int(m[1]))
         return r
@@ -419,8 +420,9 @@ def main():
     if not a.cmd and not os.environ.get("MB_STOCKS_NO_CATALOGUE"):
         c = D.connect()
         try:
-            c.execute("BEGIN IMMEDIATE"); n = M.import_catalogue(c, ROOT / "catalogue_initial.json"); c.execute("COMMIT")
+            c.execute("BEGIN IMMEDIATE"); n = M.import_catalogue(c, ROOT / "catalogue_initial.json"); nf = M.import_fournisseurs(c); c.execute("COMMIT")
             if n: log(f"Catalogue de départ : {n} articles ajoutés (sans quantité)")
+            if nf: log(f"Fournisseurs habituels : {nf} ajoutés")
         except Exception as e:
             c.execute("ROLLBACK"); log(f"Catalogue de départ non importé : {e}")
         finally: c.close()

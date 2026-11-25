@@ -155,7 +155,10 @@ def doc_receipt(c, rid):
     r = one(c, "SELECT r.*,s.name supplier,u.display_name who FROM receipts r JOIN suppliers s ON s.id=r.supplier_id JOIN users u ON u.id=r.created_by WHERE r.id=?", (rid,))
     if not r: raise M.Err("Bon introuvable", 404)
     ls = rows(c, "SELECT l.*,i.name,i.base_unit FROM receipt_lines l JOIN items i ON i.id=l.item_id WHERE receipt_id=? ORDER BY l.id", (rid,))
-    body = tbl(["Article", "Quantité", "Prix unitaire", "Remise", "Montant"], [[E(l["name"]), f"{M.fmt_qty(int(round(l['qty_entered'] * 1000)), l['unit_name'])}" + (f" <span class=muted>= {M.fmt_qty(l['qty'], l['base_unit'])}</span>" if l["unit_name"] != l["base_unit"] else ""),
+    misc = rows(c, "SELECT * FROM receipt_misc_lines WHERE receipt_id=? ORDER BY id", (rid,))
+    if misc:
+        body = tbl(["Désignation (achat divers, hors stock)", "Montant"], [[E(l["label"]), DA(l["amount"])] for l in misc] + [["<b>Total</b>", f"<b>{DA(r['total'])}</b>"]], (1,))
+    else: body = tbl(["Article", "Quantité", "Prix unitaire", "Remise", "Montant"], [[E(l["name"]), f"{M.fmt_qty(int(round(l['qty_entered'] * 1000)), l['unit_name'])}" + (f" <span class=muted>= {M.fmt_qty(l['qty'], l['base_unit'])}</span>" if l["unit_name"] != l["base_unit"] else ""),
                                                                                DA(l["unit_price"]) + " / " + E(l["unit_name"]), f"{l['discount_pct']:g} %" if l["discount_pct"] else "", DA(l["total"])] for l in ls] +
                [["<b>Total</b>", "", "", "", f"<b>{DA(r['total'])}</b>"]], (1, 2, 3, 4))
     if r["status"] == "annulee": body = f'<p class="warn">BON ANNULÉ le {fr_date(r["cancelled_at"])} : {E(r["cancel_reason"])}</p>' + body
@@ -247,7 +250,10 @@ def export(c, name, q):
         return csv_bytes(["Date", "Fournisseur", "N° bon", "Statut", "Article", "Quantité saisie", "Unité", "Quantité base", "Prix unitaire (DA)", "Remise %", "Montant (DA)"],
                          [[l["doc_date"], l["supplier"], l["number"], l["status"], l["name"], str(l["qty_entered"]).replace(".", ","), l["unit_name"], n_q(l["qty"]), n_da(l["unit_price"]), l["discount_pct"], n_da(l["total"])]
                           for l in rows(c, """SELECT r.doc_date,r.number,r.status,s.name supplier,l.*,i.name FROM receipt_lines l JOIN receipts r ON r.id=l.receipt_id JOIN suppliers s ON s.id=r.supplier_id
-                                             JOIN items i ON i.id=l.item_id WHERE r.doc_date BETWEEN ? AND ? ORDER BY r.doc_date,r.id""", (start, end))])
+                                             JOIN items i ON i.id=l.item_id WHERE r.doc_date BETWEEN ? AND ? ORDER BY r.doc_date,r.id""", (start, end))] +
+                         [[l["doc_date"], l["supplier"], l["number"], l["status"], "Divers : " + l["label"], "", "", "", "", "", n_da(l["amount"])]
+                          for l in rows(c, """SELECT r.doc_date,r.number,r.status,s.name supplier,l.label,l.amount FROM receipt_misc_lines l JOIN receipts r ON r.id=l.receipt_id
+                                             JOIN suppliers s ON s.id=r.supplier_id WHERE r.doc_date BETWEEN ? AND ? ORDER BY r.doc_date,r.id""", (start, end))])
     if name == "rapport":
         R = M.report(c, q); t = R["totaux"]
         data = [["Période", R["start"], R["end"]], [], ["Indicateur", "Valeur (DA)"]] + [[k, n_da(v)] for k, v in
