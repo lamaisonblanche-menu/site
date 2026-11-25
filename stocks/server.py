@@ -34,6 +34,8 @@ def debloquer(username):
 M.UNLOCK_HOOK = debloquer
 LOG_LOCK = threading.Lock()
 NETWORKS = []
+# Appareils de la direction reliés par Tailscale (SRV MB lui-même y apparaît sous le nom « srv-mb » depuis le 25/11/2026)
+TAILSCALE = [ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48")]
 BACKUP_STATE = {"last": None, "error": None}
 
 
@@ -382,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
             if d.get("magasinier_direct"):
                 # Entrée du magasinier sans mot de passe (demande de la direction, 25/11/2026) :
                 # seulement depuis le réseau du restaurant, jamais depuis l'accès à distance Tailscale.
-                if self.headers.get("Tailscale-User-Login") or not any(ipaddress.ip_address(ip) in n for n in NETWORKS):
+                if self.headers.get("Tailscale-User-Login") or any(ipaddress.ip_address(ip) in n for n in TAILSCALE) or not any(ipaddress.ip_address(ip) in n for n in NETWORKS):
                     raise M.Err("Entrée sans mot de passe possible seulement au restaurant", 403)
                 mags = M.rows(c, "SELECT * FROM users WHERE role='magasinier' AND active=1 ORDER BY id")
                 if not mags: raise M.Err("Aucun compte magasinier actif", 404)
@@ -460,7 +462,7 @@ def main():
     c = D.connect()
     nets = cfg.get("reseaux_autorises") or D.setting(c, "allowed_networks").split(",")
     c.close()
-    NETWORKS[:] = [ipaddress.ip_network(n.strip(), strict=False) for n in nets if n.strip()] + [ipaddress.ip_network("127.0.0.0/8"), ipaddress.ip_network("::1/128")]
+    NETWORKS[:] = [ipaddress.ip_network(n.strip(), strict=False) for n in nets if n.strip()] + [ipaddress.ip_network("127.0.0.0/8"), ipaddress.ip_network("::1/128")] + TAILSCALE
     local = host in ("127.0.0.1", "localhost", "::1")
     if not local and not (cert and key): sys.exit("TLS obligatoire pour un accès réseau : indiquez --cert et --key (voir outils/creer_certificats.py)")
     srv = Server((host, port), Handler)
