@@ -1,7 +1,7 @@
 {
  "version": "3.9.0",
- "date": "2026-11-25T21:09:24.578Z",
- "notes": "Sortie de caisse supprimable par le caissier sans code ; ruptures du jour obligatoires pour le premier caissier",
+ "date": "2026-11-25T21:09:36.031Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
