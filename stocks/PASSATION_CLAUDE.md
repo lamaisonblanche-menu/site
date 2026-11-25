@@ -95,3 +95,7 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 ## 1.4.0 (25/11/2026, Claude) — fournisseurs + achats divers (demande de Manil)
 - `M.import_fournisseurs` (au démarrage, une seule fois, clé `fournisseurs_initiaux_v1`) : 18 fournisseurs habituels (liste des achats du restaurant, dont « Divers » et « Divers matériel »). Ceux qui existent déjà ne sont pas touchés.
 - Migration SQL V2 : `receipts.divers` + table `receipt_misc_lines` (désignation, montant, immuable). Case « Achat divers » sur le bon : lignes libres sans article ni mouvement de stock ; compté dans les achats, factures et demandes de paiement comme un bon normal. Choisir un fournisseur dont le nom commence par « Divers » coche la case tout seul.
+
+## v1.5.0 (25/11/2026) — version téléphone
+- Interface adaptée au téléphone (≤ 820 px) : menu latéral escamotable (bouton ☰), grilles et formulaires sur une colonne, fenêtres en plein écran, lignes des bons en cartes, tableaux défilables, champs en 16 px (pas de zoom iOS), méta « écran d'accueil » iOS.
+- Accès à distance : Tailscale sur SRV MB (compte maisonblanchehydra@gmail.com), `tailscale serve --bg https+insecure://localhost:8765` → https://srv-mb.tailf1bd67.ts.net (les requêtes arrivent de 127.0.0.1, donc acceptées).

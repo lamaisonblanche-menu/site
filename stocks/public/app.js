@@ -263,7 +263,7 @@ let badges = {};
 function renderNav() {
   $('#nav').innerHTML = NAV.filter(n => !n[3] && n[1] !== 'dir' || isDir()).map(n => n[0][0] === '#' ? `<div class="sect">${n[0].slice(1)}</div>` :
     `<button data-p="${n[0]}" class="${S.page === n[0] ? 'on' : ''}"><span class="ic">${n[1]}</span>${n[2]}${badges[n[0]] ? `<span class="pill">${badges[n[0]]}</span>` : ''}</button>`).join('');
-  $$('#nav button').forEach(b => b.onclick = () => go(b.dataset.p));
+  $$('#nav button').forEach(b => b.onclick = () => { document.body.classList.remove('menu'); go(b.dataset.p); });
   const u = S.session.user;
   $('#me').innerHTML = `<b>${esc(u.display_name)}</b><span>${u.role === 'direction' ? 'Direction' : 'Magasinier'}</span><div class="row"><button id="mePw">Mot de passe</button><button id="meOut">Déconnexion</button></div>`;
   $('#mePw').onclick = () => passwordModal(false); $('#meOut').onclick = () => logout();
@@ -1138,4 +1138,10 @@ PAGES.reglages = async v => {
 (async () => {
   if (S.token) { try { await start(); return; } catch (e) { } }
   logout(true); $('#lgErr').textContent = '';
+})();
+
+/* ------------------------------------------------------------------ téléphone : menu latéral escamotable */
+(() => {
+  const t = () => document.body.classList.toggle('menu');
+  document.getElementById('burger').onclick = t; document.getElementById('scrim').onclick = t;
 })();

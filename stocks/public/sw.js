@@ -1,5 +1,5 @@
 /* Mode hors ligne : garde l'application (pas les données) pour l'ouvrir sans Wi-Fi. Réseau d'abord, copie sinon. */
-const C = 'mb-stocks-v1';
+const C = 'mb-stocks-v2';
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'logo.png', 'logo-blanc.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
