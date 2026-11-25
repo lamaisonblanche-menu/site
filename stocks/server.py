@@ -1,251 +1,435 @@
 #!/usr/bin/env python3
-"""Prototype autonome de gestion des stocks La Maison Blanche.
-Démarrage: python stocks/server.py --host 127.0.0.1 --port 8765
-Déploiement LAN uniquement après configuration des comptes et du pare-feu.
+"""Serveur du logiciel de stocks La Maison Blanche (Python 3.10+, sans dépendance).
+
+  py server.py                                  démarre (réglages dans data/config.json)
+  py server.py --host 0.0.0.0 --port 8765 --cert data/tls/serveur.crt --key data/tls/serveur.key
+  py server.py creer-compte IDENTIFIANT magasinier|direction "Nom affiché"
+  py server.py verifier-journal                contrôle la chaîne d'intégrité du journal
+
+Le serveur refuse d'écouter sur le réseau sans TLS (HTTPS).
 """
-import argparse, hashlib, hmac, json, os, secrets, sqlite3, threading, ssl, time
-from datetime import timedelta
-from decimal import Decimal, InvalidOperation
-from datetime import datetime, timezone
+import argparse, base64, getpass, ipaddress, json, mimetypes, os, re, ssl, sys, threading, time, traceback
+from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-ROOT=Path(__file__).resolve().parent
-DB=Path(os.environ.get("MB_STOCKS_DB",str(ROOT/"data"/"stocks.sqlite3")))
-LOCK=threading.RLock()
-SESSIONS={}
-ATTEMPTS={}
-AUTH_LOCK=threading.Lock()
-def now(): return datetime.now(timezone.utc).isoformat(timespec="microseconds")
-def conn():
-    DB.parent.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DB,timeout=20)
-    c.row_factory=sqlite3.Row
-    c.execute("PRAGMA foreign_keys=ON")
-    c.execute("PRAGMA journal_mode=WAL")
-    return c
-def init():
-    with conn() as c:
-        c.executescript("""
-        CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,role TEXT NOT NULL CHECK(role IN ('magasinier','direction')),salt TEXT NOT NULL,password_hash TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS suppliers(id INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQUE);
-        CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQUE,unit TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS receipts(id INTEGER PRIMARY KEY,supplier_id INTEGER NOT NULL REFERENCES suppliers(id),reference TEXT NOT NULL,received_at TEXT NOT NULL,created_by INTEGER NOT NULL REFERENCES users(id),UNIQUE(supplier_id,reference));
-        CREATE TABLE IF NOT EXISTS receipt_lines(id INTEGER PRIMARY KEY,receipt_id INTEGER NOT NULL REFERENCES receipts(id),item_id INTEGER NOT NULL REFERENCES items(id),quantity REAL NOT NULL CHECK(quantity>0),unit_cost INTEGER NOT NULL CHECK(unit_cost>=0));
-        CREATE TABLE IF NOT EXISTS issues(id INTEGER PRIMARY KEY,service TEXT NOT NULL CHECK(service IN ('cuisine','asiatique','brunch','comptoir')),item_id INTEGER NOT NULL REFERENCES items(id),quantity REAL NOT NULL CHECK(quantity>0),created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS invoices(id INTEGER PRIMARY KEY,supplier_id INTEGER NOT NULL REFERENCES suppliers(id),reference TEXT NOT NULL,amount INTEGER NOT NULL CHECK(amount>0),created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,UNIQUE(supplier_id,reference));
-        CREATE TABLE IF NOT EXISTS payment_requests(id INTEGER PRIMARY KEY,created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'soumise' CHECK(status IN ('soumise','approuvee','refusee')),reviewed_by INTEGER REFERENCES users(id),reviewed_at TEXT);
-        CREATE TABLE IF NOT EXISTS request_lines(request_id INTEGER NOT NULL REFERENCES payment_requests(id),invoice_id INTEGER NOT NULL REFERENCES invoices(id),amount INTEGER NOT NULL CHECK(amount>0),PRIMARY KEY(request_id,invoice_id));
-        CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,invoice_id INTEGER NOT NULL REFERENCES invoices(id),amount INTEGER NOT NULL CHECK(amount>0),mode TEXT NOT NULL,reference TEXT,paid_by INTEGER NOT NULL REFERENCES users(id),paid_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor INTEGER NOT NULL,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS inventory(id INTEGER PRIMARY KEY,item_id INTEGER NOT NULL REFERENCES items(id),counted REAL NOT NULL,expected REAL NOT NULL,delta REAL NOT NULL,reason TEXT NOT NULL,created_by INTEGER NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,approved_by INTEGER REFERENCES users(id),approved_at TEXT);
-        """)
-        if "unit_cost" not in {r[1] for r in c.execute("PRAGMA table_info(issues)")}: c.execute("ALTER TABLE issues ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0")
-        if "receipt_id" not in {r[1] for r in c.execute("PRAGMA table_info(invoices)")}: c.execute("ALTER TABLE invoices ADD COLUMN receipt_id INTEGER REFERENCES receipts(id)")
-        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS invoice_receipt_unique ON invoices(receipt_id) WHERE receipt_id IS NOT NULL")
-def hashpass(password,salt): return hashlib.pbkdf2_hmac('sha256',password.encode(),bytes.fromhex(salt),250000).hex()
-def seed_user(username,role,password):
-    if len(password)<12: raise ValueError("Mot de passe : 12 caractères minimum")
-    with conn() as c:
-        if c.execute("SELECT 1 FROM users WHERE username=?",(username,)).fetchone(): raise ValueError("Compte existant")
-        salt=secrets.token_hex(16)
-        c.execute("INSERT INTO users(username,role,salt,password_hash) VALUES(?,?,?,?)",(username,role,salt,hashpass(password,salt)))
-def fail(msg,status=400): raise APIError(msg,status)
-class APIError(Exception):
-    def __init__(self,msg,status=400): super().__init__(msg);self.status=status
-def audit(c,u,action,details): c.execute("INSERT INTO audit(actor,action,details,at) VALUES(?,?,?,?)",(u["id"],action,json.dumps(details,ensure_ascii=False),now()))
-def balance(c,item):
-    bought=c.execute("SELECT COALESCE(SUM(quantity),0) FROM receipt_lines WHERE item_id=?",(item,)).fetchone()[0]
-    issued=c.execute("SELECT COALESCE(SUM(quantity),0) FROM issues WHERE item_id=?",(item,)).fetchone()[0]
-    adjusted=c.execute("SELECT COALESCE(SUM(delta),0) FROM inventory WHERE item_id=? AND approved_at IS NOT NULL",(item,)).fetchone()[0]
-    return round(bought-issued+adjusted,3)
-def due(c,invoice):
-    inv=c.execute("SELECT amount FROM invoices WHERE id=?",(invoice,)).fetchone()
-    if not inv: fail("Facture inconnue",404)
-    paid=c.execute("SELECT COALESCE(SUM(amount),0) FROM payments WHERE invoice_id=?",(invoice,)).fetchone()[0]
-    return inv[0]-paid
-def number(d,k,minval=1):
-    try:
-        raw=Decimal(str(d[k])); v=int(raw)
-        if raw!=v: fail("Nombre entier requis : "+k)
-    except (KeyError,ValueError,TypeError,InvalidOperation,OverflowError): fail("Valeur invalide : "+k)
-    if v<minval: fail("Valeur invalide : "+k)
-    return v
-def positive_quantity(d):
-    try: q=float(d["quantity"])
-    except (KeyError,ValueError,TypeError): fail("Quantité invalide")
-    if not (0<q<100000000) or round(q,3)!=q: fail("Quantité invalide")
-    return q
-def textfield(d,k,maxlen=120):
-    v=str(d.get(k,"")).strip()
-    if not v or len(v)>maxlen: fail("Champ invalide : "+k)
-    return v
-def average_cost(c,item):
-    events=rows(c,"SELECT r.received_at at,0 kind,l.id id,l.quantity q,l.unit_cost cost FROM receipt_lines l JOIN receipts r ON r.id=l.receipt_id WHERE l.item_id=? UNION ALL SELECT created_at,1,id,quantity,unit_cost FROM issues WHERE item_id=? UNION ALL SELECT approved_at,2,id,delta,0 FROM inventory WHERE item_id=? AND approved_at IS NOT NULL ORDER BY at,kind,id",(item,item,item))
-    qty=0.0; avg=0.0
-    for e in events:
-        q=e["q"]
-        if e["kind"]==0:
-            avg=(qty*avg+q*e["cost"])/(qty+q) if qty+q>0 else 0
-            qty+=q
-        elif e["kind"]==1: qty-=q
-        else: qty+=q
-        if qty<=0: qty=0;avg=0
-    return round(avg,4)
-def rows(c,sql,args=()): return [dict(r) for r in c.execute(sql,args).fetchall()]
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self,*a): pass
-    def send(self,status,data):
-        b=json.dumps(data,ensure_ascii=False).encode()
-        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8")
-        self.send_header("Cache-Control","no-store");self.send_header("X-Content-Type-Options","nosniff")
-        self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)
-    def do_GET(self):
-        p=urlparse(self.path).path
-        if p=="/":
-            b=(ROOT/"public"/"index.html").read_bytes()
-            self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(b)));self.send_header("Cache-Control","no-store");self.end_headers();self.wfile.write(b);return
-        try: self.send(200,self.api("GET",p,{}))
-        except APIError as e: self.send(e.status,{"erreur":str(e)})
-        except Exception: self.send(500,{"erreur":"Erreur interne"})
-    def do_POST(self):
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import stockdb as D
+import metier as M
+import documents as DOC
+import backup as B
+from stockdb import rows, one, val
+
+ROOT = Path(__file__).resolve().parent
+PUBLIC = ROOT / "public"
+VERSION = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "1.0.0"
+FAILS = {}; FAIL_LOCK = threading.Lock()
+LOG_LOCK = threading.Lock()
+NETWORKS = []
+BACKUP_STATE = {"last": None, "error": None}
+
+
+def log(msg):
+    line = f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}"
+    with LOG_LOCK:
         try:
-            n=int(self.headers.get("Content-Length","0"))
-            if n<=0 or n>100000: fail("Corps invalide",413)
-            d=json.loads(self.rfile.read(n))
-            if not isinstance(d,dict): fail("Objet JSON attendu")
-            self.send(200,self.api("POST",urlparse(self.path).path,d))
-        except APIError as e:self.send(e.status,{"erreur":str(e)})
-        except (ValueError,json.JSONDecodeError):self.send(400,{"erreur":"JSON invalide"})
-        except sqlite3.IntegrityError:self.send(409,{"erreur":"Doublon ou référence invalide"})
-        except Exception:self.send(500,{"erreur":"Erreur interne"})
-    def api(self,method,p,d):
-        if p=="/api/login" and method=="POST":
-            name=textfield(d,"username",60);password=str(d.get("password",""))
-            key=self.client_address[0]
-            with AUTH_LOCK:
-                t=time.monotonic(); recent=[x for x in ATTEMPTS.get(key,[]) if t-x<300]
-                if len(recent)>=12: fail("Trop de tentatives. Réessayez dans cinq minutes.",429)
-                ATTEMPTS[key]=recent+[t]
-            with conn() as c: u=c.execute("SELECT * FROM users WHERE username=?",(name,)).fetchone()
-            if not u or not hmac.compare_digest(hashpass(password,u["salt"]),u["password_hash"]): fail("Identifiants incorrects",401)
-            with AUTH_LOCK:
-                ATTEMPTS.pop(key,None)
-                t=time.time()
-                for old,session in list(SESSIONS.items()):
-                    if session[1]<t: SESSIONS.pop(old,None)
-                token=secrets.token_urlsafe(32);SESSIONS[token]=(u["id"],t+8*3600)
-            return {"token":token,"role":u["role"]}
-        token=self.headers.get("Authorization","").removeprefix("Bearer ").strip()
-        sess=SESSIONS.get(token)
-        if not sess or sess[1]<datetime.now(timezone.utc).timestamp(): fail("Connexion requise",401)
-        if p=="/api/logout" and method=="POST":
-            with AUTH_LOCK: SESSIONS.pop(token,None)
-            return {"ok":True}
-        with LOCK,conn() as c:
-            if method=="POST": c.execute("BEGIN IMMEDIATE")
-            u=c.execute("SELECT id,username,role FROM users WHERE id=?",(sess[0],)).fetchone()
-            if not u: fail("Compte inconnu",401)
-            def direction():
-                if u["role"]!="direction": fail("Réservé à la direction",403)
-            def magasinier():
-                if u["role"]!="magasinier": fail("Réservé au magasinier",403)
-            if method=="GET" and p.startswith("/api/request-detail/"):
-                rid=number({"id":p.rsplit("/",1)[1]},"id")
-                request=c.execute("SELECT r.*,u.username author FROM payment_requests r JOIN users u ON u.id=r.created_by WHERE r.id=?",(rid,)).fetchone()
-                if not request: fail("Demande inconnue",404)
-                return {"request":dict(request),"lines":rows(c,"SELECT l.*,i.reference,s.name supplier FROM request_lines l JOIN invoices i ON i.id=l.invoice_id JOIN suppliers s ON s.id=i.supplier_id WHERE l.request_id=? ORDER BY s.name,i.reference",(rid,))}
-            if method=="GET" and p.startswith("/api/week/"):
-                try: start=datetime.strptime(p.rsplit("/",1)[1],"%Y-%m-%d").date()
-                except ValueError: fail("Date invalide")
-                a=str(start); b=str(start+timedelta(days=7))
-                return {"start":a,"end_exclusive":b,"purchases":rows(c,"SELECT s.name supplier,ROUND(SUM(l.quantity*l.unit_cost),2) amount FROM receipts r JOIN receipt_lines l ON l.receipt_id=r.id JOIN suppliers s ON s.id=r.supplier_id WHERE date(r.received_at,'+1 hour')>=? AND date(r.received_at,'+1 hour')<? GROUP BY s.id",(a,b)),"issues":rows(c,"SELECT service,ROUND(SUM(quantity*unit_cost),2) amount FROM issues WHERE date(created_at,'+1 hour')>=? AND date(created_at,'+1 hour')<? GROUP BY service",(a,b)),"payments":rows(c,"SELECT s.name supplier,SUM(p.amount) amount FROM payments p JOIN invoices i ON i.id=p.invoice_id JOIN suppliers s ON s.id=i.supplier_id WHERE date(p.paid_at,'+1 hour')>=? AND date(p.paid_at,'+1 hour')<? GROUP BY s.id",(a,b)),"debt_now":rows(c,"SELECT s.name supplier,SUM(i.amount-COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id=i.id),0)) amount FROM invoices i JOIN suppliers s ON s.id=i.supplier_id GROUP BY s.id")}
-            if method=="GET" and p=="/api/state":
-                return {"user":dict(u),"suppliers":rows(c,"SELECT * FROM suppliers ORDER BY name"),"items":[dict(r)|{"stock":balance(c,r["id"]),"unit_cost":average_cost(c,r["id"])} for r in c.execute("SELECT * FROM items ORDER BY name")],"invoices":rows(c,"SELECT i.*,s.name supplier,(i.amount-COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=i.id),0)) due FROM invoices i JOIN suppliers s ON s.id=i.supplier_id ORDER BY i.id DESC"),"inventory":rows(c,"SELECT v.*,i.name item FROM inventory v JOIN items i ON i.id=v.item_id ORDER BY v.id DESC"),"requests":rows(c,"SELECT r.*,u.username author FROM payment_requests r JOIN users u ON u.id=r.created_by ORDER BY r.id DESC"),"issues":rows(c,"SELECT x.*,i.name item FROM issues x JOIN items i ON i.id=x.item_id ORDER BY x.id DESC LIMIT 100"),"receipts":rows(c,"SELECT r.*,s.name supplier FROM receipts r JOIN suppliers s ON s.id=r.supplier_id ORDER BY r.id DESC LIMIT 100")}
-            if method!="POST":fail("Route inconnue",404)
-            if p=="/api/supplier":
-                name=textfield(d,"name");c.execute("INSERT INTO suppliers(name) VALUES(?)",(name,));audit(c,u,"fournisseur",{"name":name});return {"ok":True}
-            if p=="/api/item":
-                name=textfield(d,"name");unit=textfield(d,"unit",20)
-                c.execute("INSERT INTO items(name,unit) VALUES(?,?)",(name,unit));audit(c,u,"article",{"name":name});return {"ok":True}
-            if p=="/api/receipt":
-                magasinier()
-                supplier=number(d,"supplier_id");ref=textfield(d,"reference");lines=d.get("lines")
-                if not isinstance(lines,list) or not lines or len(lines)>100:fail("Lignes de réception invalides")
-                c.execute("INSERT INTO receipts(supplier_id,reference,received_at,created_by) VALUES(?,?,?,?)",(supplier,ref,now(),u["id"]))
-                rid=c.execute("SELECT last_insert_rowid()").fetchone()[0]
-                for x in lines:
-                    item=number(x,"item_id");q=positive_quantity(x);cost=number(x,"unit_cost",0)
-                    c.execute("INSERT INTO receipt_lines(receipt_id,item_id,quantity,unit_cost) VALUES(?,?,?,?)",(rid,item,q,cost))
-                audit(c,u,"reception",{"id":rid});return {"id":rid}
-            if p=="/api/issue":
-                magasinier()
-                service=textfield(d,"service")
-                if service not in ("cuisine","asiatique","brunch","comptoir"):fail("Service inconnu")
-                item=number(d,"item_id");q=positive_quantity(d)
-                if balance(c,item)<q:fail("Stock insuffisant",409)
-                c.execute("INSERT INTO issues(service,item_id,quantity,created_by,created_at,unit_cost) VALUES(?,?,?,?,?,?)",(service,item,q,u["id"],now(),average_cost(c,item)))
-                audit(c,u,"sortie",{"service":service,"item":item,"quantity":q});return {"ok":True}
-            if p=="/api/inventory":
-                magasinier(); item=number(d,"item_id"); reason=textfield(d,"reason",500)
-                try: counted=float(d["counted"])
-                except (KeyError,ValueError,TypeError): fail("Quantité invalide")
-                if not 0<=counted<100000000 or round(counted,3)!=counted: fail("Quantité invalide")
-                expected=balance(c,item)
-                c.execute("INSERT INTO inventory(item_id,counted,expected,delta,reason,created_by,created_at) VALUES(?,?,?,?,?,?,?)",(item,counted,expected,round(counted-expected,3),reason,u["id"],now()))
-                audit(c,u,"inventaire_propose",{"item":item,"counted":counted});return {"ok":True}
-            if p=="/api/inventory/approve":
-                direction(); iid=number(d,"id"); v=c.execute("SELECT * FROM inventory WHERE id=? AND approved_at IS NULL",(iid,)).fetchone()
-                if not v: fail("Inventaire indisponible",409)
-                if balance(c,v["item_id"])!=v["expected"]: fail("Le stock a changé : refaire le comptage",409)
-                c.execute("UPDATE inventory SET approved_at=?,approved_by=? WHERE id=?",(now(),u["id"],iid))
-                audit(c,u,"inventaire_approuve",{"id":iid});return {"ok":True}
-            if p=="/api/invoice":
-                supplier=number(d,"supplier_id");ref=textfield(d,"reference");amount=number(d,"amount")
-                receipt=d.get("receipt_id")
-                if receipt is not None:
-                    receipt=number(d,"receipt_id"); found=c.execute("SELECT supplier_id FROM receipts WHERE id=?",(receipt,)).fetchone()
-                    if not found or found[0]!=supplier: fail("Bon incompatible avec le fournisseur")
-                c.execute("INSERT INTO invoices(supplier_id,reference,amount,created_by,created_at,receipt_id) VALUES(?,?,?,?,?,?)",(supplier,ref,amount,u["id"],now(),receipt))
-                audit(c,u,"facture",{"supplier":supplier,"reference":ref,"amount":amount});return {"ok":True}
-            if p=="/api/request":
-                magasinier()
-                lines=d.get("lines")
-                if not isinstance(lines,list) or not lines:fail("Factures manquantes")
-                ids=list(dict.fromkeys(number({"id":i},"id") for i in lines))
-                if len(ids)!=len(lines):fail("Facture en double")
-                for iid in ids:
-                    if due(c,iid)<=0:fail("Facture déjà réglée")
-                    if c.execute("SELECT 1 FROM request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status IN ('soumise','approuvee')",(iid,)).fetchone():fail("Facture déjà dans une demande active",409)
-                c.execute("INSERT INTO payment_requests(created_by,created_at) VALUES(?,?)",(u["id"],now()))
-                rid=c.execute("SELECT last_insert_rowid()").fetchone()[0]
-                for iid in ids:c.execute("INSERT INTO request_lines(request_id,invoice_id,amount) VALUES(?,?,?)",(rid,iid,due(c,iid)))
-                audit(c,u,"demande_paiement",{"id":rid,"invoices":ids});return {"id":rid}
-            if p=="/api/request/review":
-                direction();rid=number(d,"request_id");status=textfield(d,"status")
-                if status not in ("approuvee","refusee"):fail("Statut invalide")
-                cur=c.execute("UPDATE payment_requests SET status=?,reviewed_by=?,reviewed_at=? WHERE id=? AND status='soumise'",(status,u["id"],now(),rid))
-                if not cur.rowcount:fail("Demande non soumise",409)
-                audit(c,u,"validation_demande",{"id":rid,"status":status});return {"ok":True}
-            if p=="/api/payment":
-                direction();iid=number(d,"invoice_id");amount=number(d,"amount");mode=textfield(d,"mode",40)
-                if amount>due(c,iid):fail("Montant supérieur au solde",409)
-                if not c.execute("SELECT 1 FROM request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status='approuvee'",(iid,)).fetchone():fail("Aucune demande approuvée pour cette facture",409)
-                c.execute("INSERT INTO payments(invoice_id,amount,mode,reference,paid_by,paid_at) VALUES(?,?,?,?,?,?)",(iid,amount,str(d.get("reference",""))[:120],u["id"],now()))
-                audit(c,u,"paiement_confirme",{"invoice":iid,"amount":amount});return {"ok":True}
-            fail("Route inconnue",404)
-if __name__=="__main__":
-    parser=argparse.ArgumentParser();parser.add_argument("--host",default="127.0.0.1");parser.add_argument("--port",type=int,default=8765);parser.add_argument("--cert");parser.add_argument("--key")
-    sub=parser.add_subparsers(dest="cmd");add=sub.add_parser("create-user");add.add_argument("username");add.add_argument("role",choices=["magasinier","direction"])
-    args=parser.parse_args();init()
-    if args.cmd=="create-user":
-        import getpass
-        seed_user(args.username,args.role,getpass.getpass("Mot de passe : "));print("Compte créé")
-    else:
-        if args.host not in ("127.0.0.1","localhost") and not (args.cert and args.key): parser.error("TLS obligatoire pour accès réseau")
-        server=ThreadingHTTPServer((args.host,args.port),Handler)
-        if args.cert and args.key:
-            ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2;ctx.load_cert_chain(args.cert,args.key);server.socket=ctx.wrap_socket(server.socket,server_side=True)
-        print("Stocks:",f"{'https' if args.cert and args.key else 'http'}://{args.host}:{args.port}")
-        server.serve_forever()
+            (D.DATA / "journaux").mkdir(parents=True, exist_ok=True)
+            with open(D.DATA / "journaux" / f"serveur-{date.today():%Y-%m}.log", "a", encoding="utf-8") as f: f.write(line + "\n")
+        except OSError: pass
+    print(line, flush=True)
+
+
+# ------------------------------------------------------------------ routes POST (écriture)
+POST = {
+    "/api/fournisseur": M.save_supplier,
+    "/api/article": M.save_item,
+    "/api/reception": M.create_receipt,
+    "/api/reception/annuler": M.cancel_receipt,
+    "/api/mouvement": M.create_issue,
+    "/api/facture": M.create_invoice,
+    "/api/facture/rapprocher": M.invoice_link,
+    "/api/facture/annuler": M.cancel_invoice,
+    "/api/avoir": M.create_credit,
+    "/api/demande": M.save_request,
+    "/api/demande/soumettre": M.submit_request,
+    "/api/demande/abandonner": M.delete_draft,
+    "/api/demande/decision": M.review_request,
+    "/api/demande/cloturer": M.close_request,
+    "/api/paiement": M.confirm_payment,
+    "/api/paiement/annuler": M.cancel_payment,
+    "/api/inventaire": M.save_inventory,
+    "/api/inventaire/decision": M.review_inventory,
+    "/api/justificatif": M.save_attachment,
+    "/api/compte": M.admin_user,
+    "/api/mot-de-passe": M.change_password,
+}
+
+
+def r_settings(c, u, d):
+    M.need(u, "direction")
+    ws = str(d.get("week_start", ""))
+    if ws not in [str(i) for i in range(7)]: raise M.Err("Jour de début de semaine invalide")
+    c.execute("UPDATE settings SET value=? WHERE key='week_start'", (ws,))
+    D.audit(c, u["id"], "reglages", "settings", None, {"week_start": ws})
+    return {"ok": True}
+
+
+POST["/api/reglages"] = r_settings
+
+
+# ------------------------------------------------------------------ lectures
+def q1(q, k, default=None):
+    v = q.get(k)
+    return v[0] if v else default
+
+
+def items_full(c):
+    its = rows(c, "SELECT * FROM items ORDER BY category,name")
+    units = {}
+    for x in rows(c, "SELECT * FROM item_units ORDER BY id"): units.setdefault(x["item_id"], []).append({"name": x["name"], "factor": x["factor"]})
+    for i in its:
+        i["units"] = [{"name": k, "factor": f} for k, f in D.STD_UNITS[i["base_unit"]].items()] + units.get(i["id"], [])
+        i["custom_units"] = units.get(i["id"], [])
+        i["avg_cost"] = i["value"] * 1000 / i["qty"] if i["qty"] else i["last_cost"]
+    return its
+
+
+def get_routes(c, u, path, q):
+    if path == "/api/session":
+        return {"user": {k: u[k] for k in ("id", "username", "display_name", "role", "must_change")}, "version": VERSION,
+                "settings": {"week_start": int(D.setting(c, "week_start"))}, "services": D.SERVICES, "issue_kinds": M.ISSUE_KINDS, "pay_modes": DOC.MODES,
+                "base_units": D.BASE_UNITS, "pdf": bool(DOC.find_browser()), "today": date.today().isoformat()}
+    if path == "/api/referentiel":
+        return {"suppliers": rows(c, "SELECT * FROM suppliers ORDER BY name"), "items": items_full(c)}
+    if path == "/api/tableau":
+        return M.dashboard(c, u)
+    if path == "/api/receptions":
+        sql = "SELECT r.*,s.name supplier,u.display_name who,(SELECT i.number FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE ir.receipt_id=r.id AND i.status='active') invoice FROM receipts r JOIN suppliers s ON s.id=r.supplier_id JOIN users u ON u.id=r.created_by WHERE 1=1"
+        args = []
+        if q1(q, "supplier"): sql += " AND r.supplier_id=?"; args.append(q1(q, "supplier"))
+        if q1(q, "start"): sql += " AND r.doc_date>=?"; args.append(q1(q, "start"))
+        if q1(q, "end"): sql += " AND r.doc_date<=?"; args.append(q1(q, "end"))
+        if q1(q, "sans_facture"): sql += " AND r.status='validee' AND NOT EXISTS(SELECT 1 FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE ir.receipt_id=r.id AND i.status='active')"
+        if q1(q, "q"): sql += " AND (r.number LIKE ? OR s.name LIKE ?)"; args += ["%" + q1(q, "q") + "%"] * 2
+        return rows(c, sql + " ORDER BY r.doc_date DESC,r.id DESC LIMIT 500", args)
+    m = re.fullmatch(r"/api/reception/(\d+)", path)
+    if m:
+        r = one(c, "SELECT r.*,s.name supplier,u.display_name who FROM receipts r JOIN suppliers s ON s.id=r.supplier_id JOIN users u ON u.id=r.created_by WHERE r.id=?", (m[1],))
+        if not r: raise M.Err("Bon introuvable", 404)
+        r["lines"] = rows(c, "SELECT l.*,i.name,i.base_unit FROM receipt_lines l JOIN items i ON i.id=l.item_id WHERE receipt_id=? ORDER BY l.id", (m[1],))
+        r["invoices"] = rows(c, "SELECT i.id,i.number,i.amount,i.status FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE ir.receipt_id=?", (m[1],))
+        r["attachments"] = M.attachments_for(c, "reception", int(m[1]))
+        return r
+    if path == "/api/mouvements":
+        sql = "SELECT x.*,u.display_name who,s.name supplier FROM issue_slips x JOIN users u ON u.id=x.created_by LEFT JOIN suppliers s ON s.id=x.supplier_id WHERE 1=1"
+        args = []
+        for k, col in (("kind", "x.kind"), ("service", "x.service")):
+            if q1(q, k): sql += f" AND {col}=?"; args.append(q1(q, k))
+        if q1(q, "start"): sql += " AND x.created_at>=?"; args.append(q1(q, "start"))
+        if q1(q, "end"): sql += " AND x.created_at<=?"; args.append(q1(q, "end") + " 23:59:59")
+        out = rows(c, sql + " ORDER BY x.id DESC LIMIT 500", args)
+        for s in out:
+            s["lines"] = rows(c, "SELECT i.name,i.base_unit,m.qty,m.value FROM stock_movements m JOIN items i ON i.id=m.item_id WHERE ref_type='issue' AND ref_id=?", (s["id"],))
+        return out
+    m = re.fullmatch(r"/api/article/(\d+)/historique", path)
+    if m:
+        return rows(c, "SELECT m.*,u.display_name who FROM stock_movements m JOIN users u ON u.id=m.created_by WHERE item_id=? ORDER BY m.id DESC LIMIT 300", (m[1],))
+    if path == "/api/factures":
+        sql = "SELECT i.*,s.name supplier FROM invoices i JOIN suppliers s ON s.id=i.supplier_id WHERE 1=1"; args = []
+        if q1(q, "supplier"): sql += " AND i.supplier_id=?"; args.append(q1(q, "supplier"))
+        if q1(q, "q"): sql += " AND (i.number LIKE ? OR s.name LIKE ?)"; args += ["%" + q1(q, "q") + "%"] * 2
+        out = rows(c, sql + " ORDER BY i.doc_date DESC,i.id DESC LIMIT 500", args)
+        locked = M.locked_invoices(c)
+        for i in out:
+            i["due"] = M.due(c, i["id"]); i["paid"] = M.paid(c, i["id"]); i["locked_by"] = locked.get(i["id"])
+            i["credits"] = val(c, "SELECT COALESCE(SUM(amount),0) FROM credit_notes WHERE invoice_id=?", (i["id"],))
+            rec = M.reconcile(c, i["id"]); i["nb_bons"] = len(rec["bons"]); i["ecart"] = rec["ecart"]
+        if q1(q, "etat") == "dues": out = [i for i in out if i["due"] > 0]
+        return out
+    m = re.fullmatch(r"/api/facture/(\d+)", path)
+    if m:
+        i = one(c, "SELECT i.*,s.name supplier,u.display_name who FROM invoices i JOIN suppliers s ON s.id=i.supplier_id JOIN users u ON u.id=i.created_by WHERE i.id=?", (m[1],))
+        if not i: raise M.Err("Facture introuvable", 404)
+        i.update(M.reconcile(c, i["id"]))
+        i["due"] = M.due(c, i["id"]); i["paid"] = M.paid(c, i["id"])
+        i["credits"] = rows(c, "SELECT * FROM credit_notes WHERE invoice_id=?", (m[1],))
+        i["payments"] = rows(c, "SELECT p.*,r.number request,x.reason cancel_reason FROM payments p JOIN payment_requests r ON r.id=p.request_id LEFT JOIN payment_cancellations x ON x.payment_id=p.id WHERE invoice_id=?", (m[1],))
+        i["requests"] = rows(c, "SELECT r.id,r.number,r.status,l.requested,l.approved FROM payment_request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=?", (m[1],))
+        i["attachments"] = M.attachments_for(c, "facture", int(m[1]))
+        return i
+    if path == "/api/a-payer":
+        ex = q1(q, "exclure")
+        return M.invoices_payable(c, int(ex) if ex and ex.isdigit() else None)
+    if path == "/api/demandes":
+        out = rows(c, "SELECT r.*,u.display_name author FROM payment_requests r JOIN users u ON u.id=r.created_by WHERE NOT (r.status='cloturee' AND r.revision=0) ORDER BY r.id DESC LIMIT 200")
+        for r in out:
+            r["total"] = val(c, "SELECT COALESCE(SUM(requested),0) FROM payment_request_lines WHERE request_id=?", (r["id"],))
+            r["approved_total"] = val(c, "SELECT COALESCE(SUM(approved),0) FROM payment_request_lines WHERE request_id=?", (r["id"],))
+            r["paid_total"] = val(c, "SELECT COALESCE(SUM(p.amount),0) FROM payments p LEFT JOIN payment_cancellations x ON x.payment_id=p.id WHERE x.payment_id IS NULL AND p.request_id=?", (r["id"],))
+            r["nb"] = val(c, "SELECT COUNT(*) FROM payment_request_lines WHERE request_id=?", (r["id"],))
+        return out
+    m = re.fullmatch(r"/api/demande/(\d+)", path)
+    if m:
+        r = M.request_detail(c, int(m[1])); r["attachments"] = M.attachments_for(c, "demande", int(m[1])); return r
+    if path == "/api/inventaires":
+        return rows(c, "SELECT v.*,u.display_name author,(SELECT COUNT(*) FROM inventory_lines WHERE inventory_id=v.id) nb,(SELECT COUNT(*) FROM inventory_lines WHERE inventory_id=v.id AND counted<>expected) ecarts FROM inventories v JOIN users u ON u.id=v.created_by ORDER BY v.id DESC LIMIT 200")
+    m = re.fullmatch(r"/api/inventaire/(\d+)", path)
+    if m: return M.inventory_detail(c, int(m[1]))
+    if path == "/api/rapport": return M.report(c, {k: v[0] for k, v in q.items()})
+    if path == "/api/journal":
+        M.need(u, "direction")
+        ok, bad = D.verify_audit_chain(c)
+        return {"integre": ok, "rupture": bad, "entries": rows(c, "SELECT a.*,u.display_name who FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 500")}
+    if path == "/api/comptes":
+        M.need(u, "direction")
+        return rows(c, "SELECT id,username,display_name,role,active,must_change,created_at,(SELECT MAX(last_seen) FROM sessions WHERE user_id=users.id) last_seen FROM users ORDER BY role,username")
+    if path == "/api/sauvegardes":
+        M.need(u, "direction")
+        return {"list": B.listing(backup_dirs())[:60], "state": BACKUP_STATE, "dirs": [str(x) for x in backup_dirs()]}
+    raise M.Err("Page inconnue", 404)
+
+
+DOCS = {"demande": DOC.doc_request, "sortie": DOC.doc_issue, "reception": DOC.doc_receipt, "inventaire": DOC.doc_inventory}
+
+
+# ------------------------------------------------------------------ sauvegardes automatiques
+def load_config():
+    p = D.DATA / "config.json"
+    try: return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except ValueError: return {}
+
+
+def backup_dirs():
+    cfg = load_config()
+    dirs = [D.DATA / "sauvegardes"] + [Path(x) for x in cfg.get("sauvegardes_externes", [])]
+    return dirs
+
+
+def run_backup(label="auto"):
+    try:
+        res = B.create(backup_dirs(), label)
+        BACKUP_STATE["last"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        errs = [f for f in res["files"] if f.startswith("ÉCHEC")]
+        BACKUP_STATE["error"] = "; ".join(errs) or None
+        log("Sauvegarde : " + " | ".join(res["files"]))
+        return res
+    except Exception as e:
+        BACKUP_STATE["error"] = str(e); log("ÉCHEC sauvegarde : " + str(e)); raise
+
+
+def backup_loop():
+    """Sauvegarde au démarrage si la dernière a plus de 12 h, puis toutes les 6 h et chaque soir à 23 h 30."""
+    time.sleep(20)
+    done_today = None
+    while True:
+        try:
+            lst = B.listing([D.DATA / "sauvegardes"])
+            last = datetime.strptime(lst[0]["date"], "%Y-%m-%d %H:%M") if lst else None
+            n = datetime.now()
+            if not last or (n - last).total_seconds() > 6 * 3600 or (n.hour == 23 and n.minute >= 30 and done_today != n.date()):
+                run_backup("auto"); done_today = n.date() if n.hour == 23 else done_today
+        except Exception: pass
+        time.sleep(300)
+
+
+# ------------------------------------------------------------------ HTTP
+class Handler(BaseHTTPRequestHandler):
+    server_version = "MBStocks"; sys_version = ""
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, *a): pass
+
+    def headers_common(self, ctype, length, extra=None):
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(length))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; frame-ancestors 'self'")
+        if isinstance(self.connection, ssl.SSLSocket): self.send_header("Strict-Transport-Security", "max-age=31536000")
+        for k, v in (extra or {}).items(): self.send_header(k, v)
+
+    def out(self, status, body, ctype="application/json; charset=utf-8", extra=None):
+        if not isinstance(body, (bytes, bytearray)): body = json.dumps(body, ensure_ascii=False).encode()
+        self.send_response(status); self.headers_common(ctype, len(body), extra); self.end_headers()
+        if self.command != "HEAD": self.wfile.write(body)
+
+    def allowed(self):
+        try: ip = ipaddress.ip_address(self.client_address[0])
+        except ValueError: return False
+        return any(ip in n for n in NETWORKS)
+
+    def token(self):
+        h = self.headers.get("Authorization", "")
+        return h[7:].strip() if h.startswith("Bearer ") else None
+
+    def handle_one_request(self):
+        try: super().handle_one_request()
+        except (ConnectionError, ssl.SSLError, TimeoutError): self.close_connection = True
+
+    def do_GET(self): self.dispatch("GET")
+    def do_POST(self): self.dispatch("POST")
+    def do_HEAD(self): self.dispatch("GET")
+
+    def dispatch(self, method):
+        try:
+            if not self.allowed(): return self.out(403, {"erreur": "Poste non autorisé"})
+            url = urlparse(self.path); path = url.path; q = parse_qs(url.query)
+            if method == "GET" and not path.startswith("/api/"): return self.static(path)
+            if method == "POST":
+                origin = self.headers.get("Origin")
+                if origin and urlparse(origin).netloc != self.headers.get("Host"): raise M.Err("Origine refusée", 403)
+                n = int(self.headers.get("Content-Length") or 0)
+                limit = 20_000_000 if path == "/api/justificatif" else 2_000_000
+                if n <= 0 or n > limit: raise M.Err("Données trop volumineuses ou absentes", 413)
+                if "application/json" not in (self.headers.get("Content-Type") or ""): raise M.Err("Format JSON attendu", 415)
+                d = json.loads(self.rfile.read(n))
+                if not isinstance(d, dict): raise M.Err("Objet JSON attendu")
+            else: d = {}
+            if path == "/api/connexion" and method == "POST": return self.out(200, self.login(d))
+            if path == "/api/ping": return self.out(200, {"ok": True, "version": VERSION, "heure": D.now()})
+            c = D.connect()
+            try:
+                u = M.session_user(c, self.token())
+                if not u: raise M.Err("Session expirée : reconnectez-vous", 401, "session")
+                c.execute("UPDATE sessions SET last_seen=? WHERE token_hash=?", (D.now(), u["token_hash"]))
+                if method == "POST":
+                    if path == "/api/deconnexion":
+                        c.execute("DELETE FROM sessions WHERE token_hash=?", (u["token_hash"],)); return self.out(200, {"ok": True})
+                    if path == "/api/sauvegarde":
+                        M.need(u, "direction"); res = run_backup("manuelle")
+                        return self.out(200, {"files": res["files"]})
+                    fn = POST.get(path)
+                    if not fn: raise M.Err("Action inconnue", 404)
+                    if u["must_change"] and path != "/api/mot-de-passe": raise M.Err("Changez d'abord votre mot de passe provisoire", 403, "must_change")
+                    with D.WRITE_LOCK:
+                        c.execute("BEGIN IMMEDIATE")
+                        try:
+                            res = fn(c, u, d); c.execute("COMMIT")
+                        except BaseException:
+                            c.execute("ROLLBACK"); raise
+                    return self.out(200, res)
+                m = re.fullmatch(r"/api/justificatif/(\d+)", path)
+                if m:
+                    a = one(c, "SELECT * FROM attachments WHERE id=?", (m[1],))
+                    if not a: raise M.Err("Pièce introuvable", 404)
+                    p = (D.DATA / a["path"]).resolve()
+                    if D.DATA.resolve() not in p.parents or not p.exists(): raise M.Err("Fichier manquant sur le serveur", 410)
+                    return self.out(200, p.read_bytes(), a["mime"], {"Content-Disposition": f"inline; filename=\"piece-{a['id']}{Path(a['path']).suffix}\""})
+                m = re.fullmatch(r"/api/(doc|pdf)/(demande|sortie|reception|inventaire|rapport|stock)(?:/(\d+))?", path)
+                if m:
+                    if m[2] == "rapport": h = DOC.doc_report(c, {k: v[0] for k, v in q.items()})
+                    elif m[2] == "stock": h = DOC.doc_stock(c)
+                    else:
+                        if not m[3]: raise M.Err("Document inconnu", 404)
+                        h = DOCS[m[2]](c, int(m[3]))
+                    if m[1] == "doc": return self.out(200, h.encode(), "text/html; charset=utf-8")
+                    return self.out(200, DOC.to_pdf(h), "application/pdf", {"Content-Disposition": f"attachment; filename=\"{m[2]}-{m[3] or date.today()}.pdf\""})
+                m = re.fullmatch(r"/api/export/(\w+)\.csv", path)
+                if m:
+                    return self.out(200, DOC.export(c, m[1], {k: v[0] for k, v in q.items()}), "text/csv; charset=utf-8",
+                                    {"Content-Disposition": f"attachment; filename=\"stocks-{m[1]}-{date.today()}.csv\""})
+                return self.out(200, get_routes(c, u, path, q))
+            finally: c.close()
+        except M.Err as e:
+            self.out(e.status, {"erreur": str(e), "code": e.code, **e.extra})
+        except json.JSONDecodeError:
+            self.out(400, {"erreur": "Données illisibles"})
+        except D.sqlite3.IntegrityError as e:
+            log(f"Contrainte {self.path} : {e}")
+            self.out(409, {"erreur": "Opération refusée : elle créerait un doublon ou une incohérence"})
+        except D.sqlite3.OperationalError as e:
+            log(f"Base occupée {self.path} : {e}")
+            self.out(503, {"erreur": "Base momentanément occupée, réessayez"})
+        except (ConnectionError, ssl.SSLError): pass
+        except Exception:
+            log("ERREUR " + self.path + "\n" + traceback.format_exc())
+            try: self.out(500, {"erreur": "Erreur interne : elle a été notée dans le journal du serveur"})
+            except Exception: pass
+
+    def login(self, d):
+        ip = self.client_address[0]
+        name = str(d.get("username", "")).strip().lower()[:60]
+        key_ip, key_user = "ip:" + ip, "u:" + name
+        t = time.time()
+        with FAIL_LOCK:
+            for k in (key_ip, key_user):
+                FAILS[k] = [x for x in FAILS.get(k, []) if t - x < 600]
+            if len(FAILS[key_ip]) >= 15 or len(FAILS[key_user]) >= 6:
+                raise M.Err("Trop d'essais : patientez 10 minutes", 429)
+        c = D.connect()
+        try:
+            u = M.authenticate(c, name, str(d.get("password", "")))
+            if not u:
+                with FAIL_LOCK: FAILS[key_ip].append(t); FAILS[key_user].append(t)
+                log(f"Connexion refusée {name} depuis {ip}")
+                raise M.Err("Identifiant ou mot de passe incorrect", 401)
+            with D.WRITE_LOCK:
+                c.execute("BEGIN IMMEDIATE")
+                tok = M.new_session(c, u["id"], ip)
+                D.audit(c, u["id"], "connexion", "user", u["id"], {"ip": ip})
+                c.execute("COMMIT")
+            with FAIL_LOCK: FAILS.pop(key_user, None)
+            return {"token": tok, "role": u["role"], "must_change": u["must_change"]}
+        finally: c.close()
+
+    def static(self, path):
+        if path in ("/", "/index.html"): path = "/index.html"
+        p = (PUBLIC / path.lstrip("/")).resolve()
+        if PUBLIC.resolve() not in p.parents or not p.is_file(): return self.out(404, b"Introuvable", "text/plain; charset=utf-8")
+        ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+        if ctype.startswith("text/") or ctype in ("application/javascript",): ctype += "; charset=utf-8"
+        self.out(200, p.read_bytes(), ctype)
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 64
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--data"); ap.add_argument("--host"); ap.add_argument("--port", type=int); ap.add_argument("--cert"); ap.add_argument("--key")
+    sub = ap.add_subparsers(dest="cmd")
+    cu = sub.add_parser("creer-compte"); cu.add_argument("username"); cu.add_argument("role", choices=["magasinier", "direction"]); cu.add_argument("nom", nargs="?")
+    cu.add_argument("--mot-de-passe-env", help="lire le mot de passe dans cette variable d'environnement")
+    sub.add_parser("verifier-journal")
+    a = ap.parse_args()
+    if a.data: D.set_paths(a.data)
+    D.init()
+    cfg = load_config()
+    if a.cmd == "creer-compte":
+        pw = os.environ.get(a.mot_de_passe_env, "") if a.mot_de_passe_env else getpass.getpass("Mot de passe (10 caractères minimum) : ")
+        c = D.connect()
+        try:
+            c.execute("BEGIN IMMEDIATE"); i = M.create_user(c, a.username, a.nom or a.username, a.role, pw)
+            D.audit(c, None, "compte_cree_console", "user", i, {"username": a.username, "role": a.role}); c.execute("COMMIT")
+        except M.Err as e: c.execute("ROLLBACK"); sys.exit("ERREUR : " + str(e))
+        print("Compte créé :", a.username, a.role); return
+    if a.cmd == "verifier-journal":
+        c = D.connect(); ok, bad = D.verify_audit_chain(c)
+        print("Journal intègre" if ok else f"JOURNAL ALTÉRÉ à partir de l'entrée {bad}"); sys.exit(0 if ok else 1)
+    host = a.host or cfg.get("host", "127.0.0.1"); port = a.port or int(cfg.get("port", 8765))
+    cert = a.cert or cfg.get("cert"); key = a.key or cfg.get("key")
+    if cert and not Path(cert).is_absolute(): cert = str(D.DATA / cert)
+    if key and not Path(key).is_absolute(): key = str(D.DATA / key)
+    c = D.connect()
+    nets = cfg.get("reseaux_autorises") or D.setting(c, "allowed_networks").split(",")
+    c.close()
+    NETWORKS[:] = [ipaddress.ip_network(n.strip(), strict=False) for n in nets if n.strip()] + [ipaddress.ip_network("127.0.0.0/8"), ipaddress.ip_network("::1/128")]
+    local = host in ("127.0.0.1", "localhost", "::1")
+    if not local and not (cert and key): sys.exit("TLS obligatoire pour un accès réseau : indiquez --cert et --key (voir outils/creer_certificats.py)")
+    srv = Server((host, port), Handler)
+    if cert and key:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.load_cert_chain(cert, key); srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
+    if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=backup_loop, daemon=True).start()
+    log(f"Stocks La Maison Blanche {VERSION} — {'https' if cert else 'http'}://{host}:{port} — données : {D.DATA}")
+    try: srv.serve_forever()
+    except KeyboardInterrupt: pass
+
+
+if __name__ == "__main__":
+    main()

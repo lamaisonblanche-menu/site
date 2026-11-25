@@ -77,3 +77,6 @@ ATTENTION : ne pas ouvrir le serveur sur 0.0.0.0 sans sécurisation préalable. 
 
 ## Consigne finale
 Le responsable attend un logiciel complet, fiable et beau, pas un tableau de bord fictif. Poursuivre le travail de développement sur la branche dédiée, signaler les blocages réels, ne pas prétendre que les tests ou l'installation ont été effectués avant preuve. Les machines Windows sont accessibles à Claude, pas à ChatGPT.
+
+## MISE À JOUR 25/11/2026 15h30 (Claude)
+Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `stocks/RAPPORT_AUDIT_CLAUDE.md`. Mode d emploi : `stocks/README.md`. Tests : `cd stocks && python -m unittest discover -s tests -v` (19/19 OK). Non installé sur SRV MB, en attente de l accord du gérant.

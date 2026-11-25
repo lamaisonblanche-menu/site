@@ -1,0 +1,4 @@
+data/
+tests/sortie/
+__pycache__/
+*.pyc

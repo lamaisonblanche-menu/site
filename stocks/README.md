@@ -1,41 +1,72 @@
-# Stocks La Maison Blanche — prototype V0.1 NON DESTINÉ À LA PRODUCTION
+# Stocks La Maison Blanche — version 1.0.0 (candidate, NON INSTALLÉE)
 
-Branche : `feature/gestion-stocks-magasin`. Aucun fichier de la caisse ou du mécanisme de mise à jour n'a été modifié.
+Logiciel de gestion du magasin central : achats, réceptions, sorties vers les 4 services, inventaires,
+factures fournisseurs, demandes de paiement hebdomadaires, paiements confirmés par la direction, rapports.
+Indépendant de la caisse (autre dossier, autre port, autre base). Fonctionne sans Internet.
 
-## Réalisé
-- Serveur Python standard library, SQLite transactionnel sur SRV MB.
-- Comptes séparés `magasinier` / `direction`, mots de passe PBKDF2.
-- Fournisseurs, articles, réceptions avec lignes, sorties vers cuisine/asiatique/brunch/comptoir, stock calculé.
-- Factures, demandes de paiement, approbation/refus direction, paiements partiels confirmés exclusivement par la direction.
-- Historique d'audit basique, interface française responsive, impression navigateur en PDF (pas encore de rapport PDF structuré).
-- Pas de dépendance de la caisse et aucune publication.
+Branche : `feature/gestion-stocks-magasin`. Ne jamais fusionner dans `main` ni `caisse`.
 
-## Lancement local de développement
-Python 3.9+ requis. Depuis la racine du dépôt :
+## Architecture
 ```
-python stocks/server.py create-user magasinier magasinier
-python stocks/server.py create-user direction direction
-python stocks/server.py --host 127.0.0.1 --port 8765
+SRV MB (Windows 11)                                   PC magasinier
+ ├─ C:\MBStocks\app      code (copie de stocks/)        └─ Edge en mode application
+ ├─ C:\MBStocks\data     base SQLite + justificatifs        https://SRV-MB:8765  (certificat de
+ │   ├─ stocks.sqlite3    (WAL, synchronous=FULL)            l'autorité privée « La Maison Blanche »)
+ │   ├─ justificatifs\    photos / PDF (empreinte SHA-256)
+ │   ├─ sauvegardes\      .zip vérifiés (+ copie externe)
+ │   ├─ tls\              autorité privée + certificat serveur
+ │   └─ journaux\         journal technique du serveur
+ └─ Tâche planifiée « MB Stocks - Serveur » (SYSTEM, au démarrage, relance auto)
 ```
-Ouvrir http://127.0.0.1:8765. Les comptes sont créés avec mots de passe saisis de manière interactive.
+- **Python 3.10+ sans dépendance** à l'exécution (le module `cryptography` sert seulement à créer les certificats).
+- Un seul serveur écrit dans la base (verrou + transactions `BEGIN IMMEDIATE`) : pas de fichier partagé sur le réseau.
+- HTTPS obligatoire dès que le serveur écoute sur le réseau ; seules les adresses du réseau local sont acceptées.
 
-## Limitations BLOQUANTES avant exploitation
-- **NE PAS exposer sur le réseau du restaurant pour le moment** : serveur HTTP sans TLS, sessions en mémoire, protection anti-bruteforce et CSRF à renforcer. Installer un proxy TLS et des règles pare-feu, ou empaqueter une application Windows sécurisée.
-- Prototype non testé sur les PC Windows SRV MB et magasinier ; aucun test automatisé encore exécuté.
-- Interface de réception limitée à une ligne par bon (l'API accepte plusieurs lignes).
-- Pas de rapprochement automatique bon de livraison/facture ; possible double comptabilisation de références si mal saisies.
-- Pas de suivi des unités converties, coût moyen pondéré, inventaire physique, valorisation des sorties, retours ou pertes.
-- Pas de PDF métier dédié ni pièces justificatives jointes, pas de période hebdomadaire figée.
-- Demandes de paiement : validation de facture entière, pas de plafond approuvé par facture ni de révision; renforcer avant paiements réels.
-- Pas de workflow de demande de sortie par chefs de service, seulement saisie validée par magasinier.
-- Pas de mécanisme de sauvegarde/restauration automatisé ou de synchronisation avec la caisse.
-- Authentification de toutes les routes métier réalisée ; néanmoins des tests d'autorisation et de concurrence restent nécessaires.
-- **Ne pas utiliser pour enregistrer les vrais achats, stocks ou paiements du restaurant** avant validation, corrections et tests.
+## Fichiers
+| Fichier | Rôle |
+|---|---|
+| `server.py` | serveur HTTP(S), routes, sessions, sauvegardes automatiques |
+| `metier.py` | règles métier : CUMP, sorties, doublons, factures, demandes, paiements, inventaires, rapports |
+| `stockdb.py` | schéma versionné (migrations), déclencheurs d'immuabilité, journal chaîné |
+| `documents.py` | documents imprimables / PDF (Edge sans fenêtre) et exports CSV (Excel FR) |
+| `backup.py` | sauvegarde, vérification, restauration |
+| `public/` | interface (HTML/CSS/JS sans framework) |
+| `outils/creer_certificats.py` | autorité privée + certificat HTTPS |
+| `installation/` | installateurs Windows (serveur, poste), restauration, désinstallation |
+| `tests/test_integration.py` | 19 tests automatiques (API, droits, concurrence, pannes, sauvegardes, TLS) |
+| `tests/ui_parcours.py` | parcours complet dans le navigateur avec captures d'écran |
 
-## Suite
-1. Corriger limites de sécurité, ajouter sauvegarde et restauration testée.
-2. Développer demandes de sorties, réceptions multi-lignes, rapprochement factures, inventaires, unités.
-3. Verrouiller les montants approuvés, historiser les révisions et paiements.
-4. Rapports hebdomadaires et PDF serveur, documents joints.
-5. Tests automatisés, audit sécurité, validation fonctionnelle.
-6. Déploiement sur SRV MB comme hôte central et PC magasinier comme client **après accord explicite**.
+## Règles importantes
+- Quantités en **millièmes** de l'unité de stock (kg, L ou unité) ; montants en **centimes** de DA : aucun arrondi flottant.
+- Valorisation au **coût moyen pondéré** (CUMP) : chaque réception recalcule le coût moyen ; sorties, pertes et
+  retours fournisseur sortent au coût moyen ; un stock vidé repart à 0 DA (pas de valeur résiduelle).
+- **Mouvements, paiements, lignes de bons et journal sont immuables** (déclencheurs SQLite) : on corrige par
+  contre-écriture (annulation de bon, annulation de paiement, ajustement d'inventaire approuvé).
+- Achats (bons), factures, paiements et consommation sont **quatre indicateurs distincts**.
+- Une **approbation n'est jamais un paiement** : seule la direction confirme un règlement réel, facture par facture.
+- Chaque saisie porte un identifiant unique (`client_uid`) : un double clic ou un renvoi après coupure réseau
+  ne crée jamais de doublon.
+
+## Développement / tests (données de test uniquement)
+```
+cd stocks
+python -m unittest discover -s tests -v          # 19 tests
+python tests/ui_parcours.py --chrome "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"   # nécessite playwright
+python server.py --data C:\temp\stocks-test creer-compte direction direction "Direction"
+python server.py --data C:\temp\stocks-test        # http://127.0.0.1:8765 (local uniquement)
+```
+
+## Installation (APRÈS accord du gérant)
+1. Sur SRV MB : copier le dossier `stocks` (ou cloner la branche), puis `installation\Installer le serveur.cmd`
+   (option : `-SauvegardeExterne "E:\Sauvegardes-Stocks"`). Le script : Python, copie dans `C:\MBStocks`, droits,
+   certificat, pare-feu (réseau local seulement, port 8765), comptes, tâche au démarrage, sauvegarde du soir,
+   raccourci bureau, dossier `pour-le-pc-magasinier`.
+2. Sur le PC magasinier : copier `C:\MBStocks\pour-le-pc-magasinier` puis lancer `Installer le poste.cmd`
+   (autorité de certification, nom du serveur, raccourci Edge).
+3. Vérifier que l'empreinte affichée est la même sur les deux PC.
+
+## Retour arrière (rollback)
+- `installation\desinstaller.ps1` (administrateur) : retire tâches, pare-feu, raccourci, autorité. Les données restent.
+- Restaurer des données : `C:\MBStocks\Restaurer une sauvegarde.cmd` (l'état actuel est conservé dans
+  `data\avant-restauration-<date>`).
+- La caisse n'est jamais modifiée : aucun retour arrière nécessaire de ce côté.
