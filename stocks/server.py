@@ -379,6 +379,21 @@ class Handler(BaseHTTPRequestHandler):
                 raise M.Err(f"Trop d'essais : réessayez dans {reste} secondes (ou demandez à la direction un nouveau mot de passe)", 429)
         c = D.connect()
         try:
+            if d.get("magasinier_direct"):
+                # Entrée du magasinier sans mot de passe (demande de la direction, 25/11/2026) :
+                # seulement depuis le réseau du restaurant, jamais depuis l'accès à distance Tailscale.
+                if self.headers.get("Tailscale-User-Login") or not any(ipaddress.ip_address(ip) in n for n in NETWORKS):
+                    raise M.Err("Entrée sans mot de passe possible seulement au restaurant", 403)
+                mags = M.rows(c, "SELECT * FROM users WHERE role='magasinier' AND active=1 ORDER BY id")
+                if not mags: raise M.Err("Aucun compte magasinier actif", 404)
+                u = mags[0]
+                with D.WRITE_LOCK:
+                    c.execute("BEGIN IMMEDIATE")
+                    c.execute("UPDATE users SET must_change=0 WHERE id=?", (u["id"],))
+                    tok = M.new_session(c, u["id"], ip)
+                    D.audit(c, u["id"], "connexion_sans_mdp", "user", u["id"], {"ip": ip})
+                    c.execute("COMMIT")
+                return {"token": tok, "role": u["role"], "must_change": 0}
             u = M.authenticate(c, name, str(d.get("password", "")))
             if not u:
                 with FAIL_LOCK: FAILS[key_ip].append(t); FAILS[key_user].append(t)

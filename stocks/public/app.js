@@ -227,6 +227,12 @@ $('#loginForm').onsubmit = async e => {
     S.token = r.token; localStorage.setItem('mb_stk', r.token); $('#lgPass').value = ''; await start();
   } catch (err) { $('#lgErr').textContent = err.message; }
 };
+if (location.hostname.endsWith('.ts.net')) $('#lgMag').remove();
+else $('#lgMag').onclick = async () => {
+  $('#lgErr').textContent = '';
+  try { const r = await api('connexion', {magasinier_direct: true}); S.token = r.token; localStorage.setItem('mb_stk', r.token); await start(); }
+  catch (err) { $('#lgErr').textContent = err.message; }
+};
 function logout(expired) {
   if (!expired && S.token) fetch('/api/deconnexion', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token}, body: '{}'}).catch(() => {});
   S.token = ''; S.session = null; sessionStorage.removeItem('mb_stk'); localStorage.removeItem('mb_stk');
