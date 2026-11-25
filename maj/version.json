@@ -1,7 +1,7 @@
 {
  "version": "3.7.8",
- "date": "2026-11-25T07:36:25.712Z",
- "notes": "Corrections : ruptures gardées en enregistrant la carte, commandes QR validables par les serveurs, regroupement de tables sans bons en double, rase automatique même avec une table oubliée ou un PC éteint, articles gardés après rechargement de l'écran, impressions une par une",
+ "date": "2026-11-25T07:36:46.770Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
