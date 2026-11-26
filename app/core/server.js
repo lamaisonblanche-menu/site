@@ -603,7 +603,8 @@ class Doc {
   lr(a, b, w) { w = w || this.w; a = String(a); b = String(b); const sp = w - a.length - b.length; if (sp >= 1) return this.t(a + ' '.repeat(sp) + b); return this.t(a.slice(0, w - b.length - 1) + ' ' + b); }
   feed(n = 4) { return this.raw(ESC, 0x64, n); }
   cut() { this.feed(4); return this.raw(GS, 0x56, 66, 0); }
-  drawer() { return this.raw(ESC, 0x70, 0, 25, 250); }
+  // 3.9.3 : impulsion sur les DEUX broches du tiroir (2 et 5) et plus longue (100 ms) : selon le câblage, le tiroir répond à l'une ou l'autre
+  drawer() { return this.raw(ESC, 0x70, 0, 50, 250).raw(ESC, 0x70, 1, 50, 250); }
   // QR code imprimé par l'imprimante elle-même (commande ESC/POS standard Epson)
   qr(texte, taille = 6) {
     const data = Buffer.from(String(texte), 'utf8'), n = data.length + 3;
@@ -1954,10 +1955,11 @@ const routes = {
     saveNow();
     journal(u, 'encaissement', 'Ticket ' + tk.num + ' table ' + c.table + ' ' + fmt(net) + ' DA (' + paiements.map(p => MODES[p.mode] + ' ' + fmt(p.montant)).join(' + ') + ')' + (remise ? ' remise ' + fmt(remise) : '') + (partiel ? ' — paiement partiel' : ''));
     save();
-    const d = ticketDoc(tk);
     const tiroir = recu > 0 && db.config.tiroirAuto;
-    if (tiroir) d.drawer();
-    const r = b.imprimer === false && !tiroir ? { ok: true } : await imprimer('ticket', b.imprimer === false ? new Doc().drawer() : d);
+    // 3.9.3 : le tiroir s'ouvre AVANT l'impression du ticket (et plus après la coupe)
+    const d = b.imprimer === false ? new Doc() : ticketDoc(tk);
+    if (tiroir) { const t = new Doc().drawer(); d.parts.splice(1, 0, ...t.parts.slice(1)); }
+    const r = b.imprimer === false && !tiroir ? { ok: true } : await imprimer('ticket', d);
     return { ticket: tk, partiel, erreurs: r.ok ? [] : [r.erreur] };
   },
   'POST /api/tiroir': async (b, u) => {

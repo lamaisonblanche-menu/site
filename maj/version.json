@@ -1,11 +1,11 @@
 {
- "version": "3.9.2",
- "date": "2026-11-26T11:16:31.534Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.3",
+ "date": "2026-11-26T11:46:54.429Z",
+ "notes": "Tiroir : ouverture sur les deux broches, impulsion plus longue, et avant l'impression du ticket",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "2e9fa1560d7dc408e42825c89133fcd37ffa3d2a7d3f911ab21ec6b21ad76cd8"
+   "sha256": "a5f3bf7c7d6bb4e38f65f6fd984cf5dabf7dee41e8990ea10e13b6eec5e38724"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "174b53fe355bf088a60bc649d0ba090395ea6075a8857c0e8ed2612f05e284e2"
+   "sha256": "9dbc8c5db534c81279ab16e9edd7568d32300a15317a609aef002a5e867479b0"
   },
   {
    "chemin": "suivi.js",

@@ -269,3 +269,7 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Imprimante injoignable (connexion jamais établie) : 2 nouveaux essais automatiques (1,5 s puis 4 s). Jamais de nouvel essai si la connexion a été établie (pas de doublon).
 - « Envoyer » imprime sur toutes les imprimantes en même temps (`Promise.all`) : une imprimante en panne ne retarde plus les autres.
 - `reessayerBons()` toutes les 20 s : un bon (hors ticket) en échec depuis moins de 10 min est réimprimé seul avec « BON EN RETARD / Envoyé à HH:MM » en tête (`rec.auto` pour la copie, exclue des alertes). Après 10 min, il reste dans les alertes pour la main. `rec.cmd` = id de la commande ; « Réimprimer les bons » d'une table règle ses échecs (pas de double bon).
+
+### 3.9.3 (26/11/2026, Claude) — tiroir qui ne s'ouvrait pas (signalé par Manil)
+- `Doc.drawer()` envoie l'impulsion sur les deux broches (`ESC p 0` et `ESC p 1`, 100 ms) : le tiroir répond selon son câblage à l'une ou l'autre.
+- Encaissement en espèces : la commande du tiroir part au DÉBUT du ticket (juste après l'initialisation), plus après la coupe.
