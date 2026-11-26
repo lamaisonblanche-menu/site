@@ -11,12 +11,12 @@ const jsq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/
 const fmt = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const da = n => fmt(n) + ' DA';
 const hm = ts => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-const ROLE = { admin: 'Responsable', caissier: 'Caisse', serveur: 'Serveur', cuisine: 'Cuisine' };
+const ROLE = { admin: 'Responsable', caissier: 'Caisse', maitre: 'Maître d’hôtel', serveur: 'Serveur', cuisine: 'Cuisine' };
 const SUITES = ['Direct', 'Entrées', 'Plats', 'Desserts', 'Suite 4', 'Suite 5'];
 // pointage seulement sur le PC de la caisse principale (celui qui fait tourner le serveur)
 const CAISSE_PRINCIPALE = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte TPE', societe: 'Facture', offert: 'Offert', mixte: 'Plusieurs modes' };
-const LV = { cuisine: 0, serveur: 1, caissier: 2, admin: 3 };
+const LV = { cuisine: 0, serveur: 1, maitre: 1.5, caissier: 2, admin: 3 };
 const peut = r => S.etat && LV[S.etat.user.role] >= LV[r];
 const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const DECO = { bar: 'Bar', caisse: 'Caisse', wc: 'Toilettes', sapin: 'Sapin', plante: 'Plante', porte: 'Entrée' };
@@ -227,7 +227,7 @@ function verifierInactivite() {
   const sec = reg > 0 ? Math.min(reg, VEILLE_SEC) : VEILLE_SEC;
   const inactif = Date.now() - lastTouch >= sec * 1000;
   if (inactif && role !== 'cuisine' && !S.envoiEnCours) {
-    if (!CAISSE_PRINCIPALE || role === 'serveur') { garderBrouillon(); logout(); return; }
+    if (!CAISSE_PRINCIPALE || role === 'serveur' || role === 'maitre') { garderBrouillon(); logout(); return; }
     if (S.view === 'commande' && $('#modal').hidden) {
       garderBrouillon();
       S.view = 'tables'; S.cmdId = null; S.draft = []; S.sel = null; S.qty = ''; S.envoiOperation = null;
@@ -464,7 +464,7 @@ async function loadResa() {
 function viewResa() {
   const R = S.resa;
   if (!R) return '<div class="main">Chargement…</div>';
-  const cais = peut('caissier'), auj = ymd(new Date());
+  const cais = peut('maitre'), auj = ymd(new Date());
   const actives = R.reservations.filter(r => r.statut !== 'annulee' && r.statut !== 'absent');
   const pers = actives.reduce((a, r) => a + r.couverts, 0);
   const salleN = id => (S.etat.config.salles.find(x => x.id === id) || {}).nom || '';
@@ -1633,7 +1633,7 @@ Object.assign(A, {
     const c = cmd(); const caisse = peut('caissier');
     const b = (ic, t, fn, cls = '') => `<button class="gb ${cls}" onclick="A.close();${fn}">${ic}<span>${t}</span></button>`;
     modal(mh(esc(titreCmd(c))) + `<div class="grille">
-      ${b('🧾', 'Addition', 'A.addition()')}${peut('caissier') ? b('⇄', 'Transférer / regrouper', 'A.transfert()') : ''}${b('👥', 'Couverts', 'A.couverts()')}
+      ${b('🧾', 'Addition', 'A.addition()')}${peut('maitre') ? b('⇄', 'Transférer / regrouper', 'A.transfert()') : ''}${b('👥', 'Couverts', 'A.couverts()')}
       ${b('✉', 'Message à la cuisine', 'A.message()')}${b('🖨', 'Réimprimer les bons', 'A.rebons()')}${enAttente(c).length ? b('⏩', 'Tout lancer maintenant', 'A.toutEnvoyer()') : ''}
       ${c.salle === 'emporter' ? b('🥡', 'Client et heure de retrait', 'A.infosEmporter()') : ''}
       ${caisse ? b('✂', 'Séparer l’addition', 'A.separer()') + b('％', 'Remise', 'A.encaisser(\'especes\',null,true)') + b('💳', 'Autres paiements', 'A.encaisser(\'tpe\')') + b('🧑‍🍳', 'Changer de serveur', 'A.chServeur()') + b('⛔', 'Ruptures', 'A.ruptures()') : ''}

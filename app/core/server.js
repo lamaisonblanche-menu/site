@@ -554,7 +554,8 @@ function jourRuptures() { return dateLocale(now() - 5 * 3600e3); }
 function rupturesAFaire(u) { return !!(u && u.role === 'caissier' && (db.rupturesJour || {}).date !== jourRuptures()); }
 const LIBRE_RUPTURES = new Set(['POST /api/produit/stock', 'POST /api/ruptures/valider', 'POST /api/logout']);
 function pinAdmin(pin) { const u = parCode(pin); return u && u.role === 'admin' ? u : null; }
-const ROLES = { cuisine: 0, serveur: 1, caissier: 2, admin: 3 };
+// 3.10.0 : maître d'hôtel (maitre) = serveur + réservations + transfert de tables, sans argent ni annulation
+const ROLES = { cuisine: 0, serveur: 1, maitre: 1.5, caissier: 2, admin: 3 };
 function peut(u, role) { return u && ROLES[u.role] >= ROLES[role]; }
 
 // ---------------------------------------------------------------- Impression ESC/POS
@@ -1594,7 +1595,7 @@ const routes = {
     return { reservations: db.reservations.filter(r => r.date >= du && r.date <= au).sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure)).map(resaPublic), site: siteEtat, mail: !!(db.config.mail && db.config.mail.actif && db.config.mail.pass) };
   },
   'POST /api/reservation': (b, u) => {
-    if (!peut(u, 'caissier')) E('Seuls les caissiers peuvent prendre une réservation', 403);
+    if (!peut(u, 'maitre')) E('Seuls la caisse et le maître d\'hôtel peuvent prendre une réservation', 403);
     const r = verifierResa(b);
     const ex = b.id ? db.reservations.find(x => x.id === b.id) : null;
     if (b.id && !ex) E('Réservation introuvable');
@@ -1619,7 +1620,7 @@ const routes = {
     const r = db.reservations.find(x => x.id === b.id);
     if (!r) E('Réservation introuvable');
     if (!['prevue', 'arrivee', 'annulee', 'absent'].includes(b.statut)) E('Statut inconnu');
-    if (!peut(u, 'caissier') && b.statut !== 'arrivee') E('Seuls les caissiers peuvent faire ça', 403);
+    if (!peut(u, 'maitre') && b.statut !== 'arrivee') E('Seuls la caisse et le maître d\'hôtel peuvent faire ça', 403);
     const avant = r.statut;
     r.statut = b.statut; if (b.statut === 'arrivee') r.arrivee = now();
     journal(u, 'réservation ' + b.statut, r.nom + ' ' + r.date + ' ' + r.heure);
@@ -1628,7 +1629,7 @@ const routes = {
     if (b.statut === 'prevue' && avant === 'a_confirmer') notifier('[Caisse MB] Réservation du site confirmée : ' + r.nom + ', ' + r.couverts + ' pers., ' + jourTxt(r.date) + ' à ' + r.heure, resaTexte(r) + '\nConfirmée par : ' + u.nom);
     return resaPublic(r);
   },
-  'POST /api/reservations/site': async (b, u) => { if (!peut(u, 'caissier')) E('Non autorisé', 403); return await lireSite(); },
+  'POST /api/reservations/site': async (b, u) => { if (!peut(u, 'maitre')) E('Non autorisé', 403); return await lireSite(); },
   'POST /api/logout': (b, u, req) => { sessions.delete(req.headers['x-token']); return {}; },
 
   'POST /api/commande/ouvrir': (b, u) => {
@@ -1745,7 +1746,7 @@ const routes = {
   },
   'POST /api/produit/stock': (b, u) => {
     if (QR.estEssai(b.pid)) E('Stock réservé à la campagne QR', 403);
-    if (u.role === 'serveur') E('Seuls la cuisine, la caisse et le responsable gèrent les ruptures', 403);
+    if (u.role === 'serveur' || u.role === 'maitre') E('Seuls la cuisine, la caisse et le responsable gèrent les ruptures', 403);
     const p = db.produits.find(x => x.id === b.pid); if (!p) E('Article introuvable');
     p.stock = b.stock === null || b.stock === '' || b.stock === undefined ? null : Math.max(0, parseInt(b.stock, 10) || 0);
     journal(u, 'rupture / stock', p.nom + ' : ' + (p.stock === null ? 'disponible' : p.stock === 0 ? 'ÉPUISÉ' : 'reste ' + p.stock));
@@ -1809,7 +1810,7 @@ const routes = {
   },
   'POST /api/commande/modifier': async (b, u) => {
     const c = getCmd(b.id);
-    if (b.salle && b.table && !peut(u, 'caissier')) E('Seul un caissier peut transférer ou regrouper une table', 403);
+    if (b.salle && b.table && !peut(u, 'maitre')) E('Seuls la caisse et le maître d\'hôtel peuvent transférer ou regrouper une table', 403);
     if (b.couverts) c.couverts = Math.max(1, +b.couverts);
     if (b.salle && b.table) {
       const t = String(b.table);
@@ -2311,7 +2312,7 @@ const routes = {
     const unique = (code, nom) => { if (!code) return; if (codes.has(code)) E('Le même code ou badge est utilisé par ' + codes.get(code) + ' et ' + nom); codes.set(code, nom); };
     for (const x of list) {
       if (!x.nom || !/^\d{4,6}$/.test(String(x.pin))) E('Chaque personne doit avoir un nom et un code de 4 à 6 chiffres');
-      if (!['admin', 'caissier', 'serveur', 'cuisine'].includes(x.role)) E('Rôle inconnu');
+      if (!['admin', 'caissier', 'maitre', 'serveur', 'cuisine'].includes(x.role)) E('Rôle inconnu');
       if (x.actif) { unique(String(x.pin), x.nom); unique(String(x.badge || '').trim(), x.nom); }
     }
     if (!list.some(x => x.actif && x.role === 'admin')) E('Il faut garder au moins un responsable actif');

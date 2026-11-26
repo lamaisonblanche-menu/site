@@ -1,11 +1,11 @@
 {
- "version": "3.9.6",
- "date": "2026-11-26T18:19:11.222Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.10.0",
+ "date": "2026-11-26T18:21:56.839Z",
+ "notes": "Nouveau poste Maître d'hôtel : réservations et transfert de tables, sans encaissement ni annulation",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "05566dceb1394c0ba52e28e74b18cfc0efb325b12d58183db953af94e4a9e27d"
+   "sha256": "ac67a8a961ce1353733aeef7762757f3f3b28d1f4ef1bf97369f3b5a329b3b4b"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "f422e534c88f9f4016768a9bde1be8c66738e47faca2d38c7c9851d63efcfab1"
+   "sha256": "e68ea424a1b045873e1c6890f22099384ec5b01cd661039057ba84fa96b57ca4"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "a02cbc469e31e3464834b3a32535903d3a470fbf6c052f1d9007703c127c41f4"
+   "sha256": "5e620123b2575d6fc4d7da2e6488e2a38ae62f6ab98263e1498756d16d2b1581"
   },
   {
    "chemin": "suivi.js",
