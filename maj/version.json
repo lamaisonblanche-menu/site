@@ -1,7 +1,7 @@
 {
  "version": "3.9.3",
- "date": "2026-11-26T11:46:54.429Z",
- "notes": "Tiroir : ouverture sur les deux broches, impulsion plus longue, et avant l'impression du ticket",
+ "date": "2026-11-26T11:47:05.387Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
