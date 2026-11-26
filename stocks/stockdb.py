@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("MB_STOCKS_DATA", str(ROOT / "data")))
 DB_PATH = Path(os.environ.get("MB_STOCKS_DB", str(DATA / "stocks.sqlite3")))
 WRITE_LOCK = threading.RLock()
-SERVICES = {"cuisine": "Cuisine", "asiatique": "Asiatique", "brunch": "Brunch", "comptoir": "Comptoir / Bar"}
+SERVICES = {"cuisine": "Cuisine", "asiatique": "Asiatique", "brunch": "Brunch", "comptoir": "Comptoir / Bar", "patisserie": "Pâtisserie"}
 BASE_UNITS = {"kg": "kilogramme", "L": "litre", "u": "unité"}
 # Conversions standard proposées pour chaque unité de base (facteur = combien d'unités de base)
 STD_UNITS = {"kg": {"kg": 1, "g": 0.001}, "L": {"L": 1, "cL": 0.01, "mL": 0.001}, "u": {"u": 1}}
@@ -170,7 +170,19 @@ CREATE TRIGGER no_del_rml BEFORE DELETE ON receipt_misc_lines BEGIN SELECT RAISE
 CREATE TRIGGER no_upd_rml BEFORE UPDATE ON receipt_misc_lines BEGIN SELECT RAISE(ABORT,'Ligne immuable'); END;
 """
 
-MIGRATIONS = [SCHEMA_V1, SCHEMA_V2]  # ajouter ici les migrations suivantes (jamais modifier une migration publiée)
+SCHEMA_V3 = """
+CREATE TABLE issue_slips_v3(
+  id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('sortie','retour_service','perte','retour_fournisseur')),
+  service TEXT CHECK(service IS NULL OR service IN ('cuisine','asiatique','brunch','comptoir','patisserie')),
+  supplier_id INTEGER REFERENCES suppliers(id), requested_by TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
+  total INTEGER NOT NULL DEFAULT 0, created_by INTEGER NOT NULL REFERENCES users(id), created_at TEXT NOT NULL, client_uid TEXT UNIQUE);
+INSERT INTO issue_slips_v3(id,kind,service,supplier_id,requested_by,reason,total,created_by,created_at,client_uid)
+  SELECT id,kind,service,supplier_id,requested_by,reason,total,created_by,created_at,client_uid FROM issue_slips;
+DROP TABLE issue_slips;
+ALTER TABLE issue_slips_v3 RENAME TO issue_slips;
+"""  # v1.7.0 : service Pâtisserie
+
+MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3]  # ajouter ici les migrations suivantes (jamais modifier une migration publiée)
 
 DEFAULT_SETTINGS = {
     "week_start": "0",            # 0 = dimanche … 6 = samedi (semaine algérienne : dimanche → samedi)

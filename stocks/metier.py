@@ -372,9 +372,9 @@ def duplicate_check(c, table, supplier, key, total, doc_date, d, label):
         raise Err(f"Doublon : ce {label} existe déjà pour ce fournisseur", 409, "doublon")
     col = "total" if table == "receipts" else "amount"
     near = rows(c, f"SELECT id,number,doc_date FROM {table} WHERE supplier_id=? AND {col}=? AND status IN ('validee','active') AND ABS(julianday(doc_date)-julianday(?))<=3", (supplier, total, doc_date))
-    if near:
-        reason = text(d, "duplicate_reason", 300, False)
-        if not (d.get("force") and reason):
+    if near:  # v1.7.0 : plus bloquant, simplement signalé sur la pièce
+        reason = text(d, "duplicate_reason", 300, False) or ("Même fournisseur et même montant qu'une autre pièce à moins de 3 jours (n° " + ", ".join(n["number"] for n in near) + ")")[:300]
+        if False:
             raise Err(f"Doublon probable : même fournisseur, même montant ({fmt_da(total)}) à moins de 3 jours — n° " + ", ".join(n["number"] for n in near) +
                       ". Confirmez en indiquant la raison.", 409, "doublon_probable", {"similaires": near})
         return reason
@@ -388,9 +388,10 @@ def create_receipt(c, u, d):
     sup = intid(d, "supplier_id", "Fournisseur")
     s = one(c, "SELECT * FROM suppliers WHERE id=?", (sup,))
     if not s or not s["active"]: raise Err("Fournisseur inconnu ou désactivé")
-    number = text(d, "number", 60, label="N° du bon"); key = number_key(number)
-    if not key: raise Err("N° du bon invalide")
-    doc_date = day(d, "doc_date", "Date du bon")
+    number = text(d, "number", 60, required=False, label="N° du bon"); key = number_key(number)
+    if not key:  # n° facultatif (v1.7.0) : numéro automatique unique
+        number = "SANS-N° " + datetime.now().strftime("%d/%m %H:%M:%S"); key = number_key(number) + "-" + uid(d)[:8]
+    doc_date = day(d, "doc_date", "Date du bon", required=False, default=date.today().isoformat())
     if doc_date > date.today().isoformat(): raise Err("La date du bon ne peut pas être dans le futur")
     divers = bool(d.get("divers"))
     if divers: misc, lines = misc_lines_input(d.get("misc_lines")), []
@@ -418,14 +419,16 @@ def create_receipt(c, u, d):
 
 
 def cancel_receipt(c, u, d):
-    need(u, "direction")
-    rid = intid(d, "receipt_id"); reason = text(d, "reason", 300, label="Motif")
+    """Magasinier ou direction. Seul blocage : la facture du bon a déjà été payée (même en partie) par la direction."""
+    rid = intid(d, "receipt_id"); reason = text(d, "reason", 300, False, "Motif") or ("Annulé par " + u["display_name"])
     r = one(c, "SELECT * FROM receipts WHERE id=?", (rid,))
     if not r or r["status"] != "validee": raise Err("Bon introuvable ou déjà annulé", 409)
-    if one(c, "SELECT 1 FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE receipt_id=? AND i.status='active'", (rid,)):
-        raise Err("Ce bon est rapproché d'une facture active : annulez ou corrigez d'abord la facture", 409)
+    for inv in rows(c, "SELECT i.id FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE ir.receipt_id=? AND i.status='active'", (rid,)):
+        if paid(c, inv["id"]): raise Err("Impossible : la facture de ce bon a déjà été payée par la direction", 409, "deja_payee")
+        others = val(c, "SELECT COUNT(*) FROM invoice_receipts WHERE invoice_id=? AND receipt_id<>?", (inv["id"], rid))
+        if not others: cancel_invoice(c, u, {"invoice_id": inv["id"], "reason": "Bon annulé : " + reason})
     for l in rows(c, "SELECT * FROM receipt_lines WHERE receipt_id=?", (rid,)):
-        move(c, u, l["item_id"], "annulation_reception", -l["qty"], -l["total"], None, "reception", rid)
+        move(c, u, l["item_id"], "annulation_reception", -l["qty"], -l["total"], None, "reception", rid, allow_clamp=True)
     c.execute("DELETE FROM invoice_receipts WHERE receipt_id=?", (rid,))
     c.execute("UPDATE receipts SET status='annulee',cancelled_by=?,cancelled_at=?,cancel_reason=? WHERE id=?", (u["id"], now(), reason, rid))
     audit(c, u["id"], "reception_annulee", "receipt", rid, {"reason": reason})
@@ -444,7 +447,7 @@ def create_issue(c, u, d):
     if kind in ("sortie", "retour_service"):
         if service not in SERVICES: raise Err("Choisissez le service")
     else: service = None
-    reason = text(d, "reason", 300, kind in ("perte", "retour_fournisseur"), "Motif")
+    reason = text(d, "reason", 300, False, "Motif")
     if kind == "retour_fournisseur":
         supplier = intid(d, "supplier_id", "Fournisseur")
         if not one(c, "SELECT id FROM suppliers WHERE id=?", (supplier,)): raise Err("Fournisseur inconnu")
@@ -543,13 +546,17 @@ def invoice_link(c, u, d):
 
 
 def cancel_invoice(c, u, d):
-    need(u, "direction")
-    iid = intid(d, "invoice_id"); reason = text(d, "reason", 300, label="Motif")
+    """Magasinier ou direction. Seul blocage : la direction a déjà payé cette facture (même en partie)."""
+    iid = intid(d, "invoice_id"); reason = text(d, "reason", 300, False, "Motif") or ("Annulée par " + u["display_name"])
     inv = one(c, "SELECT * FROM invoices WHERE id=?", (iid,))
     if not inv or inv["status"] != "active": raise Err("Facture introuvable ou déjà annulée", 409)
-    if paid(c, iid): raise Err("Des paiements sont enregistrés sur cette facture : annulez-les d'abord", 409)
-    if one(c, f"SELECT 1 FROM payment_request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status IN {OPEN_REQUEST}", (iid,)):
-        raise Err("Facture présente dans une demande de paiement en cours", 409)
+    if paid(c, iid): raise Err("Impossible : cette facture a déjà été payée par la direction", 409, "deja_payee")
+    for l in rows(c, f"SELECT l.id,l.request_id FROM payment_request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status IN {OPEN_REQUEST}", (iid,)):
+        c.execute("DELETE FROM payment_request_lines WHERE id=?", (l["id"],))
+        if not val(c, "SELECT COUNT(*) FROM payment_request_lines WHERE request_id=?", (l["request_id"],)):
+            c.execute("UPDATE payment_requests SET status='cloturee',closed_at=?,review_comment=COALESCE(review_comment,'')||? WHERE id=?",
+                      (now(), " Annulée : plus aucune facture.", l["request_id"]))
+        else: request_status_refresh(c, l["request_id"])
     c.execute("UPDATE invoices SET status='annulee',cancelled_by=?,cancelled_at=?,cancel_reason=? WHERE id=?", (u["id"], now(), reason, iid))
     c.execute("DELETE FROM invoice_receipts WHERE invoice_id=?", (iid,))
     audit(c, u["id"], "facture_annulee", "invoice", iid, {"reason": reason})
@@ -630,10 +637,13 @@ def save_request(c, u, d):
     if rid:
         r = one(c, "SELECT * FROM payment_requests WHERE id=?", (rid,))
         if not r: raise Err("Demande inconnue", 404)
-        if r["status"] not in ("brouillon", "a_corriger"): raise Err("Demande verrouillée : elle n'est plus modifiable", 409)
+        if r["status"] not in ("brouillon", "a_corriger", "soumise", "approuvee", "refusee") or request_paid(c, rid):
+            raise Err("La direction a déjà payé une partie de cette demande : elle n'est plus modifiable", 409)
         lines = request_lines_input(c, d, rid, r["week_start"])
         c.execute("DELETE FROM payment_request_lines WHERE request_id=?", (rid,))
         c.execute("UPDATE payment_requests SET note=? WHERE id=?", (text(d, "note", 1000, False), rid))
+        if r["status"] in ("soumise", "approuvee", "refusee"):  # modifiée après envoi : la direction devra la revoir
+            c.execute("UPDATE payment_requests SET status='a_corriger',reviewed_by=NULL,reviewed_at=NULL WHERE id=?", (rid,))
     else:
         ex = existing(c, "payment_requests", uid(d))
         if ex: return ex
@@ -653,7 +663,8 @@ def submit_request(c, u, d):
     need(u, "magasinier")
     rid = intid(d, "request_id")
     r = one(c, "SELECT * FROM payment_requests WHERE id=?", (rid,))
-    if not r or r["status"] not in ("brouillon", "a_corriger"): raise Err("Seule une demande en brouillon ou à corriger peut être soumise", 409)
+    if not r or r["status"] not in ("brouillon", "a_corriger", "soumise", "approuvee", "refusee") or request_paid(c, rid):
+        raise Err("Cette demande ne peut plus être soumise (déjà payée ou clôturée)", 409)
     for l in rows(c, "SELECT * FROM payment_request_lines WHERE request_id=?", (rid,)):
         dv = due(c, l["invoice_id"])
         if l["requested"] > dv: raise Err("Une facture a été réglée ou modifiée entre-temps : ouvrez la demande et corrigez-la", 409)
@@ -665,13 +676,19 @@ def submit_request(c, u, d):
     return {"id": rid, "revision": rev}
 
 
+def request_paid(c, rid):
+    return val(c, "SELECT COUNT(*) FROM payments p LEFT JOIN payment_cancellations x ON x.payment_id=p.id WHERE x.payment_id IS NULL AND p.request_id=?", (rid,))
+
+
 def delete_draft(c, u, d):
+    """Annuler une demande (magasinier) : possible à toute étape tant que la direction n'a rien payé."""
     need(u, "magasinier")
     rid = intid(d, "request_id")
     r = one(c, "SELECT * FROM payment_requests WHERE id=?", (rid,))
-    if not r or r["status"] != "brouillon" or r["revision"] > 0: raise Err("Seul un brouillon jamais soumis peut être supprimé", 409)
+    if not r or r["status"] in ("payee", "cloturee"): raise Err("Demande introuvable ou déjà clôturée", 409)
+    if request_paid(c, rid): raise Err("Impossible : la direction a déjà payé une partie de cette demande", 409, "deja_payee")
     c.execute("DELETE FROM payment_request_lines WHERE request_id=?", (rid,))
-    c.execute("UPDATE payment_requests SET status='cloturee',closed_at=?,review_comment='Brouillon abandonné' WHERE id=?", (now(), rid))
+    c.execute("UPDATE payment_requests SET status='cloturee',closed_at=?,review_comment=COALESCE(review_comment,'')||' Annulée par le magasinier.' WHERE id=?", (now(), rid))
     audit(c, u["id"], "brouillon_abandonne", "request", rid)
     return {"ok": True}
 
@@ -812,8 +829,6 @@ def save_inventory(c, u, d):
     if d.get("submit"):
         n = val(c, "SELECT COUNT(*) FROM inventory_lines WHERE inventory_id=?", (iid,))
         if not n: raise Err("Inventaire vide")
-        missing = val(c, "SELECT COUNT(*) FROM inventory_lines WHERE inventory_id=? AND counted<>expected AND reason=''", (iid,))
-        if missing: raise Err(f"{missing} écart(s) sans explication : indiquez la raison de chaque écart")
         c.execute("UPDATE inventories SET status='soumis',submitted_at=? WHERE id=?", (now(), iid))
         audit(c, u["id"], "inventaire_soumis", "inventory", iid, {"lignes": n})
     else:

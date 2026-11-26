@@ -134,35 +134,39 @@ class T1Stocks(Base):
         for num in ("BL-0042", "bl 42", "BL/042"):
             r = self.receive(s, num, [{"item_id": it, "qty": 5, "unit_price": 200}])
             self.assertEqual(r["status"], 409, num); self.assertEqual(r["code"], "doublon")
-        r = self.receive(s, "BL-0043", [{"item_id": it, "qty": 5, "unit_price": 200}])
-        self.assertEqual(r["code"], "doublon_probable")
-        self.ok(self.receive(s, "BL-0043", [{"item_id": it, "qty": 5, "unit_price": 200}], force=True, duplicate_reason="Deuxième livraison le même jour"))
+        # v1.7.0 : doublon probable (même montant, autre n°) n'est plus bloquant, il est noté sur le bon
+        r = self.ok(self.receive(s, "BL-0043", [{"item_id": it, "qty": 5, "unit_price": 200}]))
         self.assertEqual(self.stock(it)[0], 10000)
+        # v1.7.0 : n° du bon facultatif (deux bons sans n° le même jour acceptés)
+        self.ok(self.m("reception", {"supplier_id": s, "number": "", "lines": [{"item_id": it, "qty": 1, "unit_price": 7}], "client_uid": U()}))
+        self.ok(self.m("reception", {"supplier_id": s, "lines": [{"item_id": it, "qty": 1, "unit_price": 9}], "client_uid": U()}))
+        self.assertEqual(self.stock(it)[0], 12000)
         # idempotence : la même saisie renvoyée deux fois (double clic, coupure réseau) n'est enregistrée qu'une fois
         uid = U(); body = {"supplier_id": s, "number": "BL-0050", "doc_date": date.today().isoformat(), "lines": [{"item_id": it, "qty": 1, "unit_price": 1}], "client_uid": uid}
         a = self.ok(self.m("reception", body)); b = self.ok(self.m("reception", body))
-        self.assertEqual(a["id"], b["id"]); self.assertTrue(b.get("deja_enregistre")); self.assertEqual(self.stock(it)[0], 11000)
+        self.assertEqual(a["id"], b["id"]); self.assertTrue(b.get("deja_enregistre")); self.assertEqual(self.stock(it)[0], 13000)
 
     def test_04_cump_et_services(self):
         s = self.supplier("Fournisseur D"); it = self.item("Saumon")
         self.ok(self.receive(s, "S1", [{"item_id": it, "qty": 10, "unit_price": 100}]))
         self.ok(self.receive(s, "S2", [{"item_id": it, "qty": 10, "unit_price": 200}]))  # CUMP = 150
         vals = {}
-        for svc, q in (("cuisine", 2), ("asiatique", 4), ("brunch", 1), ("comptoir", 3)):
+        for svc, q in (("cuisine", 2), ("asiatique", 4), ("brunch", 1), ("comptoir", 3), ("patisserie", 0)):
+            if not q: continue
             r = self.ok(self.m("mouvement", {"kind": "sortie", "service": svc, "lines": [{"item_id": it, "qty": q}], "client_uid": U(), "requested_by": "Chef " + svc}))
             vals[svc] = r["total"]
         self.assertEqual(vals, {"cuisine": 30000, "asiatique": 60000, "brunch": 15000, "comptoir": 45000})
         self.assertEqual(self.stock(it), (10000, 150000))
         # retour d'un service au coût moyen, perte, retour fournisseur
         self.ok(self.m("mouvement", {"kind": "retour_service", "service": "asiatique", "lines": [{"item_id": it, "qty": 1}], "client_uid": U()}))
-        self.assertEqual(self.m("mouvement", {"kind": "perte", "lines": [{"item_id": it, "qty": 1}], "client_uid": U()})["status"], 400)  # motif obligatoire
-        self.ok(self.m("mouvement", {"kind": "perte", "reason": "Rupture chaîne du froid", "lines": [{"item_id": it, "qty": 1}], "client_uid": U()}))
+        self.ok(self.m("mouvement", {"kind": "perte", "lines": [{"item_id": it, "qty": 1}], "client_uid": U()}))  # motif facultatif (v1.7.0)
         self.ok(self.m("mouvement", {"kind": "retour_fournisseur", "supplier_id": s, "reason": "Qualité", "lines": [{"item_id": it, "qty": 2}], "client_uid": U()}))
         self.assertEqual(self.stock(it), (8000, 120000))
         # le magasinier seul autorise les sorties
         self.assertEqual(self.d("mouvement", {"kind": "sortie", "service": "cuisine", "lines": [{"item_id": it, "qty": 1}]})["status"], 403)
         # sortie de tout le stock : valeur remise exactement à zéro
-        self.ok(self.m("mouvement", {"kind": "sortie", "service": "cuisine", "lines": [{"item_id": it, "qty": 8}], "client_uid": U()}))
+        self.ok(self.m("mouvement", {"kind": "sortie", "service": "patisserie", "lines": [{"item_id": it, "qty": 1}], "client_uid": U()}))
+        self.ok(self.m("mouvement", {"kind": "sortie", "service": "cuisine", "lines": [{"item_id": it, "qty": 7}], "client_uid": U()}))
         self.assertEqual(self.stock(it), (0, 0))
         rep = self.m("rapport?period=semaine")
         self.assertEqual(rep["controle"], 0)
@@ -173,9 +177,7 @@ class T1Stocks(Base):
         s = self.supplier("Fournisseur E"); it = self.item("Huile", "L")
         self.ok(self.receive(s, "H1", [{"item_id": it, "qty": 20, "unit_price": 300}]))
         inv = self.ok(self.m("inventaire", {"lines": [{"item_id": it, "counted": "18,5", "unit": "L"}]}))["id"]
-        r = self.m("inventaire", {"id": inv, "submit": True})
-        self.assertEqual(r["status"], 400)  # raison obligatoire pour un écart
-        self.ok(self.m("inventaire", {"id": inv, "lines": [{"item_id": it, "counted": "18,5", "unit": "L", "reason": "Fuite bidon"}], "submit": True}))
+        self.ok(self.m("inventaire", {"id": inv, "submit": True}))  # explication de l'écart facultative (v1.7.0)
         self.assertEqual(self.m("inventaire/decision", {"inventory_id": inv, "action": "approuver"})["status"], 403)
         self.assertEqual(self.stock(it)[0], 20000)  # pas d'ajustement avant approbation
         self.ok(self.d("inventaire/decision", {"inventory_id": inv, "action": "approuver"}))
@@ -253,7 +255,11 @@ class T2Paiements(Base):
         self.assertEqual(r["code"], "deja_demandee")
         self.assertEqual(next(x for x in self.m("a-payer") if x["id"] == old)["locked_by"], req["number"])
         self.ok(self.m("demande/soumettre", {"request_id": rid}))
-        self.assertEqual(self.m("demande", {"id": rid, "lines": [{"invoice_id": old}]})["status"], 409)  # verrouillée après soumission
+        # v1.7.0 : le magasinier peut encore la modifier tant que rien n'est payé (elle repasse « à corriger »)
+        self.ok(self.m("demande", {"id": rid, "lines": [{"invoice_id": old}, {"invoice_id": new, "amount": 500}]}))
+        self.assertEqual(self.m(f"demande/{rid}")["status"], "a_corriger")
+        self.ok(self.m("demande/soumettre", {"request_id": rid}))
+        req = self.m(f"demande/{rid}"); req["lines"].sort(key=lambda l: l["invoice_id"] != old)
         self.ok(self.d("demande/decision", {"request_id": rid, "action": "approuver", "approved": {str(req["lines"][0]["id"]): 1000}}))  # plafond
         req = self.m(f"demande/{rid}")
         line_old = next(l for l in req["lines"] if l["invoice_id"] == old)
@@ -298,8 +304,16 @@ class T2Paiements(Base):
         self.ok(self.d("paiement/annuler", {"payment_id": p, "reason": "Erreur de saisie"}))
         self.assertEqual(self.m(f"facture/{inv}")["due"], 150000)
         self.assertEqual(self.m(f"demande/{rid}")["status"], "approuvee")
-        # bon rapproché : annulation refusée tant que la facture est active
-        self.assertEqual(self.d("reception/annuler", {"receipt_id": rec["id"], "reason": "x"})["status"], 409)
+        # v1.7.0 : annulation par le magasinier refusée seulement si la direction a payé
+        p2 = self.ok(self.d("paiement", {"request_id": rid, "invoice_id": inv, "amount": 100, "mode": "especes", "client_uid": U()}))["id"]
+        self.assertEqual(self.m("reception/annuler", {"receipt_id": rec["id"]})["code"], "deja_payee")
+        self.assertEqual(self.m("facture/annuler", {"invoice_id": inv})["code"], "deja_payee")
+        self.assertEqual(self.m("demande/abandonner", {"request_id": rid})["code"], "deja_payee")
+        self.ok(self.d("paiement/annuler", {"payment_id": p2, "reason": "test"}))
+        # rien de payé : le magasinier annule le bon → la facture liée est annulée, la demande vide est clôturée
+        self.ok(self.m("reception/annuler", {"receipt_id": rec["id"]}))
+        self.assertEqual(self.m(f"facture/{inv}")["status"], "annulee")
+        self.assertEqual(self.m(f"demande/{rid}")["status"], "cloturee")
 
 
 class T3Systeme(Base):
@@ -308,8 +322,6 @@ class T3Systeme(Base):
         self.assertEqual(call(self.port, "tableau", token="faux")["status"], 401)
         self.assertEqual(self.m("journal")["status"], 403)
         self.assertEqual(self.m("compte", {"action": "creer", "username": "x", "role": "direction", "password": "Abcdef12345"})["status"], 403)
-        self.assertEqual(self.m("reception/annuler", {"receipt_id": 1, "reason": "x"})["status"], 403)
-        self.assertEqual(self.m("facture/annuler", {"invoice_id": 1, "reason": "x"})["status"], 403)
         # Origine étrangère refusée (protection CSRF)
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/fournisseur", data=b'{"name":"x"}', headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.mag, "Origin": "http://pirate.example"})
         with self.assertRaises(urllib.error.HTTPError) as e: urllib.request.urlopen(req)

@@ -111,20 +111,23 @@ def lancer(log, avant=None):
     return dict(ETAT)
 
 
-def boucle_auto(log, heure=4, avant=None):
-    """Chaque nuit à `heure` h : si GitHub publie une version plus récente, l'installe tout seul."""
+def boucle_auto(log, heure=4, avant=None, calme=None, toutes_les=900, calme_min=180):
+    """Toutes les 15 min : si GitHub publie une version plus récente, l'installe toute seule dès que personne
+    n'a rien enregistré depuis 3 min (comme la caisse). Les écrans se rechargent seuls ensuite."""
     time.sleep(60)
-    fait = None
+    echec = None  # version déjà essayée et refusée : on ne la retélécharge pas en boucle
     while True:
         try:
-            n = datetime.now()
-            if n.hour == heure and fait != n.date():
-                fait = n.date()
-                v = version_disponible()
-                if v and _plus_recente(v, version_locale()):
+            v = version_disponible()
+            if v and v != echec and _plus_recente(v, version_locale()) and not ETAT["en_cours"]:
+                if calme is None or calme() >= calme_min:
                     log(f"Mise à jour automatique : {version_locale()} -> {v}"); lancer(log, avant)
+                    time.sleep(120)
+                    if ETAT.get("erreur"): echec = v
+                    continue
+                time.sleep(60); continue  # quelqu'un saisit : on réessaie dans 1 min
         except Exception: pass
-        time.sleep(600)
+        time.sleep(toutes_les)
 
 
 def etat():

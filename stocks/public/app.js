@@ -11,7 +11,7 @@ const parseNum = s => { const v = Number(String(s ?? '').replace(/\s| /g, '').
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/-/g, '');
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const fd = s => { if (!s) return ''; const [d, t] = String(s).split(' '); const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` + (t ? ' ' + t.slice(0, 5) : ''); };
-const SVC = {cuisine: 'Cuisine', asiatique: 'Asiatique', brunch: 'Brunch', comptoir: 'Comptoir / Bar'};
+const SVC = {cuisine: 'Cuisine', asiatique: 'Asiatique', brunch: 'Brunch', comptoir: 'Comptoir / Bar', patisserie: 'Pâtisserie'};
 const KINDS = {sortie: 'Sortie vers service', retour_service: "Retour d'un service", perte: 'Perte / casse', retour_fournisseur: 'Retour fournisseur'};
 const MVK = {reception: 'Réception', annulation_reception: 'Annulation réception', sortie: 'Sortie', retour_service: 'Retour service', perte: 'Perte', retour_fournisseur: 'Retour fournisseur', ajustement: 'Ajustement inventaire'};
 const MODES = {especes: 'Espèces', cheque: 'Chèque', virement: 'Virement', autre: 'Autre'};
@@ -130,7 +130,14 @@ function setOnline(v) {
   if (v) OQ.flush();
   if (v && S.session && !$('#modals .back')) go(S.page, S.params);  // retour du réseau : on recharge la page affichée
 }
-setInterval(async () => { if (!S.token) return; try { await fetch('/api/ping', {cache: 'no-store'}); setOnline(true); } catch (e) { setOnline(false); } }, 10000);
+/* Nouvelle version installée sur SRV MB : l'écran se recharge tout seul (dès qu'aucune fenêtre n'est ouverte et que rien n'attend d'être envoyé). */
+let APP_V = null, MAJ_ATTENTE = false;
+function rechargerSiNouvelle(v) {
+  if (!v) return; if (!APP_V) { APP_V = v; return; }
+  if (v !== APP_V) MAJ_ATTENTE = true;
+  if (MAJ_ATTENTE && !$('#modals .back') && !OQ.list().length) { MAJ_ATTENTE = false; toast('Nouvelle version ' + v + ' : mise à jour de l\'écran…', 'ok'); setTimeout(() => location.reload(), 1200); }
+}
+setInterval(async () => { try { const p = await (await fetch('/api/ping', {cache: 'no-store'})).json(); setOnline(true); rechargerSiNouvelle(p.version); } catch (e) { if (S.token) setOnline(false); } }, 10000);
 
 /* ------------------------------------------------------------------ interface commune */
 function toast(msg, kind = '') { const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg; $('#toasts').append(t); setTimeout(() => t.remove(), kind === 'bad' ? 7000 : 3500); }
@@ -147,15 +154,15 @@ function modal({title, body, foot = '', size = '', onClose}) {
   return m;
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const b = $$('#modals .back').pop(); b && b.querySelector('.x').click(); } });
-function confirmBox(title, text, okLabel = 'Confirmer', cls = 'dark', withReason = false) {
+function confirmBox(title, text, okLabel = 'Confirmer', cls = 'dark', withReason = false, optional = false) {
   return new Promise(res => {
     const m = modal({title, body: `<p style="margin-top:0">${text}</p>` + (withReason ? `<label class="f">${withReason}<textarea id="cbReason"></textarea></label>` : ''),
       foot: `<button class="btn" data-a="no">Annuler</button><button class="btn ${cls}" data-a="ok">${okLabel}</button>`, onClose: () => res(null)});
     m.querySelector('[data-a=no]').onclick = () => m.close();
     m.querySelector('[data-a=ok]').onclick = () => {
       const r = withReason ? m.querySelector('#cbReason').value.trim() : true;
-      if (withReason && !r) return m.err('Ce champ est obligatoire');
-      res(r); m.querySelector('.x').onclick = null; $('#modals').lastChild.remove();
+      if (withReason && !r && !optional) return m.err('Ce champ est obligatoire');
+      res(withReason && !r ? ' ' : r); m.querySelector('.x').onclick = null; $('#modals').lastChild.remove();
     };
   });
 }
@@ -479,7 +486,7 @@ PAGES.receptions = async (v, p) => {
 function receptionForm() {
   const m = modal({title: 'Nouvelle réception', size: 'w3', body: `
     <div class="fields c4"><label class="f span2">Fournisseur<div class="row" style="flex-wrap:nowrap"><select id="rSup">${supplierOptions('')}</select><button class="btn sm" id="rNewSup" title="Nouveau fournisseur">＋</button></div></label>
-    <label class="f">N° du bon de livraison<input id="rNum" placeholder="ex. BL-2026-0153"></label><label class="f">Date du bon<input type="date" id="rDate" value="${today()}" max="${today()}"></label></div>
+    <label class="f">N° du bon (facultatif)<input id="rNum" placeholder="laisser vide s'il n'y en a pas"></label><label class="f">Date du bon<input type="date" id="rDate" value="${today()}" max="${today()}"></label></div>
     <label class="row" style="gap:8px;margin-top:14px"><input type="checkbox" id="rDiv"> <span><b>Achat divers</b> — bon sans article de stock (matériel, pressing, prestations, petits achats…)</span></label>
     <h3 id="rLinesT" style="margin:18px 0 6px;font-size:17px">Articles reçus</h3><div id="rLines"></div><div id="rMisc" class="hidden"></div>
     <div class="fields c2" style="margin-top:14px"><label class="f">Notes<textarea id="rNotes" placeholder="Remarques sur la livraison (facultatif)"></textarea></label>
@@ -567,13 +574,13 @@ async function receptionDetail(id, after) {
     ${r.lines.map(l => `<tr><td>${esc(l.name)}</td><td class="r">${NB3.format(l.qty_entered)} ${esc(l.unit_name)}${l.unit_name !== l.base_unit ? `<div class="muted small">${qf(l.qty, l.base_unit)}</div>` : ''}</td><td class="r">${da(l.unit_price)}</td><td class="r">${l.discount_pct ? l.discount_pct + ' %' : ''}</td><td class="r">${da(l.total)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="4">Total</td><td class="r">${da(r.total)}</td></tr></tfoot></table>
     <h3 style="margin:16px 0 8px;font-size:16px">Justificatifs</h3>${attachBlock(r.attachments, 'reception', r.id, r.status === 'validee', () => { m.close(); receptionDetail(id, after); })}`,
-    foot: (isDir() && r.status === 'validee' ? `<button class="btn bad" data-a="cancel">Annuler ce bon…</button>` : '') + `<button class="btn" data-a="doc">Imprimer / PDF</button>`});
+    foot: (r.status === 'validee' ? `<button class="btn bad" data-a="cancel">Annuler ce bon…</button>` : '') + `<button class="btn" data-a="doc">Imprimer / PDF</button>`});
   m.querySelector('[data-a=doc]').onclick = () => showDoc('reception/' + id, `Bon de réception ${r.number}`);
   const c = m.querySelector('[data-a=cancel]');
   if (c) c.onclick = async () => {
-    const why = await confirmBox('Annuler le bon', 'Le stock sera diminué des quantités de ce bon (contre-écriture). Cette action est tracée.', 'Annuler le bon', 'bad', 'Motif de l\'annulation');
+    const why = await confirmBox('Annuler le bon', 'Le stock sera diminué des quantités de ce bon. Si une facture est liée à ce bon et n\'est pas encore payée, elle est annulée aussi.', 'Annuler le bon', 'bad', 'Motif (facultatif)', true);
     if (!why) return;
-    try { await save('reception/annuler', {receipt_id: id, reason: why}); toast('Bon annulé', 'ok'); m.close(); await loadRef(); after && after(); } catch (e) { toast(e.message, 'bad'); }
+    if (!why) return; try { await save('reception/annuler', {receipt_id: id, reason: why.trim()}); toast('Bon annulé', 'ok'); m.close(); await loadRef(); after && after(); } catch (e) { toast(e.message, 'bad'); }
   };
 }
 
@@ -612,10 +619,10 @@ function issueForm(kind) {
     const svc = `<label class="f">Service<select id="iSvc"><option value="">— Choisir —</option>${Object.entries(SVC).map(([k, l]) => opt(k, l)).join('')}</select></label>`;
     $('#iHead', m).innerHTML = kind === 'sortie' ? svc + `<label class="f">Demandé par<input id="iReq" placeholder="ex. Chef de cuisine"></label><label class="f">Motif / commentaire<input id="iWhy" placeholder="facultatif"></label>`
       : kind === 'retour_service' ? svc + `<label class="f">Rapporté par<input id="iReq"></label><label class="f">Motif<input id="iWhy" placeholder="facultatif"></label>`
-      : kind === 'perte' ? `<label class="f span2">Motif de la perte (obligatoire)<input id="iWhy" placeholder="ex. produit périmé, casse, rupture de la chaîne du froid"></label><label class="f">Constaté par<input id="iReq"></label>`
-      : `<label class="f">Fournisseur<select id="iSup">${supplierOptions('')}</select></label><label class="f span2">Motif du retour (obligatoire)<input id="iWhy"></label>`;
-    $('#iInfo', m).textContent = kind === 'retour_service' ? 'Le stock augmente : les articles reviennent au magasin, valorisés au coût moyen actuel.'
-      : 'Le stock diminue immédiatement. Une sortie supérieure au stock disponible est refusée. Valeur calculée au coût moyen pondéré.';
+      : kind === 'perte' ? `<label class="f span2">Motif de la perte (facultatif)<input id="iWhy" placeholder="ex. produit périmé, casse"></label><label class="f">Constaté par<input id="iReq"></label>`
+      : `<label class="f">Fournisseur<select id="iSup">${supplierOptions('')}</select></label><label class="f span2">Motif du retour (facultatif)<input id="iWhy"></label>`;
+    $('#iInfo', m).textContent = kind === 'retour_service' ? 'Le stock augmente : les articles reviennent au magasin.'
+      : 'Le stock diminue immédiatement.';
     ed = lineEditor($('#iLines', m), kind === 'retour_service' ? 'entree' : 'sortie', ed ? ed.lines : []);
   };
   head();
@@ -809,7 +816,7 @@ async function invoiceDetail(id, after) {
     ${i.payments.length ? `<h3 style="font-size:16px;margin:14px 0 6px">Paiements</h3><table class="t"><tbody>${i.payments.map(p => `<tr class="${p.cancel_reason ? 'muted' : ''}"><td>${fd(p.paid_on)}</td><td>${MODES[p.mode]} ${esc(p.reference)}</td><td>${esc(p.request)}</td><td class="r">${p.cancel_reason ? `<s>${da(p.amount)}</s> <span class="tag bad">annulé</span>` : da(p.amount)}</td></tr>`).join('')}</tbody></table>` : ''}
     ${i.credits.length ? `<h3 style="font-size:16px;margin:14px 0 6px">Avoirs</h3><table class="t"><tbody>${i.credits.map(c => `<tr><td>${fd(c.doc_date)}</td><td>${esc(c.number)}</td><td>${esc(c.reason)}</td><td class="r">${da(c.amount)}</td></tr>`).join('')}</tbody></table>` : ''}
     <h3 style="font-size:16px;margin:14px 0 6px">Justificatifs</h3>${attachBlock(i.attachments, 'facture', i.id, i.status === 'active', () => { m.close(); invoiceDetail(id, after); })}`,
-    foot: (i.status === 'active' ? (i.kind === 'facture' ? `<button class="btn" data-a="link">Rapprocher des bons</button>` : '') + (i.due ? `<button class="btn" data-a="credit">＋ Avoir</button>` : '') + (isDir() ? `<button class="btn bad" data-a="cancel">Annuler la facture…</button>` : '') : '')});
+    foot: (i.status === 'active' ? (i.kind === 'facture' ? `<button class="btn" data-a="link">Rapprocher des bons</button>` : '') + (i.due ? `<button class="btn" data-a="credit">＋ Avoir</button>` : '') + (!i.payments.some(p => !p.cancel_reason) ? `<button class="btn bad" data-a="cancel">Annuler la facture…</button>` : '') : '')});
   const b = n => m.querySelector(`[data-a=${n}]`);
   b('credit') && (b('credit').onclick = () => creditForm(i, () => { m.close(); invoiceDetail(id, after); after && after(); }));
   b('link') && (b('link').onclick = async () => {
@@ -822,8 +829,8 @@ async function invoiceDetail(id, after) {
     };
   });
   b('cancel') && (b('cancel').onclick = async () => {
-    const why = await confirmBox('Annuler la facture', 'La facture ne sera plus comptée dans les dettes. Impossible si un paiement est enregistré.', 'Annuler la facture', 'bad', 'Motif');
-    if (!why) return; try { await save('facture/annuler', {invoice_id: id, reason: why}); m.close(); toast('Facture annulée', 'ok'); after && after(); } catch (e) { toast(e.message, 'bad'); }
+    const why = await confirmBox('Annuler la facture', 'La facture ne sera plus comptée dans les dettes et elle est retirée de la demande de paiement (tant que la direction ne l\'a pas payée).', 'Annuler la facture', 'bad', 'Motif (facultatif)', true);
+    if (!why) return; try { await save('facture/annuler', {invoice_id: id, reason: why.trim()}); m.close(); toast('Facture annulée', 'ok'); after && after(); } catch (e) { toast(e.message, 'bad'); }
   });
 }
 function creditForm(inv, after) {
@@ -929,13 +936,14 @@ async function requestDetail(id) {
     <h3 style="font-size:16px;margin:16px 0 6px">Justificatifs</h3>${attachBlock(r.attachments, 'demande', r.id, true, () => { m.close(); requestDetail(id); })}
     ${r.history.length ? `<p class="muted small" style="margin-top:14px">Historique : ${r.history.map(h => `${fd(h.at)} ${RST[h.event]?.[0] || h.event} (${esc(h.who)})`).join(' · ')}</p>` : ''}`,
     foot: `<button class="btn" data-a="doc">Aperçu / PDF</button>`
-      + (isMag() && ['brouillon', 'a_corriger'].includes(st) ? (st === 'brouillon' && r.revision === 0 ? `<button class="btn ghost" data-a="del">Abandonner</button>` : '') + `<button class="btn" data-a="edit">Modifier</button><button class="btn dark" data-a="submit">Soumettre</button>` : '')
+      + (isMag() && !r.total_paid && !['payee', 'cloturee'].includes(st) ? `<button class="btn bad" data-a="del">Annuler la demande</button>` + (st !== 'partiellement_payee' ? `<button class="btn" data-a="edit">Modifier</button>` : '') : '')
+      + (isMag() && ['brouillon', 'a_corriger', 'refusee'].includes(st) ? `<button class="btn dark" data-a="submit">Soumettre</button>` : '')
       + (canReview ? `<button class="btn bad" data-a="refuse">Refuser</button><button class="btn" data-a="fix">Demander une correction</button><button class="btn ok lg" data-a="approve">Approuver</button>` : '')
       + (canPay ? `<button class="btn" data-a="close">Clôturer…</button>` : '')});
   const b = n => m.querySelector(`[data-a=${n}]`), reopen = () => { m.close(); go('demandes'); requestDetail(id); refreshBadges(); };
   b('doc').onclick = () => showDoc('demande/' + id, `Demande de paiement ${r.number}`);
   b('edit') && (b('edit').onclick = () => { m.close(); requestForm(r); });
-  b('del') && (b('del').onclick = async () => { if (await confirmBox('Abandonner le brouillon', 'Le brouillon sera retiré.', 'Abandonner', 'bad')) { try { await api('demande/abandonner', {request_id: id}); m.close(); go('demandes'); } catch (e) { toast(e.message, 'bad'); } } });
+  b('del') && (b('del').onclick = async () => { if (await confirmBox('Annuler la demande', 'La demande est annulée et ses factures redeviennent disponibles pour une autre demande.', 'Annuler la demande', 'bad')) { try { await api('demande/abandonner', {request_id: id}); m.close(); go('demandes'); } catch (e) { toast(e.message, 'bad'); } } });
   b('submit') && (b('submit').onclick = async e => { try { await save('demande/soumettre', {request_id: id}, e.currentTarget); toast('Demande soumise', 'ok'); reopen(); } catch (er) { m.err(er.message); } });
   const decide = async (action, comment) => {
     const approved = {}; $$('[data-ap]', m).forEach(i => approved[i.dataset.ap] = i.value);
@@ -1010,7 +1018,7 @@ async function inventoryForm(inv) {
         return `<tr><td><b>${esc(i.name)}</b><div class="muted small">${esc(i.category)}</div></td><td class="muted small">${esc(i.location)}</td>${blind ? '' : `<td class="r">${qf(i.qty, i.base_unit)}</td>`}
         <td><div class="row" style="flex-wrap:nowrap;gap:6px"><input data-c="${i.id}" inputmode="decimal" value="${esc(c.counted ?? '')}"><span class="muted">${i.base_unit}</span></div></td>
         ${blind ? '' : `<td class="r" style="color:${d < 0 ? 'var(--bad)' : d > 0 ? 'var(--ok)' : ''}">${d ? (d > 0 ? '+' : '') + qf(d, i.base_unit) : d === 0 ? '✓' : ''}</td>`}
-        <td><input data-r="${i.id}" value="${esc(c.reason || '')}" placeholder="${d ? 'obligatoire' : ''}" class="${d && !c.reason ? 'bad' : ''}"></td></tr>`; }).join('')}</tbody></table>`;
+        <td><input data-r="${i.id}" value="${esc(c.reason || '')}" placeholder="${d ? 'facultatif' : ''}"></td></tr>`; }).join('')}</tbody></table>`;
     $$('[data-c]', m).forEach(x => x.onchange = () => { (counted[x.dataset.c] ||= {}).counted = x.value; draw(); });
     $$('[data-r]', m).forEach(x => x.oninput = () => { (counted[x.dataset.r] ||= {}).reason = x.value; x.classList.remove('bad'); });
     $('#vS', m).textContent = `${Object.values(counted).filter(c => c.counted !== undefined && c.counted !== '').length} article(s) compté(s)`;
@@ -1117,7 +1125,7 @@ PAGES.reglages = async v => {
     <div class="small muted" style="margin-bottom:10px">Version installée : <b>${esc(S.session.version)}</b> · PDF serveur : ${S.session.pdf ? 'disponible (Edge)' : 'indisponible — utilisez Imprimer › Enregistrer en PDF'}</div>
     <div id="majInfo" class="small" style="margin-bottom:10px">Vérification de la version disponible…</div>
     <div class="row"><button class="btn" id="majCheck">Vérifier</button><button class="btn dark" id="majGo">Mettre à jour maintenant</button></div>
-    <p class="small muted" style="margin:10px 0 0">Le serveur télécharge la dernière version depuis GitHub, l'installe et redémarre tout seul (environ 30 s). Les données ne sont jamais touchées. Une vérification automatique a lieu chaque nuit à 4 h.</p></div></div>`;
+    <p class="small muted" style="margin:10px 0 0">Le serveur télécharge la dernière version depuis GitHub, l'installe et redémarre tout seul (environ 30 s). Les données ne sont jamais touchées. Les nouvelles versions s'installent aussi toutes seules (vérification toutes les 15 min, après 3 min sans saisie) ; les écrans se rechargent seuls.</p></div></div>`;
   $('#wsOk').onclick = async () => { try { await api('reglages', {week_start: $('#wsS').value}); S.session.settings.week_start = +$('#wsS').value; toast('Réglage enregistré', 'ok'); } catch (e) { toast(e.message, 'bad'); } };
   const majShow = st => {
     const el = $('#majInfo'); if (!el) return;

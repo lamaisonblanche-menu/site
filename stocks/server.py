@@ -38,6 +38,7 @@ NETWORKS = []
 # Appareils de la direction reliés par Tailscale (SRV MB lui-même y apparaît sous le nom « srv-mb » depuis le 25/11/2026)
 TAILSCALE = [ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48")]
 BACKUP_STATE = {"last": None, "error": None}
+ACTIVITE = {"t": time.time()}  # dernière saisie (POST) : la mise à jour automatique attend 3 min de calme
 
 
 def log(msg):
@@ -318,6 +319,7 @@ class Handler(BaseHTTPRequestHandler):
             url = urlparse(self.path); path = url.path; q = parse_qs(url.query)
             if method == "GET" and not path.startswith("/api/"): return self.static(path)
             if method == "POST":
+                if path not in ("/api/erreur-client",): ACTIVITE["t"] = time.time()
                 origin = self.headers.get("Origin")
                 if origin and urlparse(origin).netloc != self.headers.get("Host"): raise M.Err("Origine refusée", 403)
                 n = int(self.headers.get("Content-Length") or 0)
@@ -503,7 +505,7 @@ def main():
         ctx.load_cert_chain(cert, key); srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
     if not os.environ.get("MB_STOCKS_NO_BACKUP"): threading.Thread(target=backup_loop, daemon=True).start()
     if not os.environ.get("MB_STOCKS_NO_BACKUP"):
-        threading.Thread(target=MAJ.boucle_auto, args=(log,), kwargs={"avant": lambda: run_backup("avant-maj")}, daemon=True).start()
+        threading.Thread(target=MAJ.boucle_auto, args=(log,), kwargs={"avant": lambda: run_backup("avant-maj"), "calme": lambda: time.time() - ACTIVITE["t"]}, daemon=True).start()
         threading.Thread(target=sante_loop, daemon=True).start()
         try: CTL.garder_version(ROOT, VERSION)  # ce code a démarré : c'est la dernière version qui marche
         except Exception as e: log("Copie de la version en cours impossible : " + str(e))

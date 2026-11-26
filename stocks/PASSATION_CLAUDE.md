@@ -109,3 +109,11 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 - **Contrôle de santé** (`GET /api/sante`, direction ; aussi 2 min après démarrage puis toutes les 6 h dans le journal) : intégrité de la base, journal chaîné, stock = dernier mouvement, clés étrangères, disque, âge de la dernière sauvegarde.
 - **Erreurs d'écran** : toute erreur JavaScript sur un poste/téléphone est envoyée à `POST /api/erreur-client` et notée dans le journal (`ERREUR écran`), 30/h max.
 - Limite d'essais de connexion comptée par appareil d'origine derrière Tailscale (`X-Forwarded-For`).
+
+## v1.7.0 (26/11/2026, Claude) — plus simple pour le magasinier (demande de Manil)
+- **Mises à jour** : avant, SRV MB ne vérifiait GitHub qu'à 4 h du matin et les écrans ouverts ne se rechargeaient jamais → le magasinier ne voyait pas les changements. Maintenant `boucle_auto` vérifie toutes les 15 min et installe dès 3 min sans saisie (`ACTIVITE` dans server.py, mis à jour à chaque POST) ; une version refusée n'est pas retéléchargée en boucle. Chaque écran compare la version de `/api/ping` à celle chargée et se recharge seul (`rechargerSiNouvelle`) dès qu'aucune fenêtre n'est ouverte et que la file hors ligne est vide.
+- **Annulations par le magasinier** (bons, factures, demandes de paiement), à toute étape, **sauf si la direction a déjà payé** (code `deja_payee`). Annuler un bon annule aussi sa facture si elle ne couvre que ce bon ; une facture annulée est retirée des demandes ouvertes (demande vide → clôturée). Annulation d'un bon : le stock ne bloque plus (`allow_clamp`).
+- Demande de paiement : le magasinier peut la **modifier** même soumise/approuvée tant que rien n'est payé → elle repasse « à corriger » et doit être revalidée.
+- **N° du bon facultatif** (numéro auto « SANS-N° jj/mm hh:mm:ss ») ; date par défaut = aujourd'hui.
+- **Moins de blocages** : doublon probable (même montant ±3 j) seulement noté sur le bon ; motifs (perte, retour fournisseur, annulations) et explications d'écart d'inventaire facultatifs. Restent bloquants : même n° de bon deux fois chez le même fournisseur, sortie supérieure au stock.
+- **Service Pâtisserie** (`patisserie`) : migration SQL V3 (reconstruction de `issue_slips` pour la contrainte CHECK).
