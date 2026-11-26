@@ -6,6 +6,7 @@ import stockdb as D
 from stockdb import rows, one, val, now, audit, SERVICES, STD_UNITS
 
 OPEN_REQUEST = ("brouillon", "soumise", "a_corriger", "approuvee", "partiellement_payee")
+ANNULEE = "Annulée : "  # préfixe du commentaire d'une demande annulée (statut cloturee, pas de changement de base)
 PAY_MODES = ("especes", "cheque", "virement", "autre")
 ISSUE_KINDS = {"sortie": "Sortie vers service", "retour_service": "Retour d'un service", "perte": "Perte / casse", "retour_fournisseur": "Retour fournisseur"}
 
@@ -418,12 +419,13 @@ def create_receipt(c, u, d):
 
 
 def cancel_receipt(c, u, d):
-    need(u, "direction")
+    # 1.7.0 : le magasinier peut aussi annuler un bon validé (motif obligatoire, tracé au journal)
     rid = intid(d, "receipt_id"); reason = text(d, "reason", 300, label="Motif")
     r = one(c, "SELECT * FROM receipts WHERE id=?", (rid,))
     if not r or r["status"] != "validee": raise Err("Bon introuvable ou déjà annulé", 409)
-    if one(c, "SELECT 1 FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE receipt_id=? AND i.status='active'", (rid,)):
-        raise Err("Ce bon est rapproché d'une facture active : annulez ou corrigez d'abord la facture", 409)
+    inv = one(c, "SELECT i.number FROM invoice_receipts ir JOIN invoices i ON i.id=ir.invoice_id WHERE receipt_id=? AND i.status='active'", (rid,))
+    if inv:
+        raise Err(f"Ce bon est rattaché à la facture {inv['number']} : annulez d'abord la facture (ou retirez le bon de la facture), puis le bon", 409)
     for l in rows(c, "SELECT * FROM receipt_lines WHERE receipt_id=?", (rid,)):
         move(c, u, l["item_id"], "annulation_reception", -l["qty"], -l["total"], None, "reception", rid)
     c.execute("DELETE FROM invoice_receipts WHERE receipt_id=?", (rid,))
@@ -543,13 +545,20 @@ def invoice_link(c, u, d):
 
 
 def cancel_invoice(c, u, d):
-    need(u, "direction")
+    # 1.7.0 : le magasinier peut aussi annuler une facture, sauf si la direction a déjà payé
     iid = intid(d, "invoice_id"); reason = text(d, "reason", 300, label="Motif")
     inv = one(c, "SELECT * FROM invoices WHERE id=?", (iid,))
     if not inv or inv["status"] != "active": raise Err("Facture introuvable ou déjà annulée", 409)
-    if paid(c, iid): raise Err("Des paiements sont enregistrés sur cette facture : annulez-les d'abord", 409)
-    if one(c, f"SELECT 1 FROM payment_request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status IN {OPEN_REQUEST}", (iid,)):
-        raise Err("Facture présente dans une demande de paiement en cours", 409)
+    if paid(c, iid):
+        raise Err("La direction a déjà payé cette facture : elle ne peut plus être annulée" + (" (annulez d'abord le paiement)" if u["role"] == "direction" else ""), 409, "deja_payee")
+    for r in rows(c, f"SELECT DISTINCT r.id,r.number,r.status FROM payment_request_lines l JOIN payment_requests r ON r.id=l.request_id WHERE l.invoice_id=? AND r.status IN {OPEN_REQUEST}", (iid,)):
+        if r["status"] in ("brouillon", "a_corriger"):  # demande encore modifiable : on retire simplement la facture
+            c.execute("DELETE FROM payment_request_lines WHERE request_id=? AND invoice_id=?", (r["id"], iid))
+            audit(c, u["id"], "facture_retiree_demande", "request", r["id"], {"invoice": iid, "number": inv["number"]})
+            if not val(c, "SELECT COUNT(*) FROM payment_request_lines WHERE request_id=?", (r["id"],)):
+                c.execute("UPDATE payment_requests SET status='cloturee',closed_at=?,review_comment=? WHERE id=?", (now(), "Annulée : plus aucune facture", r["id"]))
+        else:
+            raise Err(f"Cette facture est dans la demande de paiement {r['number']} : annulez d'abord la demande, puis la facture", 409, "dans_demande")
     c.execute("UPDATE invoices SET status='annulee',cancelled_by=?,cancelled_at=?,cancel_reason=? WHERE id=?", (u["id"], now(), reason, iid))
     c.execute("DELETE FROM invoice_receipts WHERE invoice_id=?", (iid,))
     audit(c, u["id"], "facture_annulee", "invoice", iid, {"reason": reason})
@@ -676,6 +685,21 @@ def delete_draft(c, u, d):
     return {"ok": True}
 
 
+def cancel_request(c, u, d):
+    """1.7.0 : annuler une demande de paiement (magasinier ou direction), même soumise ou approuvée,
+    tant que la direction n'a confirmé aucun paiement dessus. Les factures redeviennent libres."""
+    rid = intid(d, "request_id"); reason = text(d, "reason", 300, label="Motif")
+    r = one(c, "SELECT * FROM payment_requests WHERE id=?", (rid,))
+    if not r: raise Err("Demande inconnue", 404)
+    if r["status"] not in OPEN_REQUEST and r["status"] != "refusee": raise Err("Cette demande est déjà clôturée", 409)
+    if val(c, "SELECT COUNT(*) FROM payments p LEFT JOIN payment_cancellations x ON x.payment_id=p.id WHERE x.payment_id IS NULL AND p.request_id=?", (rid,)):
+        raise Err("La direction a déjà payé sur cette demande : elle ne peut plus être annulée", 409, "deja_payee")
+    c.execute("UPDATE payment_requests SET status='cloturee',closed_at=?,review_comment=? WHERE id=?", (now(), ANNULEE + reason, rid))
+    c.execute("INSERT INTO payment_request_revisions(request_id,revision,event,snapshot,user_id,at) VALUES(?,?,?,?,?,?)", (rid, r["revision"], "annulee", snapshot(c, rid), u["id"], now()))
+    audit(c, u["id"], "demande_annulee", "request", rid, {"reason": reason, "statut_avant": r["status"]})
+    return {"ok": True}
+
+
 def review_request(c, u, d):
     need(u, "direction")
     rid = intid(d, "request_id"); action = d.get("action")
@@ -783,6 +807,8 @@ def request_detail(c, rid):
                               FROM payments p JOIN invoices i ON i.id=p.invoice_id JOIN suppliers s ON s.id=i.supplier_id JOIN users u ON u.id=p.confirmed_by
                               LEFT JOIN payment_cancellations x ON x.payment_id=p.id WHERE p.request_id=? ORDER BY p.id""", (rid,))
     r["history"] = rows(c, "SELECT h.revision,h.event,h.at,u.display_name who FROM payment_request_revisions h JOIN users u ON u.id=h.user_id WHERE request_id=? ORDER BY h.id", (rid,))
+    r["annulee"] = r["status"] == "cloturee" and (r["review_comment"] or "").startswith(ANNULEE)
+    r["can_cancel"] = (r["status"] in OPEN_REQUEST or r["status"] == "refusee") and not any(not p["cancel_reason"] for p in r["payments"])
     r["total_requested"] = sum(l["requested"] for l in r["lines"])
     r["total_approved"] = sum(l["approved"] or 0 for l in r["lines"]) if r["status"] not in ("brouillon", "soumise", "a_corriger", "refusee") else None
     r["total_paid"] = sum(l["paid"] for l in r["lines"])

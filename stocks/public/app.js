@@ -16,7 +16,8 @@ const KINDS = {sortie: 'Sortie vers service', retour_service: "Retour d'un servi
 const MVK = {reception: 'Réception', annulation_reception: 'Annulation réception', sortie: 'Sortie', retour_service: 'Retour service', perte: 'Perte', retour_fournisseur: 'Retour fournisseur', ajustement: 'Ajustement inventaire'};
 const MODES = {especes: 'Espèces', cheque: 'Chèque', virement: 'Virement', autre: 'Autre'};
 const RST = {brouillon: ['Brouillon', ''], soumise: ['À valider', 'warn'], a_corriger: ['À corriger', 'bad'], refusee: ['Refusée', 'bad'], approuvee: ['Approuvée — à payer', 'info'],
-  partiellement_payee: ['Partiellement payée', 'gold'], payee: ['Payée', 'ok'], cloturee: ['Clôturée', ''], soumis: ['À valider', 'warn'], approuve: ['Approuvé', 'ok'], rejete: ['Rejeté', 'bad']};
+  partiellement_payee: ['Partiellement payée', 'gold'], payee: ['Payée', 'ok'], cloturee: ['Clôturée', ''], annulee: ['Annulée', 'bad'], soumis: ['À valider', 'warn'], approuve: ['Approuvé', 'ok'], rejete: ['Rejeté', 'bad']};
+const rst = r => r.status === 'cloturee' && (r.review_comment || '').startsWith('Annulée') ? 'annulee' : r.status;
 const tag = s => { const [l, c] = RST[s] || [s, '']; return `<span class="tag ${c}">${esc(l)}</span>`; };
 
 const S = {token: localStorage.getItem('mb_stk') || sessionStorage.getItem('mb_stk') || '', session: null, ref: {suppliers: [], items: []}, page: 'tableau', online: true, params: {}};
@@ -567,7 +568,7 @@ async function receptionDetail(id, after) {
     ${r.lines.map(l => `<tr><td>${esc(l.name)}</td><td class="r">${NB3.format(l.qty_entered)} ${esc(l.unit_name)}${l.unit_name !== l.base_unit ? `<div class="muted small">${qf(l.qty, l.base_unit)}</div>` : ''}</td><td class="r">${da(l.unit_price)}</td><td class="r">${l.discount_pct ? l.discount_pct + ' %' : ''}</td><td class="r">${da(l.total)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="4">Total</td><td class="r">${da(r.total)}</td></tr></tfoot></table>
     <h3 style="margin:16px 0 8px;font-size:16px">Justificatifs</h3>${attachBlock(r.attachments, 'reception', r.id, r.status === 'validee', () => { m.close(); receptionDetail(id, after); })}`,
-    foot: (isDir() && r.status === 'validee' ? `<button class="btn bad" data-a="cancel">Annuler ce bon…</button>` : '') + `<button class="btn" data-a="doc">Imprimer / PDF</button>`});
+    foot: (r.status === 'validee' ? `<button class="btn bad" data-a="cancel">Annuler ce bon…</button>` : '') + `<button class="btn" data-a="doc">Imprimer / PDF</button>`});
   m.querySelector('[data-a=doc]').onclick = () => showDoc('reception/' + id, `Bon de réception ${r.number}`);
   const c = m.querySelector('[data-a=cancel]');
   if (c) c.onclick = async () => {
@@ -809,7 +810,7 @@ async function invoiceDetail(id, after) {
     ${i.payments.length ? `<h3 style="font-size:16px;margin:14px 0 6px">Paiements</h3><table class="t"><tbody>${i.payments.map(p => `<tr class="${p.cancel_reason ? 'muted' : ''}"><td>${fd(p.paid_on)}</td><td>${MODES[p.mode]} ${esc(p.reference)}</td><td>${esc(p.request)}</td><td class="r">${p.cancel_reason ? `<s>${da(p.amount)}</s> <span class="tag bad">annulé</span>` : da(p.amount)}</td></tr>`).join('')}</tbody></table>` : ''}
     ${i.credits.length ? `<h3 style="font-size:16px;margin:14px 0 6px">Avoirs</h3><table class="t"><tbody>${i.credits.map(c => `<tr><td>${fd(c.doc_date)}</td><td>${esc(c.number)}</td><td>${esc(c.reason)}</td><td class="r">${da(c.amount)}</td></tr>`).join('')}</tbody></table>` : ''}
     <h3 style="font-size:16px;margin:14px 0 6px">Justificatifs</h3>${attachBlock(i.attachments, 'facture', i.id, i.status === 'active', () => { m.close(); invoiceDetail(id, after); })}`,
-    foot: (i.status === 'active' ? (i.kind === 'facture' ? `<button class="btn" data-a="link">Rapprocher des bons</button>` : '') + (i.due ? `<button class="btn" data-a="credit">＋ Avoir</button>` : '') + (isDir() ? `<button class="btn bad" data-a="cancel">Annuler la facture…</button>` : '') : '')});
+    foot: (i.status === 'active' ? (i.kind === 'facture' ? `<button class="btn" data-a="link">Rapprocher des bons</button>` : '') + (i.due ? `<button class="btn" data-a="credit">＋ Avoir</button>` : '') + `<button class="btn bad" data-a="cancel">Annuler la facture…</button>` : '')});
   const b = n => m.querySelector(`[data-a=${n}]`);
   b('credit') && (b('credit').onclick = () => creditForm(i, () => { m.close(); invoiceDetail(id, after); after && after(); }));
   b('link') && (b('link').onclick = async () => {
@@ -822,7 +823,7 @@ async function invoiceDetail(id, after) {
     };
   });
   b('cancel') && (b('cancel').onclick = async () => {
-    const why = await confirmBox('Annuler la facture', 'La facture ne sera plus comptée dans les dettes. Impossible si un paiement est enregistré.', 'Annuler la facture', 'bad', 'Motif');
+    const why = await confirmBox('Annuler la facture', 'La facture ne sera plus comptée dans les dettes. Si elle est dans une demande en brouillon ou à corriger, elle en est retirée. Impossible si la direction l\'a déjà payée.', 'Annuler la facture', 'bad', 'Motif');
     if (!why) return; try { await save('facture/annuler', {invoice_id: id, reason: why}); m.close(); toast('Facture annulée', 'ok'); after && after(); } catch (e) { toast(e.message, 'bad'); }
   });
 }
@@ -844,7 +845,7 @@ PAGES.demandes = async (v, p) => {
   const groups = isDir() ? [['À valider', l => l.status === 'soumise'], ['Approuvées — paiements à confirmer', l => ['approuvee', 'partiellement_payee'].includes(l.status)], ['Historique', l => !['soumise', 'approuvee', 'partiellement_payee'].includes(l.status)]]
     : [['En cours', l => ['brouillon', 'a_corriger', 'soumise', 'approuvee', 'partiellement_payee'].includes(l.status)], ['Historique', l => !['brouillon', 'a_corriger', 'soumise', 'approuvee', 'partiellement_payee'].includes(l.status)]];
   v.innerHTML = groups.map(([t, fn]) => { const ls = list.filter(fn); return `<div class="card"><div class="hd"><h2>${t}</h2><span class="tag" style="margin-left:auto">${ls.length}</span></div>${ls.length ? `<table class="t"><thead><tr><th>N°</th><th>Semaine</th><th>Statut</th><th>Factures</th><th class="r">Demandé</th><th class="r">Approuvé</th><th class="r">Payé</th><th>Soumise</th></tr></thead><tbody>
-    ${ls.map(r => `<tr class="click" data-id="${r.id}"><td><b>${esc(r.number)}</b>${r.revision > 1 ? ` <span class="muted small">rév. ${r.revision}</span>` : ''}</td><td>${fd(r.week_start)} → ${fd(r.week_end)}</td><td>${tag(r.status)}</td><td>${r.nb}</td><td class="r">${da(r.total)}</td><td class="r">${['approuvee', 'partiellement_payee', 'payee', 'cloturee'].includes(r.status) ? da(r.approved_total) : '—'}</td><td class="r">${r.paid_total ? da(r.paid_total) : '—'}</td><td class="muted">${fd(r.submitted_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="bd muted">Aucune.</div>'}</div>`; }).join('');
+    ${ls.map(r => `<tr class="click" data-id="${r.id}"><td><b>${esc(r.number)}</b>${r.revision > 1 ? ` <span class="muted small">rév. ${r.revision}</span>` : ''}</td><td>${fd(r.week_start)} → ${fd(r.week_end)}</td><td>${tag(rst(r))}</td><td>${r.nb}</td><td class="r">${da(r.total)}</td><td class="r">${['approuvee', 'partiellement_payee', 'payee', 'cloturee'].includes(r.status) ? da(r.approved_total) : '—'}</td><td class="r">${r.paid_total ? da(r.paid_total) : '—'}</td><td class="muted">${fd(r.submitted_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="bd muted">Aucune.</div>'}</div>`; }).join('');
   $$('tr[data-id]', v).forEach(tr => tr.onclick = () => requestDetail(+tr.dataset.id));
   if (p.nouveau && isMag()) requestForm();
   if (p.id) requestDetail(p.id);
@@ -915,8 +916,9 @@ async function requestDetail(id) {
       <td class="r">${canPay && l.reste_a_payer ? `<button class="btn sm ok" data-pay="${l.invoice_id}">Confirmer un paiement</button>` : l.approved != null && !l.reste_a_payer && l.paid ? '<span class="tag ok">réglée</span>' : ''}</td></tr>`;
   }
   const m = modal({title: `Demande ${esc(r.number)}`, size: 'w3', body: `
-    <div class="row" style="margin-bottom:12px">${tag(st)}<span class="muted">Semaine du ${fd(r.week_start)} au ${fd(r.week_end)} · révision ${r.revision} · préparée par ${esc(r.author)}</span><span class="grow"></span>
+    <div class="row" style="margin-bottom:12px">${tag(rst(r))}<span class="muted">Semaine du ${fd(r.week_start)} au ${fd(r.week_end)} · révision ${r.revision} · préparée par ${esc(r.author)}</span><span class="grow"></span>
     <div class="steps">${steps.map((s, i) => `<span class="${i < stepIdx ? 'done' : i === stepIdx ? 'on' : ''}">${['Préparée', 'Soumise', 'Approuvée', 'Payée'][i]}</span>`).join('›')}</div></div>
+    ${r.annulee ? `<div class="alertbox bad"><b>Demande annulée</b> le ${fd(r.closed_at)} — ${esc(r.review_comment.slice(10))}. Ses factures peuvent être remises dans une autre demande.</div>` : ''}
     ${st === 'a_corriger' || st === 'refusee' ? `<div class="alertbox bad"><b>${st === 'refusee' ? 'Refusée' : 'À corriger'} :</b> ${esc(r.review_comment)}</div>` : ''}
     ${['approuvee', 'partiellement_payee'].includes(st) ? '<div class="alertbox info">Approuvée : <b>aucune somme n\'est considérée payée</b> tant que la direction n\'a pas confirmé le règlement réel de chaque facture.</div>' : ''}
     ${r.note ? `<div class="alertbox warn"><b>Note du magasinier :</b> ${esc(r.note)}</div>` : ''}
@@ -931,11 +933,13 @@ async function requestDetail(id) {
     foot: `<button class="btn" data-a="doc">Aperçu / PDF</button>`
       + (isMag() && ['brouillon', 'a_corriger'].includes(st) ? (st === 'brouillon' && r.revision === 0 ? `<button class="btn ghost" data-a="del">Abandonner</button>` : '') + `<button class="btn" data-a="edit">Modifier</button><button class="btn dark" data-a="submit">Soumettre</button>` : '')
       + (canReview ? `<button class="btn bad" data-a="refuse">Refuser</button><button class="btn" data-a="fix">Demander une correction</button><button class="btn ok lg" data-a="approve">Approuver</button>` : '')
+      + (r.can_cancel && !(st === 'brouillon' && r.revision === 0) ? `<button class="btn bad" data-a="annul">Annuler la demande…</button>` : '')
       + (canPay ? `<button class="btn" data-a="close">Clôturer…</button>` : '')});
   const b = n => m.querySelector(`[data-a=${n}]`), reopen = () => { m.close(); go('demandes'); requestDetail(id); refreshBadges(); };
   b('doc').onclick = () => showDoc('demande/' + id, `Demande de paiement ${r.number}`);
   b('edit') && (b('edit').onclick = () => { m.close(); requestForm(r); });
   b('del') && (b('del').onclick = async () => { if (await confirmBox('Abandonner le brouillon', 'Le brouillon sera retiré.', 'Abandonner', 'bad')) { try { await api('demande/abandonner', {request_id: id}); m.close(); go('demandes'); } catch (e) { toast(e.message, 'bad'); } } });
+  b('annul') && (b('annul').onclick = async () => { const why = await confirmBox('Annuler la demande', 'La demande sera annulée (tracé au journal) et ses factures redeviendront libres pour une autre demande. Impossible si la direction a déjà payé.', 'Annuler la demande', 'bad', 'Motif'); if (why) { try { await save('demande/annuler', {request_id: id, reason: why}); toast('Demande annulée', 'ok'); reopen(); } catch (e) { toast(e.message, 'bad'); } } });
   b('submit') && (b('submit').onclick = async e => { try { await save('demande/soumettre', {request_id: id}, e.currentTarget); toast('Demande soumise', 'ok'); reopen(); } catch (er) { m.err(er.message); } });
   const decide = async (action, comment) => {
     const approved = {}; $$('[data-ap]', m).forEach(i => approved[i.dataset.ap] = i.value);

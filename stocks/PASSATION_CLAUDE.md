@@ -109,3 +109,10 @@ Le prototype a été réécrit (v1.0.0). État, tests et anomalies restantes : `
 - **Contrôle de santé** (`GET /api/sante`, direction ; aussi 2 min après démarrage puis toutes les 6 h dans le journal) : intégrité de la base, journal chaîné, stock = dernier mouvement, clés étrangères, disque, âge de la dernière sauvegarde.
 - **Erreurs d'écran** : toute erreur JavaScript sur un poste/téléphone est envoyée à `POST /api/erreur-client` et notée dans le journal (`ERREUR écran`), 30/h max.
 - Limite d'essais de connexion comptée par appareil d'origine derrière Tailscale (`X-Forwarded-For`).
+
+## v1.7.0 (26/11/2026) — annulations par le magasinier (demande de Manil)
+- Le magasinier peut annuler un **bon** validé (contre-écriture du stock) et une **facture** (motif obligatoire, tracé au journal), comme la direction.
+- Facture dans une demande en brouillon / à corriger : retirée automatiquement de la demande (demande vide → annulée). Dans une demande soumise ou approuvée : il faut d'abord annuler la demande.
+- Nouvelle route `POST /api/demande/annuler` (`cancel_request`) : magasinier ou direction, demande brouillon, soumise, à corriger, refusée ou approuvée, **tant qu'aucun paiement non annulé n'existe** sur la demande. Bloqué dès que la direction a confirmé un paiement (`deja_payee`).
+- Pas de changement de base : une demande annulée = statut `cloturee` + commentaire préfixé « Annulée : » (`ANNULEE`), drapeaux `annulee` / `can_cancel` dans le détail ; l'interface affiche « Annulée ».
+- Test : `T2Paiements.test_00_annulations_magasinier`.

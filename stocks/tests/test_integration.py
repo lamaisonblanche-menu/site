@@ -209,6 +209,30 @@ class T2Paiements(Base):
     def invoice(self, sup, num, amount, doc_date=None, **kw):
         return self.ok(self.m("facture", {"supplier_id": sup, "number": num, "amount": amount, "doc_date": doc_date or date.today().isoformat(), "client_uid": U(), **kw}))["id"]
 
+    def test_00_annulations_magasinier(self):
+        """1.7.0 : le magasinier annule bons, factures et demandes, sauf si la direction a déjà payé."""
+        s = self.supplier("Grossiste annul")
+        # demande soumise puis approuvée sans paiement : le magasinier peut l'annuler, la facture redevient libre
+        inv = self.invoice(s, "FA-1", 5000)
+        rid = self.ok(self.m("demande", {"lines": [{"invoice_id": inv}], "submit": True, "client_uid": U()}))["id"]
+        self.assertEqual(self.m("facture/annuler", {"invoice_id": inv, "reason": "x"})["code"], "dans_demande")
+        self.ok(self.d("demande/decision", {"request_id": rid, "action": "approuver"}))
+        self.ok(self.m("demande/annuler", {"request_id": rid, "reason": "Erreur de semaine"}))
+        r = self.m(f"demande/{rid}"); self.assertTrue(r["annulee"]); self.assertFalse(r["can_cancel"])
+        self.assertEqual(self.d("paiement", {"request_id": rid, "invoice_id": inv, "amount": 10, "mode": "especes", "client_uid": U()})["code"], "non_approuvee")
+        # facture dans un brouillon : retirée de la demande puis annulée par le magasinier
+        rid2 = self.ok(self.m("demande", {"lines": [{"invoice_id": inv}], "client_uid": U()}))["id"]
+        self.ok(self.m("facture/annuler", {"invoice_id": inv, "reason": "Facture en double"}))
+        self.assertEqual(self.m(f"demande/{rid2}")["lines"], [])
+        # demande payée par la direction : plus d'annulation possible (ni demande ni facture)
+        inv2 = self.invoice(s, "FA-2", 3000)
+        rid3 = self.ok(self.m("demande", {"lines": [{"invoice_id": inv2}], "submit": True, "client_uid": U()}))["id"]
+        self.ok(self.d("demande/decision", {"request_id": rid3, "action": "approuver"}))
+        self.ok(self.d("paiement", {"request_id": rid3, "invoice_id": inv2, "amount": 1000, "mode": "especes", "client_uid": U()}))
+        self.assertEqual(self.m("demande/annuler", {"request_id": rid3, "reason": "x"})["code"], "deja_payee")
+        self.assertEqual(self.m("facture/annuler", {"invoice_id": inv2, "reason": "x"})["code"], "deja_payee")
+        self.assertFalse(self.m(f"demande/{rid3}")["can_cancel"])
+
     def test_01_parcours_paiement_complet(self):
         s = self.supplier("Grossiste 1"); inv = self.invoice(s, "F-001", 10000)
         rid = self.ok(self.m("demande", {"lines": [{"invoice_id": inv}], "submit": True, "client_uid": U()}))["id"]
@@ -308,8 +332,6 @@ class T3Systeme(Base):
         self.assertEqual(call(self.port, "tableau", token="faux")["status"], 401)
         self.assertEqual(self.m("journal")["status"], 403)
         self.assertEqual(self.m("compte", {"action": "creer", "username": "x", "role": "direction", "password": "Abcdef12345"})["status"], 403)
-        self.assertEqual(self.m("reception/annuler", {"receipt_id": 1, "reason": "x"})["status"], 403)
-        self.assertEqual(self.m("facture/annuler", {"invoice_id": 1, "reason": "x"})["status"], 403)
         # Origine étrangère refusée (protection CSRF)
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/fournisseur", data=b'{"name":"x"}', headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.mag, "Origin": "http://pirate.example"})
         with self.assertRaises(urllib.error.HTTPError) as e: urllib.request.urlopen(req)

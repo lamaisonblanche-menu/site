@@ -64,6 +64,7 @@ POST = {
     "/api/demande": M.save_request,
     "/api/demande/soumettre": M.submit_request,
     "/api/demande/abandonner": M.delete_draft,
+    "/api/demande/annuler": M.cancel_request,
     "/api/demande/decision": M.review_request,
     "/api/demande/cloturer": M.close_request,
     "/api/paiement": M.confirm_payment,
