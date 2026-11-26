@@ -1,11 +1,11 @@
 {
- "version": "3.10.0",
- "date": "2026-11-26T18:22:12.414Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.10.1",
+ "date": "2026-11-26T20:05:40.870Z",
+ "notes": "Cuisine 2 en panne : tous les bons de la Cuisine 2 sortent sur la Cuisine principale",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "ac67a8a961ce1353733aeef7762757f3f3b28d1f4ef1bf97369f3b5a329b3b4b"
+   "sha256": "881b245dd96946e769e50a6fa3ada219902b2b673a31a1b83969f23dd0c8505d"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "5e620123b2575d6fc4d7da2e6488e2a38ae62f6ab98263e1498756d16d2b1581"
+   "sha256": "b0645d0ee42cdabb628af000a88ae140cee2410327c712b0ad37828bcc46a4c4"
   },
   {
    "chemin": "suivi.js",

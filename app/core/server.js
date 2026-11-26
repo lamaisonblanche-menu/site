@@ -664,6 +664,7 @@ function imprimantesWindows() {
 // Les impressions en échec gardent leurs données pour une réimpression ciblée, une seule fois.
 let impressionsEnCours = 0;
 function imprimer(poste, doc, opts) {
+  poste = cible(poste);
   impressionsEnCours++;
   const p = db.config.imprimantes[poste];
   if (!Array.isArray(db.impressions)) db.impressions = [];
@@ -781,10 +782,14 @@ function infosEmporter(d, c) {
 }
 function nomUser(id) { const u = db.users.find(x => x.id === id); return u ? u.nom : '-'; }
 function postesBons() { return Object.keys(db.config.imprimantes).filter(k => k !== 'ticket'); }
+// 3.10.1 : imprimante Cuisine 2 en panne -> tout ce qui devait y sortir part sur la Cuisine principale.
+// Pour la remettre en service : db.config.cuisine2Panne = false (la carte n'est pas modifiée).
+function cible(k) { return k === 'cuisine2' && db.config.cuisine2Panne !== false && db.config.imprimantes.cuisine ? 'cuisine' : k; }
+function cibles(l) { return [...new Set(l.map(cible))]; }
 function posteDe(pid) {
   const p = db.produits.find(x => x.id === pid); const c = p && db.categories.find(x => x.id === p.cat);
   const k = c ? c.poste : 'cuisine';
-  return db.config.imprimantes[k] && k !== 'ticket' ? k : postesBons()[0];
+  return cible(db.config.imprimantes[k] && k !== 'ticket' ? k : postesBons()[0]);
 }
 // Article « partout » (3.3.6) : le bon sort sur toutes les imprimantes de bons branchées (IP ou USB)
 function postesDe(pid) {
@@ -792,10 +797,10 @@ function postesDe(pid) {
   if (p && p.partout) {
     const reels = postesBons().filter(k => { const i = db.config.imprimantes[k]; return i && (i.ip || (i.type === 'usb' && i.windows)); });
     const l = reels.length ? reels : postesBons().filter(k => k !== 'cuisine2');
-    if (l.length) return l;
+    if (l.length) return cibles(l);
   }
   // article envoyé sur plusieurs imprimantes choisies (3.3.8), ex. Fondant : cuisine + comptoir
-  if (p && Array.isArray(p.postes)) { const l = p.postes.filter(k => db.config.imprimantes[k] && k !== 'ticket'); if (l.length) return l; }
+  if (p && Array.isArray(p.postes)) { const l = p.postes.filter(k => db.config.imprimantes[k] && k !== 'ticket'); if (l.length) return cibles(l); }
   return [posteDe(pid)];
 }
 const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', societe: 'Sur facture', offert: 'Offert', mixte: 'Plusieurs modes' };
