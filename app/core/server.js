@@ -675,8 +675,10 @@ let reessaiBons = false;
 async function reessayerBons() {
   if (reessaiBons) return; reessaiBons = true;
   try {
+    // 3.9.2 : si une imprimante vient d'échouer, ses autres bons attendent le prochain passage (inutile de la bloquer pour rien)
+    const enPanne = new Set();
     for (const rec of impressionsEnEchec()) {
-      if (rec.poste === 'ticket' || !rec.data || rec.ts < now() - 10 * 60000) continue;
+      if (rec.poste === 'ticket' || !rec.data || rec.ts < now() - 10 * 60000 || enPanne.has(rec.poste)) continue;
       const p = db.config.imprimantes[rec.poste]; if (!p || !p.ip) continue;
       rec.reimprime = { ts: now(), par: 'automatique' };
       const entete = Buffer.from('\x1b@\x1ba\x01\x1bE\x01\x1d!\x11BON EN RETARD\n\x1d!\x00Envoye a ' + heure(rec.ts) + '\n\x1bE\x00\x1ba\x00\n', 'latin1');
@@ -684,7 +686,11 @@ async function reessayerBons() {
       const doc = { txt: ['(auto) ' + rec.titre], buf: () => buf, texte: () => '(auto) ' + rec.titre + '\n' };
       const r = await imprimer(rec.poste, doc, { auto: true });
       if (r.ok) { delete rec.data; journal(null, 'réimpression automatique', rec.imprimante + ' : ' + rec.titre); broadcast(); }
-      else delete rec.reimprime;
+      else {
+        delete rec.reimprime; enPanne.add(rec.poste);
+        // 3.9.2 : un essai automatique raté n'est pas gardé dans l'historique (il le remplissait et en chassait les vrais bons en échec)
+        for (let i = db.impressions.length - 1; i >= 0; i--) if (db.impressions[i].auto && db.impressions[i].etat === 'echec') db.impressions.splice(i, 1);
+      }
     }
   } catch (e) { console.error(e); } finally { reessaiBons = false; }
 }
@@ -719,8 +725,10 @@ function imprimerReseau(p, poste, doc) {
   // 3.9.1 : si l'imprimante n'a pas pu être jointe (rien n'a été envoyé), on réessaie 2 fois tout seul (après 1,5 s puis 4 s).
   // Aucun risque de bon en double : on ne réessaie que si la connexion n'a jamais été établie.
   const buf = doc.buf();
-  const essai = n => essaiReseau(p, buf).then(r => (r.ok || r.connecte || n >= 2) ? r : new Promise(ok => setTimeout(ok, n ? 4000 : 1500)).then(() => essai(n + 1)));
-  return essai(0).then(({ connecte, ...r }) => r);
+  // 3.9.2 : seulement si elle a refusé tout de suite. Si elle ne répond pas du tout (éteinte, câble débranché), on n'insiste pas :
+  // sinon « Envoyer » restait bloqué 20 à 40 s sur l'écran du serveur. Le bon est de toute façon réessayé seul toutes les 20 s.
+  const essai = n => essaiReseau(p, buf).then(r => (r.ok || r.connecte || r.muette || n >= 2) ? r : new Promise(ok => setTimeout(ok, n ? 4000 : 1500)).then(() => essai(n + 1)));
+  return essai(0).then(({ connecte, muette, ...r }) => r);
 }
 function essaiReseau(p, buf) {
   return new Promise(resolve => {
@@ -730,7 +738,7 @@ function essaiReseau(p, buf) {
     // 3.9.1 : on lit (et jette) ce que l'imprimante renvoie. Avant, ces octets restaient non lus et la fermeture brutale
     // de la connexion 200 ms après l'envoi (RST) pouvait faire jeter le bon par l'imprimante : bon « transmis » mais jamais sorti.
     sock.on('data', () => {});
-    sock.setTimeout(5000, () => fin(ecrit ? { ok: true } : { ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') ne répond pas' }));
+    sock.setTimeout(5000, () => fin(ecrit ? { ok: true } : { ok: false, muette: !connecte, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') ne répond pas' }));
     sock.on('error', e => fin(ecrit ? { ok: true } : { ok: false, erreur: 'Imprimante ' + p.nom + ' (' + p.ip + ') : ' + e.code }));
     sock.on('connect', () => {
       connecte = true;
