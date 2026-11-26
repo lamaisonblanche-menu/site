@@ -1,7 +1,7 @@
 {
  "version": "3.10.1",
- "date": "2026-11-26T20:05:40.870Z",
- "notes": "Cuisine 2 en panne : tous les bons de la Cuisine 2 sortent sur la Cuisine principale",
+ "date": "2026-11-26T20:05:54.755Z",
+ "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
  "fichiers": [
   {
    "chemin": "VERSION",
