@@ -26,6 +26,13 @@ const isMag = () => S.session?.user.role === 'magasinier';
 
 /* ------------------------------------------------------------------ API */
 class ApiError extends Error { constructor(m, st, body) { super(m); this.status = st; this.body = body || {}; } }
+// 1.7.0 : signale au serveur qu'on utilise le logiciel (une mise à jour attend 3 min sans activité, comme la caisse)
+let lastAct = 0;
+['pointerdown', 'keydown', 'input'].forEach(ev => document.addEventListener(ev, () => {
+  const t = Date.now(); if (!S.token || t - lastAct < 30000) return; lastAct = t;
+  fetch('/api/activite', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token}, body: '{}', cache: 'no-store'}).catch(() => {});
+}, true));
+
 async function api(path, data, opt = {}) {
   const tries = data ? 4 : 2;
   for (let i = 0; ; i++) {
@@ -1121,11 +1128,12 @@ PAGES.reglages = async v => {
     <div class="small muted" style="margin-bottom:10px">Version installée : <b>${esc(S.session.version)}</b> · PDF serveur : ${S.session.pdf ? 'disponible (Edge)' : 'indisponible — utilisez Imprimer › Enregistrer en PDF'}</div>
     <div id="majInfo" class="small" style="margin-bottom:10px">Vérification de la version disponible…</div>
     <div class="row"><button class="btn" id="majCheck">Vérifier</button><button class="btn dark" id="majGo">Mettre à jour maintenant</button></div>
-    <p class="small muted" style="margin:10px 0 0">Le serveur télécharge la dernière version depuis GitHub, l'installe et redémarre tout seul (environ 30 s). Les données ne sont jamais touchées. Une vérification automatique a lieu chaque nuit à 4 h.</p></div></div>`;
+    <p class="small muted" style="margin:10px 0 0">Le serveur télécharge la dernière version depuis GitHub, l'installe et redémarre tout seul (environ 30 s). Les données ne sont jamais touchées. Automatique : toutes les 15 min le serveur regarde s'il y a une nouvelle version et l'installe dès que personne n'a touché le logiciel depuis 3 minutes.</p></div></div>`;
   $('#wsOk').onclick = async () => { try { await api('reglages', {week_start: $('#wsS').value}); S.session.settings.week_start = +$('#wsS').value; toast('Réglage enregistré', 'ok'); } catch (e) { toast(e.message, 'bad'); } };
   const majShow = st => {
     const el = $('#majInfo'); if (!el) return;
     if (st.en_cours) { el.innerHTML = `⏳ Mise à jour en cours : ${esc(st.etape)}…`; return; }
+    if (st.attente) { el.innerHTML = `Nouvelle version <b>${esc(st.attente)}</b> : installation automatique après 3 min sans activité (installée : ${esc(st.locale)})`; return; }
     if (st.erreur) { el.innerHTML = `<span style="color:var(--bad)">Échec : ${esc(st.erreur)}</span>`; return; }
     if (st.disponible === null && st.verifie) { el.innerHTML = `GitHub injoignable depuis SRV MB (${esc(st.verifie)})`; return; }
     if (!st.disponible) { el.textContent = 'Version disponible : inconnue'; return; }

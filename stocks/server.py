@@ -336,6 +336,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not u: raise M.Err("Session expirée : reconnectez-vous", 401, "session")
                 c.execute("UPDATE sessions SET last_seen=? WHERE token_hash=?", (D.now(), u["token_hash"]))
                 if method == "POST":
+                    MAJ.activite()
+                    if path == "/api/activite": return self.out(200, {"ok": True})
                     if path == "/api/deconnexion":
                         c.execute("DELETE FROM sessions WHERE token_hash=?", (u["token_hash"],)); return self.out(200, {"ok": True})
                     if path == "/api/sauvegarde":

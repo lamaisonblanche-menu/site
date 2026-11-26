@@ -15,7 +15,10 @@ SOUS_DOSSIER = "stocks"
 URL_VERSION = f"https://raw.githubusercontent.com/{DEPOT}/{BRANCHE}/{SOUS_DOSSIER}/VERSION"
 URL_ZIP = f"https://codeload.github.com/{DEPOT}/zip/refs/heads/{BRANCHE}"
 EXCLUS = {"data", "tests", "__pycache__", ".git"}  # jamais touchés dans le dossier de l'application
-ETAT = {"en_cours": False, "etape": "", "erreur": None, "fin": None, "disponible": None, "verifie": None, "refusee": None}
+CALME_SEC = 180          # comme la caisse : installation après 3 min sans aucune activité
+VERIF_SEC = 15 * 60      # vérification de GitHub toutes les 15 min
+ACTIVITE = {"t": time.time()}
+ETAT = {"attente": None, "en_cours": False, "etape": "", "erreur": None, "fin": None, "disponible": None, "verifie": None, "refusee": None}
 _LOCK = threading.Lock()
 
 
@@ -106,25 +109,35 @@ def lancer(log, avant=None):
             v = _installer(log, avant); ETAT["fin"] = v
         except Exception as e:
             ETAT["erreur"] = str(e)[:300]; log("ÉCHEC mise à jour : " + str(e))
+            ETAT["refusee_version"] = ETAT.get("disponible")  # pas de nouvel essai automatique de la même version
         finally: ETAT["en_cours"] = False
     threading.Thread(target=run, daemon=True).start()
     return dict(ETAT)
 
 
+def activite():
+    """Appelé à chaque saisie / clic sur un écran (et à chaque enregistrement)."""
+    ACTIVITE["t"] = time.time()
+
+
 def boucle_auto(log, heure=4, avant=None):
-    """Chaque nuit à `heure` h : si GitHub publie une version plus récente, l'installe tout seul."""
+    """1.7.0 : comme la caisse. Toutes les 15 min, regarde si une version plus récente est publiée sur GitHub ;
+    si oui, l'installe dès que personne n'a touché le logiciel depuis 3 min (sauvegarde avant, essai, retour arrière)."""
     time.sleep(60)
-    fait = None
+    derniere = 0
     while True:
         try:
-            n = datetime.now()
-            if n.hour == heure and fait != n.date():
-                fait = n.date()
-                v = version_disponible()
-                if v and _plus_recente(v, version_locale()):
-                    log(f"Mise à jour automatique : {version_locale()} -> {v}"); lancer(log, avant)
+            if not ETAT["en_cours"]:
+                if time.time() - derniere >= VERIF_SEC:
+                    derniere = time.time()
+                    v = version_disponible()
+                    ETAT["attente"] = v if v and _plus_recente(v, version_locale()) and v not in (ETAT.get("refusee_version"), ETAT.get("lancee")) else None
+                v = ETAT["attente"]
+                if v and time.time() - ACTIVITE["t"] >= CALME_SEC:
+                    log(f"Mise à jour automatique (3 min sans activité) : {version_locale()} -> {v}")
+                    ETAT["attente"] = None; ETAT["lancee"] = v; lancer(log, avant)
         except Exception: pass
-        time.sleep(600)
+        time.sleep(20)
 
 
 def etat():
