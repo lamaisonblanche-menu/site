@@ -1,11 +1,11 @@
 {
- "version": "3.9.3",
- "date": "2026-11-26T11:47:05.387Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.4",
+ "date": "2026-11-26T15:24:11.028Z",
+ "notes": "Remises : le caissier les applique sans code du responsable",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "a5f3bf7c7d6bb4e38f65f6fd984cf5dabf7dee41e8990ea10e13b6eec5e38724"
+   "sha256": "aa77303aac98eddf36b60c556bb4f1252b4829be76a80d94853a5a2ecd1f0766"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "8f220e4e891b327bf402bd8ac69457801ac3ad7e666d332e824477b6a6ab803d"
+   "sha256": "743f0c0775c10b7d96d85bb7be0fd0df71af33e5a1b7503139805dd76bc35a33"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "9dbc8c5db534c81279ab16e9edd7568d32300a15317a609aef002a5e867479b0"
+   "sha256": "97b9cce80c8f70be0949c29a330f72cc69dde4855628bcea3c241fb31856b02f"
   },
   {
    "chemin": "suivi.js",

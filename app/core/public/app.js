@@ -735,7 +735,7 @@ function admPointage() {
 }
 function admEquipe() {
   if (!adm.users) return '<p>Chargement…</p>';
-  return `<div class="row" style="margin-bottom:12px"><p class="muted grow">Chacun se connecte en <b>passant son badge</b> sur le lecteur, ou avec son code. <b>Serveur</b> : prend les commandes. <b>Caisse</b> : encaisse, sorties, rase. <b>Responsable</b> : tout, et autorise annulations, remises et offerts (code ou badge). <b>Cuisine</b> : uniquement l’écran cuisine (tablette en cuisine).</p><button class="btn" onclick="A.addUser()">+ Personne</button><button class="btn dark" onclick="A.saveUsers()">Enregistrer</button></div>
+  return `<div class="row" style="margin-bottom:12px"><p class="muted grow">Chacun se connecte en <b>passant son badge</b> sur le lecteur, ou avec son code. <b>Serveur</b> : prend les commandes. <b>Caisse</b> : encaisse, sorties, rase. <b>Responsable</b> : tout, et autorise annulations et offerts (code ou badge). <b>Cuisine</b> : uniquement l’écran cuisine (tablette en cuisine).</p><button class="btn" onclick="A.addUser()">+ Personne</button><button class="btn dark" onclick="A.saveUsers()">Enregistrer</button></div>
   <div class="panel"><table class="l"><tr><th>Nom</th><th style="width:170px">Rôle</th><th style="width:120px">Code</th><th style="width:250px">Badge</th><th style="width:70px">Actif</th></tr>
   ${adm.users.map((u, i) => `<tr class="${u.actif ? '' : 'x'}"><td><input value="${esc(u.nom)}" onchange="A.uset(${i},'nom',this.value)"></td>
     <td><select onchange="A.uset(${i},'role',this.value)">${Object.entries(ROLE).map(([k, n]) => `<option value="${k}" ${u.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
@@ -1249,7 +1249,7 @@ const A = window.A = {
     A.ef = v => { st.reference = v; };
     A.eo = v => { st.motif = v; };
     A.ei = v => { st.imprimer = v; };
-    A.er = () => { st.remise = null; st.pin = ''; draw(); };
+    A.er = () => { st.remise = null; draw(); };
     A.ediv = k => { st.saisie = String(Math.min(Math.max(reste(), 0), Math.ceil(net() / k))); draw(); };
     A.eadd = () => { const m = courant(); if (!(m > 0)) return; if (st.mode === 'societe' && !st.societe.trim()) return toast('Nom de la société', true); if (m > reste() && st.mode !== 'especes') return toast('Seules les espèces peuvent dépasser le reste', true); st.pays.push({ mode: st.mode, montant: m, societe: st.societe.trim(), reference: st.reference }); st.saisie = ''; st.reference = ''; draw(); };
     A.erm = i => { st.pays.splice(i, 1); draw(); };
@@ -1261,7 +1261,7 @@ const A = window.A = {
       A.rt = t => { type = t; val = ''; npv.rem = ''; dr(); };
       A.rv = p => { val = String(p); dr(); };
       A.rback = draw;
-      A.rok = () => askPin('Autoriser la remise', p => { st.pin = p; st.remise = { type, valeur: +val }; draw(); });
+      A.rok = () => { st.remise = { type, valeur: +val }; draw(); };
       npv.rem = ''; dr();
     };
     const operationPaiement = {};

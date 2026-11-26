@@ -1896,7 +1896,7 @@ const routes = {
     const total = selections.reduce((s, x) => s + (x.ligne.offert ? 0 : x.qte * x.ligne.prix), 0);
     let remise = 0;
     if (b.remise && +b.remise.valeur > 0) {
-      if (!pinAdmin(b.pin)) E('Code du responsable obligatoire pour une remise', 403);
+      // le caissier applique lui-même la remise (pas de code responsable)
       remise = b.remise.type === 'pct' ? Math.round(total * Math.min(100, +b.remise.valeur) / 100) : Math.min(total, Math.round(+b.remise.valeur));
     }
     const tablePatron = estTablePatron(c);

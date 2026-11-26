@@ -90,7 +90,7 @@ Seul `app/core/` se met à jour à distance. Toute modification de `app/main.js`
   options (cuisson obligatoire sur les viandes), commentaires rapides, texte libre avec clavier à l'écran,
   à emporter par plat, suite. Note pour toute la commande. Réclame des suites.
 - **Encaissement** : espèces en 2 gestes (compte juste, billets suggérés, rendu en grand), TPE, chèque, facture société,
-  offert (code responsable), plusieurs paiements, partage ÷N, séparation par articles, remise (code responsable).
+  offert (code responsable), plusieurs paiements, partage ÷N, séparation par articles, remise (faite par le caissier, sans code).
 - **Imprimantes ESC/POS**, en réseau (IP, port 9100) ou **en USB sur le PC de caisse** (type `usb` : envoi brut par le spouleur Windows via `core/impression-usb.ps1`, nom de l'imprimante Windows dans `windows`). L'imprimante des tickets (`ticket`) est en USB. 5 postes : `ticket` (caisse + tiroir), `cuisine` (principale), `cuisine2`,
   `asiatique`, `comptoir`. Chaque groupe de la carte choisit son imprimante. Bons groupés par suite, réclame,
   messages, annulations, addition, ticket avec logo + QR code, rapport X, rapport Z.
