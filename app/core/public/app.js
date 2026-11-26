@@ -1256,7 +1256,7 @@ const A = window.A = {
     A.erem = () => {
       let type = 'pct', val = '';
       const dr = () => modal(mh('Remise') + `<div class="chips"><button class="chip ${type === 'pct' ? 'on' : ''}" onclick="A.rt('pct')">En %</button><button class="chip ${type === 'da' ? 'on' : ''}" onclick="A.rt('da')">En DA</button></div>
-        ${type === 'pct' ? `<div class="chips">${[5, 10, 15, 20, 25, 50].map(p => `<button class="chip ${+val === p ? 'on' : ''}" onclick="A.rv(${p})">${p} %</button>`).join('')}</div>` : `<div class="amount num">${val ? da(val) : '—'}</div>${numpad('rem', v => { val = v; dr(); })}`}
+        ${type === 'pct' ? `<div class="chips">${[5, 10, 15, 20, 25, 30, 50].map(p => `<button class="chip ${+val === p ? 'on' : ''}" onclick="A.rv(${p})">${p} %</button>`).join('')}</div>` : `<div class="amount num">${val ? da(val) : '—'}</div>${numpad('rem', v => { val = v; dr(); })}`}
         <div class="mf"><button class="btn" onclick="A.rback()">Retour</button><button class="btn dark" ${+val > 0 ? '' : 'disabled'} onclick="A.rok()">Appliquer</button></div>`);
       A.rt = t => { type = t; val = ''; npv.rem = ''; dr(); };
       A.rv = p => { val = String(p); dr(); };

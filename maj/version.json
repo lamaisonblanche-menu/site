@@ -1,11 +1,11 @@
 {
- "version": "3.9.4",
- "date": "2026-11-26T15:24:21.278Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.5",
+ "date": "2026-11-26T15:31:57.302Z",
+ "notes": "Remise : bouton 30 % ajouté",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "aa77303aac98eddf36b60c556bb4f1252b4829be76a80d94853a5a2ecd1f0766"
+   "sha256": "f4e2d005055b0f8cc4e1c26c3de3e19c07d5fec9eb3d2a2a110c3e3d780f30eb"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "743f0c0775c10b7d96d85bb7be0fd0df71af33e5a1b7503139805dd76bc35a33"
+   "sha256": "f422e534c88f9f4016768a9bde1be8c66738e47faca2d38c7c9851d63efcfab1"
   },
   {
    "chemin": "public/index.html",
