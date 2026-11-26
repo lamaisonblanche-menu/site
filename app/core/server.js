@@ -441,6 +441,12 @@ if (!db.carte8) {
   db.carte8 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Pavlova (version 3.9.6) : le bon sort en cuisine et au comptoir (bar), plus sur l'imprimante asiatique
+if (!db.pavlova396) {
+  for (const p of db.produits) if (/^pavlova/i.test(p.nom)) { delete p.partout; p.postes = ['cuisine', 'comptoir']; }
+  db.pavlova396 = true;
+  setTimeout(() => saveNow(), 0);
+}
 let saveTimer = null;
 let requetesEnCours = 0;
 const SANS_ECRITURE = new Set(['POST /api/login', 'POST /api/code-valide', 'POST /api/pointage/autoriser', 'POST /api/admin/mail-test', 'POST /api/admin/test-impression', 'POST /api/rapport-x', 'POST /api/qr/test', 'POST /api/admin/diagnostic/imprimantes']);

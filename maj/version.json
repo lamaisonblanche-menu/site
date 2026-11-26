@@ -1,11 +1,11 @@
 {
- "version": "3.9.5",
- "date": "2026-11-26T15:32:08.196Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.6",
+ "date": "2026-11-26T18:19:01.174Z",
+ "notes": "Pavlova : le bon sort en cuisine et au bar (comptoir), plus sur l'imprimante asiatique",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "f4e2d005055b0f8cc4e1c26c3de3e19c07d5fec9eb3d2a2a110c3e3d780f30eb"
+   "sha256": "05566dceb1394c0ba52e28e74b18cfc0efb325b12d58183db953af94e4a9e27d"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "97b9cce80c8f70be0949c29a330f72cc69dde4855628bcea3c241fb31856b02f"
+   "sha256": "a02cbc469e31e3464834b3a32535903d3a470fbf6c052f1d9007703c127c41f4"
   },
   {
    "chemin": "suivi.js",
