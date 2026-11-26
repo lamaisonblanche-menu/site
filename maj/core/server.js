@@ -579,6 +579,26 @@ class Doc {
   center(on) { return this.raw(ESC, 0x61, on ? 1 : 0); }
   bold(on) { return this.raw(ESC, 0x45, on ? 1 : 0); }
   size(n) { return this.raw(GS, 0x21, n === 2 ? 0x11 : n === 3 ? 0x01 : 0); } // 2 = double, 3 = double hauteur
+  // 3.9.2 : impression plus foncée (double frappe ESC G) pour les bons de cuisine / bar
+  fonce() { return this.raw(ESC, 0x47, 1); }
+  // texte coupé entre les mots ; en double largeur (size 2) une ligne contient moitié moins de caractères
+  tw(s, taille = 0, retrait = '') {
+    const w = taille === 2 ? Math.floor(this.w / 2) : this.w, mots = String(s).split(/\s+/).filter(Boolean), lignes = [], lead = String(s).match(/^\s*/)[0];
+    let cur = '';
+    for (let m of mots) {
+      while (m.length > w - retrait.length) { if (cur) { lignes.push(cur); cur = ''; } lignes.push(m.slice(0, w - retrait.length)); m = m.slice(w - retrait.length); }
+      if (!m) continue;
+
+      if (!cur) cur = (lignes.length ? retrait : lead) + m;
+      else if ((cur + ' ' + m).length <= w) cur += ' ' + m;
+      else { lignes.push(cur); cur = retrait + m; }
+      
+    }
+    if (cur) lignes.push(cur);
+    this.size(taille).bold(1);
+    for (const l of lignes.length ? lignes : ['']) this.t(l);
+    return this.bold(0).size(0);
+  }
   line(ch = '-') { return this.t(ch.repeat(this.w)); }
   lr(a, b, w) { w = w || this.w; a = String(a); b = String(b); const sp = w - a.length - b.length; if (sp >= 1) return this.t(a + ' '.repeat(sp) + b); return this.t(a.slice(0, w - b.length - 1) + ' ' + b); }
   feed(n = 4) { return this.raw(ESC, 0x64, n); }
@@ -775,21 +795,23 @@ const MODES = { especes: 'Espèces', cheque: 'Chèque', tpe: 'Carte (TPE)', soci
 // libellé d'une option sur les bons et tickets : les suppléments montrent leur prix
 const estSupp = o => o.g === 'supplements';
 const optBon = o => estSupp(o) ? 'SUPPLEMENT ' + o.nom + (o.prix ? ' (' + fmt(o.prix) + ' DA)' : '') : o.nom + (o.prix ? ' (+' + fmt(o.prix) + ' DA)' : '');
+// 3.9.2 : bons plus lisibles. Plat en double largeur + double hauteur, options et notes en double hauteur, tout en gras
 function lignesBon(d, l) {
-  d.size(3).bold(1).t(l.qte + '  ' + l.nom).bold(0).size(0);
-  for (const o of l.opts || []) d.bold(1).t('    + ' + optBon(o)).bold(0);
-  if (l.emporter) d.bold(1).t('    *** A EMPORTER ***').bold(0);
-  if (l.note) d.bold(1).t('    >> ' + l.note).bold(0);
+  d.tw(l.qte + ' ' + l.nom, 2, '   ');
+  for (const o of l.opts || []) d.tw('  + ' + optBon(o), 3, '    ');
+  if (l.emporter) d.tw('  *** A EMPORTER ***', 3);
+  if (l.note) d.tw('  >> ' + l.note, 3, '     ');
+  d.t('');
 }
 function bon(poste, cmd, lignes, titre, infos) {
-  const d = new Doc();
+  const d = new Doc().fonce();
   d.center(1).size(2).bold(1).t(((db.config.imprimantes[poste] || {}).nom || poste).toUpperCase()).size(0);
   if (titre) for (const ligne of String(titre).split('\n')) d.t(ligne);
   d.bold(0).center(0).line('=');
   d.size(2).bold(1).t(titreCmd(cmd)).size(0).bold(0);
   if (cmd.salle === 'emporter') infosEmporter(d, cmd); else d.t(salleNom(cmd.salle) + ' - ' + (cmd.couverts || '?') + ' couv.');
-  d.t('Serveur : ' + nomUser(cmd.serveurId) + '   ' + heure(now()));
-  if (cmd.note) d.bold(1).t('NOTE : ' + cmd.note).bold(0);
+  d.bold(1).t('Serveur : ' + nomUser(cmd.serveurId) + '   ' + heure(now())).bold(0);
+  if (cmd.note) d.tw('NOTE : ' + cmd.note, 3);
   d.line();
   const suites = [...new Set(lignes.map(l => l.suite || 0))].sort((a, b) => a - b);
   for (const s of suites) {
@@ -1668,7 +1690,7 @@ const routes = {
     for (const poste of postesBons()) {
       const lp = ls.filter(l => postesDe(l.pid).includes(poste));
       if (!lp.length) continue;
-      const d = new Doc();
+      const d = new Doc().fonce();
       d.center(1).size(2).bold(1).t('RÉCLAME').t(SUITES[s].toUpperCase()).size(0).bold(0).center(0).line('=');
       d.size(2).bold(1).t(titreCmd(c)).size(0).bold(0).t(salleNom(c.salle) + '   ' + heure(now()) + '   ' + nomUser(c.serveurId)).line();
       for (const l of lp) lignesBon(d, l);
@@ -1689,10 +1711,10 @@ const routes = {
     for (const poste of postes) {
       db.seq.bon++;
       db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: u.id, poste, ts: now(), suite: 0, type: 'message', etat: 'a_faire', lignes: [{ qte: '', nom: texte, opts: [], note: '' }] });
-      const d = new Doc();
+      const d = new Doc().fonce();
       d.center(1).size(2).bold(1).t('MESSAGE').size(0).bold(0).center(0).line('=');
       d.size(2).bold(1).t(titreCmd(c)).size(0).bold(0).t(nomUser(u.id) + '   ' + heure(now())).line();
-      d.size(3).bold(1).t(texte).size(0).bold(0).line().cut();
+      d.tw(texte, 2).line().cut();
       const r = await imprimer(poste, d); if (!r.ok) erreurs.push(r.erreur);
     }
     save();
@@ -1759,9 +1781,9 @@ const routes = {
     for (const k of postesDe(l.pid)) { db.seq.bon++; db.bons.push({ id: 'B' + db.seq.bon, cmdId: c.id, salle: c.salle, table: c.table, serveurId: c.serveurId, poste: k, ts: now(), suite: 0, type: 'annulation', etat: 'a_faire', lignes: [{ qte: q, nom: l.nom, opts: [], note: b.motif }] }); }
     journal(u, 'annulation article', 'Table ' + c.table + ' : ' + q + ' ' + l.nom + ' (' + b.motif + ') autorisé par ' + chef.nom);
     save(); saveNow();
-    const d = new Doc();
+    const d = new Doc().fonce();
     d.center(1).size(2).bold(1).t('*** ANNULATION ***').size(0).bold(0).center(0).t('Table ' + c.table + ' - ' + heure(now())).line();
-    d.size(3).bold(1).t(q + '  ' + l.nom).size(0).bold(0).t('Motif : ' + b.motif).cut();
+    d.tw(q + ' ' + l.nom, 2, '   ').tw('Motif : ' + b.motif, 3).cut();
     const erreurs = [];
     for (const k of postesDe(l.pid)) { const r = await imprimer(k, d); if (!r.ok) erreurs.push(r.erreur); }
     return { commande: c, erreurs };
@@ -1812,7 +1834,7 @@ const routes = {
           for (const poste of postesBons()) {
             const lp = aLancer.filter(l => postesDe(l.pid).includes(poste));
             if (!lp.length) continue;
-            const d = new Doc();
+            const d = new Doc().fonce();
             d.center(1).size(2).bold(1).t('RÉCLAME').size(0).bold(0).center(0).line('=');
             d.size(2).bold(1).t(titreCmd(occ)).size(0).bold(0).t('Tables regroupées   ' + heure(now())).line();
             for (const l of lp) lignesBon(d, l);

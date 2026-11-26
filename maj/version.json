@@ -1,11 +1,11 @@
 {
- "version": "3.9.1",
- "date": "2026-11-25T21:15:19.233Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.9.2",
+ "date": "2026-11-26T11:16:20.838Z",
+ "notes": "Bons de cuisine, bar et asiatique plus lisibles : plats en très gros, notes et options plus grandes, impression plus foncée",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "b43b810226c9625fdb0d7aad91c019a8423b40c4a3d7a80562c3725ee7df7919"
+   "sha256": "2e9fa1560d7dc408e42825c89133fcd37ffa3d2a7d3f911ab21ec6b21ad76cd8"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "b511ef596a2d829a2d7cd12181cce1a5c34ecf08f51f00dbd57ab685f0efbad5"
+   "sha256": "174b53fe355bf088a60bc649d0ba090395ea6075a8857c0e8ed2612f05e284e2"
   },
   {
    "chemin": "suivi.js",
