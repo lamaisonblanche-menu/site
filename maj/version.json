@@ -1,11 +1,11 @@
 {
- "version": "3.10.2",
- "date": "2026-11-27T11:09:15.077Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.11.0",
+ "date": "2026-11-27T20:12:09.351Z",
+ "notes": "Gâteau d'anniversaire à prix libre ; Tagliatelles au saumon à la place des Rigatoni",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "adfd5666b735e8f90dec03769a84d624675243d1c08f7f6b1f7ad107378b868e"
+   "sha256": "d30f1520c6b70aa635e37a22df030c16723c65eb74814c5e751fe40eeed95b7a"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "e68ea424a1b045873e1c6890f22099384ec5b01cd661039057ba84fa96b57ca4"
+   "sha256": "d319617a1b8490fab3ebc067a2e9f290c7d4f50feea5e2cd8a05ceb4da1b1061"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "f221708e12c201d3fa9467dfb008346923ff04911f037cea7f73a64bfb056a57"
+   "sha256": "52e952cc6cdf3040c8cffff531ca674abf4bd0bfee5fffd47146b99e195270a8"
   },
   {
    "chemin": "suivi.js",

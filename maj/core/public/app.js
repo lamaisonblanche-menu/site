@@ -343,7 +343,8 @@ function cmd() { return S.etat.commandes.find(c => c.id === S.cmdId); }
 const prod = id => S.etat.produits.find(x => x.id === id) || {};
 const catDe = p => S.etat.categories.find(k => k.id === p.cat) || {};
 const optsDe = d => (d.opts || []).map(o => { const g = S.etat.options.find(x => x.id === o.g); const ch = g && g.choix[o.i]; return ch ? { g: o.g, nom: ch.nom, prix: ch.prix } : null; }).filter(Boolean);
-const prixDraft = d => (prod(d.pid).prix || 0) + optsDe(d).reduce((s, o) => s + o.prix, 0);
+const estLibre = p => !!p && (p.id === 'gateau-anniv' || !!p.prixLibre);
+const prixDraft = d => (estLibre(prod(d.pid)) ? (+d.prix || 0) : (prod(d.pid).prix || 0)) + optsDe(d).reduce((s, o) => s + o.prix, 0);
 const suiteDraft = d => d.suite != null ? d.suite : (catDe(prod(d.pid)).suite || 0);
 const optsTxt = os => os.length ? `<small class="o">${os.map(o => (o.g === 'supplements' ? 'Supplément ' : '') + esc(o.nom) + (o.prix ? ' +' + fmt(o.prix) + ' DA' : '')).join(' · ')}</small>` : '';
 const titreCmd = c => c.salle === 'emporter' ? 'À emporter ' + c.table : c.salle === 'comptoir' ? 'Comptoir' : 'Table ' + c.table;
@@ -360,7 +361,7 @@ function viewCommande() {
   if (!S.univ || (S.univ !== '★' && !univs.includes(S.univ)) || (S.univ === '★' && !top.length)) S.univ = top.length ? '★' : univs[0];
   const qd = {}; S.draft.forEach(d => (qd[d.pid] = (qd[d.pid] || 0) + d.qte));
   const tile = p => `<button class="pt ${p.stock === 0 ? 'ep' : ''} ${qd[p.id] ? 'has' : ''}" data-pid="${p.id}" style="--c:${catDe(p).couleur || '#eee'}">
-      <span class="pn">${esc(p.nom)}</span><span class="pp num">${p.stock === 0 ? 'ÉPUISÉ' : fmt(p.prix)}</span>
+      <span class="pn">${esc(p.nom)}</span><span class="pp num">${p.stock === 0 ? 'ÉPUISÉ' : estLibre(p) ? 'Prix libre' : fmt(p.prix)}</span>
       ${qd[p.id] ? `<span class="q">${qd[p.id]}</span>` : ''}${p.stock > 0 ? `<span class="st">reste ${p.stock}</span>` : ''}${(p.options || []).length ? '<span class="op" title="Options">⚙</span>' : ''}</button>`;
   const q = S.search.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   let cat;
@@ -1035,6 +1036,7 @@ const A = window.A = {
   nq(k) { if (k === 'C') { S.qty = ''; S.sel = null; } else if (S.qty.length < 2) S.qty = (S.qty + k).replace(/^0+/, ''); render(); },
   add(pid) {
     const p = prod(pid);
+    if (estLibre(p)) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, true);
     if (p.stock === 0) return toast(p.nom + ' est épuisé', true);
     const n = Math.max(1, +S.qty || 1); S.qty = '';
     const deja = S.draft.filter(d => d.pid === pid).reduce((s, d) => s + d.qte, 0);
@@ -1534,7 +1536,7 @@ Object.assign(A, {
     if (p.stock === 0) return toast(p.nom + ' est épuisé', true);
     const deja = S.draft.filter(d => d.pid === pid).reduce((s, d) => s + d.qte, 0);
     if (p.stock > 0 && deja + 1 > p.stock) return toast('Il ne reste que ' + p.stock + ' « ' + p.nom + ' »', true);
-    if (long || pid === 'supplement-fixe' || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
+    if (long || pid === 'supplement-fixe' || estLibre(p) || (p.options || []).length) return A.feuille(null, { pid, qte: 1, note: '', opts: [], suite: null, emporter: false }, !long);
     const j = S.draft.findIndex(d => d.pid === pid && !d.note && !(d.opts || []).length && d.suite == null && !d.emporter);
     if (j >= 0) S.draft[j].qte++; else S.draft.push({ pid, qte: 1, note: '', opts: [], suite: null, emporter: false });
     S.flash = j >= 0 ? j : S.draft.length - 1; clearTimeout(S._fl); S._fl = setTimeout(() => { S.flash = null; }, 400);
@@ -1553,9 +1555,12 @@ Object.assign(A, {
     const parts = d.note ? d.note.split(', ') : [];
     let chips = parts.filter(x => coms.includes(x)), libre = parts.filter(x => !coms.includes(x)).join(', ');
     // 3.7.7 : le « Supplément » exige le nom du supplément écrit (avant, « Ajouter » restait actif et l'envoi était refusé ensuite)
-    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length) && (p.id !== 'supplement-fixe' || !!String(libre || '').trim());
-    const prixU = () => (p.prix || 0) + groupes.reduce((s, g) => s + (sel[g.id] || []).reduce((a, k) => a + (+g.choix[k].prix || 0), 0), 0);
+    const libreP = estLibre(p); let prixL = libreP && d.prix ? String(d.prix) : '';
+    const prixOk = () => !libreP || (/^\d+$/.test(prixL) && +prixL >= 1);
+    const ok = () => groupes.every(g => !g.obligatoire || (sel[g.id] || []).length) && (p.id !== 'supplement-fixe' || !!String(libre || '').trim()) && prixOk();
+    const prixU = () => (libreP ? (+prixL || 0) : (p.prix || 0)) + groupes.reduce((s, g) => s + (sel[g.id] || []).reduce((a, k) => a + (+g.choix[k].prix || 0), 0), 0);
     const draw = () => modal(mh(esc(p.nom) + ` <small class="muted">${fmt(prixU())} DA</small>`) + `<div class="fe">
+      ${libreP ? `<div class="fe-g ${prixOk() ? '' : 'req'}"><div class="fe-l">Prix (DA) <b>*</b></div><div class="row"><input id="fe-prix" type="number" inputmode="numeric" min="1" class="fe-in grow" value="${esc(prixL)}" placeholder="Prix à taper, ex. 3500" oninput="A.fp(this.value)"></div></div>` : ''}
       <div class="fe-row"><span>Quantité</span><div class="qty sm"><button onclick="A.fq(-1)">−</button><span>${d.qte}</span><button onclick="A.fq(1)">+</button></div></div>
       ${groupes.map(g => `<div class="fe-g ${g.obligatoire && !(sel[g.id] || []).length ? 'req' : ''}"><div class="fe-l">${esc(g.nom)}${g.obligatoire ? ' <b>*</b>' : ''}${g.multiple ? ' <span class="muted">(plusieurs possibles)</span>' : ''}</div>
         <div class="chips">${g.choix.map((ch, k) => `<button class="chip big ${(sel[g.id] || []).includes(k) ? 'on' : ''}" onclick="A.fo('${g.id}',${k})">${esc(ch.nom)}${ch.prix ? ' <small>+' + fmt(ch.prix) + '</small>' : ''}</button>`).join('')}</div></div>`).join('')}
@@ -1578,13 +1583,16 @@ Object.assign(A, {
       draw();
     };
     A.fc = x => { const j = chips.indexOf(x); if (j >= 0) chips.splice(j, 1); else chips.push(x); draw(); };
+    A.fp = v => { prixL = String(v || '').replace(/[^0-9]/g, ''); const t = document.querySelector('.mh small'); if (t) t.textContent = fmt(prixU()) + ' DA'; const b = document.querySelector('.mf .btn.dark.big'); if (b) { b.disabled = !ok(); if (nouveau) b.textContent = 'Ajouter ' + fmt(prixU() * d.qte) + ' DA'; } };
     A.fl = v => { libre = v; const b = document.querySelector('.mf .btn.dark.big'); if (b && p.id === 'supplement-fixe') b.disabled = !ok(); };
     A.fe = () => { d.emporter = !d.emporter; draw(); };
     A.fs = s => { d.suite = s === (catDe(p).suite || 0) ? null : s; draw(); };
     A.fdel = () => { S.draft.splice(i, 1); closeModal(); render(); };
     A.fdup = () => { A.fok(true); };
     A.fok = dup => {
+      if (!prixOk()) return toast('Tapez le prix (en DA) avant de continuer.', true);
       if (!ok()) return toast(p.id === 'supplement-fixe' ? 'Écrivez quel supplément (ex. gruyère) avant de continuer.' : 'Choisissez les options obligatoires (*).', true);
+      if (libreP) d.prix = +prixL;
       d.opts = []; for (const g of groupes) for (const k of sel[g.id] || []) d.opts.push({ g: g.id, i: k });
       d.note = [...chips, libre.trim()].filter(Boolean).join(', ');
       // 3.7.7 : un « Supplément » part avec le plat juste avant lui (même suite : plats, entrées…)

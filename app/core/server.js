@@ -441,6 +441,21 @@ if (!db.carte8) {
   db.carte8 = true;
   setTimeout(() => saveNow(), 0);
 }
+// Version 3.11.0 (demande de Manil) : « Gâteau d'anniversaire » à prix libre (le serveur ou le caissier tape le prix),
+// et « Rigatoni au saumon » devient « Tagliatelles au saumon » (même prix, même article : ventes passées inchangées).
+if (!db.carte311) {
+  const n = x => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const faits = [];
+  const rig = db.produits.find(p => !String(p.id).startsWith('essai-') && n(p.nom) === 'rigatoni au saumon');
+  if (rig) { rig.nom = 'Tagliatelles au saumon'; rig.actif = true; faits.push('Rigatoni au saumon → Tagliatelles au saumon (' + rig.prix + ' DA)'); }
+  if (!db.produits.some(p => p.id === 'gateau-anniv')) {
+    const cat = db.categories.find(c => c.id === 'desserts') || db.categories.find(c => /dessert/i.test(c.nom)) || db.categories[0];
+    if (cat) { db.produits.push({ id: 'gateau-anniv', nom: 'Gâteau d\'anniversaire', prix: 0, prixLibre: true, cat: cat.id, actif: true, options: [], stock: null, horsQr: true }); faits.push('Gâteau d\'anniversaire (prix libre)'); }
+  }
+  if (faits.length) db.journal.push({ ts: Date.now(), user: '-', action: 'carte modifiée (3.11.0)', detail: faits.join(' ; ') });
+  db.carte311 = true;
+  setTimeout(() => saveNow(), 0);
+}
 // Pavlova (version 3.9.6) : le bon sort en cuisine et au comptoir (bar), plus sur l'imprimante asiatique
 if (!db.pavlova396) {
   for (const p of db.produits) if (/^pavlova/i.test(p.nom)) { delete p.partout; p.postes = ['cuisine', 'comptoir']; }
@@ -1520,6 +1535,9 @@ function verifierLignes(c, lignes, opt = {}) {
     if (!p) continue;
     const qte = Number(x.qte);
     if (p.id === 'supplement-fixe' && !String(x.note || '').trim()) E('Quel supplément ? Indiquez son nom avant de l’ajouter.');
+    const libreP = p.id === 'gateau-anniv' || !!p.prixLibre;
+    const prixSaisi = Number(x.prix);
+    if (libreP && (!Number.isInteger(prixSaisi) || prixSaisi < 1 || prixSaisi > 1000000)) E('Indiquez le prix de « ' + p.nom + ' » (en DA).');
     const cat = db.categories.find(k => k.id === p.cat) || {};
     // options (cuisson, accompagnement, suppléments…)
     const opts = [];
@@ -1534,7 +1552,7 @@ function verifierLignes(c, lignes, opt = {}) {
       for (const ch of g.multiple ? choisis : choisis.slice(0, 1)) opts.push({ g: gid, nom: ch.nom, prix: Math.round(+ch.prix || 0) });
     }
     const suite = x.suite !== undefined && x.suite !== null ? Math.max(0, Math.min(5, parseInt(x.suite, 10) || 0)) : (cat.suite || 0);
-    nouvelles.push({ pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: p.id === 'supplement-fixe' ? '' : String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter' });
+    nouvelles.push({ pid: p.id, nom: p.id === 'supplement-fixe' ? 'Supplément – ' + String(x.note).trim().slice(0, 90) : p.nom, prix: (p.id === 'supplement-fixe' ? 500 : libreP ? prixSaisi : p.prix) + opts.reduce((s, o) => s + o.prix, 0), opts, suite, catNom: cat.nom || '', qte, note: p.id === 'supplement-fixe' ? '' : String(x.note || '').slice(0, 120), emporter: !!x.emporter && c.salle !== 'emporter' });
   }
   if (!nouvelles.length) E('Rien à envoyer');
   return nouvelles;
@@ -2374,6 +2392,8 @@ const routes = {
       const cat = db.categories.find(c => c.poste === 'cuisine') || db.categories[0];
       if (cat) db.produits.push({ id: 'supplement-fixe', nom: 'Supplément', prix: 500, cat: cat.id, actif: true, options: [], stock: null });
     }
+    const gateau = db.produits.find(p => p.id === 'gateau-anniv');
+    if (gateau) { gateau.prix = 0; gateau.prixLibre = true; gateau.horsQr = true; }
     retirerOptionsSupplement();
     topCache.ts = 0;
     journal(u, 'carte modifiée', db.produits.length + ' articles');

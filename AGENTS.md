@@ -281,3 +281,10 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 - Test `audit-3.8.test.js` mis à jour (il attendait encore le code du responsable pour toute remise).
 - À savoir : `config.cuisine2Panne` n'a pas de bouton. Quand Cuisine 2 est réparée, il faut une mise à jour (ou un réglage à ajouter) pour arrêter le renvoi.
 - Proposé, non fait : code du responsable au-dessus d'un seuil de remise (ex. 50 %) ; le maître d'hôtel (3.10.0) peut transférer une table vers la table 18 (toujours offerte) : lister les tickets de la table 18 dans le mail de rase ; limiter les essais sur les codes d'autorisation.
+
+### 3.11.0 (27/11/2026, Claude) — carte (demande de Manil)
+- Migration `db.carte311` : « Rigatoni au saumon » renommé « Tagliatelles au saumon » (même article, même prix 2 800 DA).
+- Article système `gateau-anniv` « Gâteau d'anniversaire » (famille Desserts, `prixLibre: true`, `horsQr`, prix 0) : la fiche du plat
+  demande le prix (obligatoire), envoyé dans la ligne (`x.prix`, entier 1 à 1 000 000, vérifié par `verifierLignes`). Gardé à prix libre par « Enregistrer » de la carte.
+- À faire si Manil le demande : le site (branche main) affiche encore « Rigatoni au saumon ».
+
