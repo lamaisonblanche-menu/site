@@ -273,3 +273,11 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
 ### 3.9.3 (26/11/2026, Claude) — tiroir qui ne s'ouvrait pas (signalé par Manil)
 - `Doc.drawer()` envoie l'impulsion sur les deux broches (`ESC p 0` et `ESC p 1`, 100 ms) : le tiroir répond selon son câblage à l'une ou l'autre.
 - Encaissement en espèces : la commande du tiroir part au DÉBUT du ticket (juste après l'initialisation), plus après la coupe.
+
+### 3.10.2 (27/11/2026, Claude) — analyse quotidienne (branche `analyse/2026-11-27`, PR à valider par Manil)
+- Remise (sans code depuis 3.9.4) : une remise qui ramène l'addition à 0 (100 %, ou montant en DA égal au total) est refusée sans le code du responsable (`pin`), avec le message « choisissez Offert ». Avant, un caissier pouvait offrir une table entière sans code en passant par « Remise en DA ». Les autres remises restent sans code.
+- Reprise de la correction de la PR #25 (jamais fusionnée, son numéro 3.9.2 a été pris depuis) : imprimante de bons qui ne répond pas du tout → un seul essai de 5 s (`muette`), plus 3 essais (20 à 40 s de blocage sur « Envoyer ») ; `reessayerBons()` ne garde plus ses essais ratés dans l'historique et n'insiste pas sur une imprimante qui vient d'échouer (`enPanne`).
+- Gestion → Imprimantes → « Tester » : `imprimer(…, { direct: true, auto: true })` imprime sur l'imprimante choisie, sans le renvoi Cuisine 2 → Cuisine de 3.10.1 (sinon impossible de vérifier Cuisine 2 après réparation) et sans nouvel essai automatique.
+- Test `audit-3.8.test.js` mis à jour (il attendait encore le code du responsable pour toute remise).
+- À savoir : `config.cuisine2Panne` n'a pas de bouton. Quand Cuisine 2 est réparée, il faut une mise à jour (ou un réglage à ajouter) pour arrêter le renvoi.
+- Proposé, non fait : code du responsable au-dessus d'un seuil de remise (ex. 50 %) ; le maître d'hôtel (3.10.0) peut transférer une table vers la table 18 (toujours offerte) : lister les tickets de la table 18 dans le mail de rase ; limiter les essais sur les codes d'autorisation.

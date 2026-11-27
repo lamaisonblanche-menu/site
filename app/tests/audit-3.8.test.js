@@ -81,10 +81,13 @@ test('Audit 3.8.0 : argent, annulations, pointage, tables, sauvegarde, impressio
 
     await t.test('Remises, offerts, annulations d\'articles', async () => {
       const c = await table(5);
-      let r = await K.api('/api/commande/encaisser', { id: c.id, mode: 'especes', recu: 2 * P, remise: { type: 'pct', valeur: 10 }, imprimer: false }, cais);
-      assert.equal(r.status, 403, 'remise sans code responsable refusée');
-      r = await K.api('/api/commande/encaisser', { id: c.id, mode: 'especes', recu: 2 * P, remise: { type: 'pct', valeur: 10 }, pin: '1234', imprimer: false }, cais);
-      assert.equal(r.status, 200); assert.equal(r.data.ticket.net, 2 * P - Math.round(2 * P * 0.1));
+      // 3.9.4 : le caissier fait la remise sans code ; 3.10.2 : une remise de la totalité demande le code du responsable (= offert)
+      let r = await K.api('/api/commande/encaisser', { id: c.id, mode: 'especes', recu: 0, remise: { type: 'pct', valeur: 100 }, imprimer: false }, cais);
+      assert.equal(r.status, 403, 'remise de 100 % sans code responsable refusée');
+      r = await K.api('/api/commande/encaisser', { id: c.id, mode: 'especes', recu: 0, remise: { type: 'da', valeur: 2 * P }, imprimer: false }, cais);
+      assert.equal(r.status, 403, 'remise en DA égale au total sans code responsable refusée');
+      r = await K.api('/api/commande/encaisser', { id: c.id, mode: 'especes', recu: 2 * P, remise: { type: 'pct', valeur: 10 }, imprimer: false }, cais);
+      assert.equal(r.status, 200, 'remise de 10 % sans code acceptée'); assert.equal(r.data.ticket.net, 2 * P - Math.round(2 * P * 0.1));
       const c2 = await table(6);
       r = await K.api('/api/commande/annuler-ligne', { id: c2.id, ligne: c2.lignes[0].id, qte: 1, motif: 'Erreur' }, serv);
       assert.equal(r.status, 403, 'un serveur seul ne peut pas annuler');

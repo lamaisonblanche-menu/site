@@ -1,11 +1,11 @@
 {
- "version": "3.10.1",
- "date": "2026-11-26T20:05:54.755Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.10.2",
+ "date": "2026-11-27T02:53:36.261Z",
+ "notes": "Remise totale réservée au responsable, Envoyer ne bloque plus si une imprimante est éteinte, test direct des imprimantes",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "881b245dd96946e769e50a6fa3ada219902b2b673a31a1b83969f23dd0c8505d"
+   "sha256": "adfd5666b735e8f90dec03769a84d624675243d1c08f7f6b1f7ad107378b868e"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "b0645d0ee42cdabb628af000a88ae140cee2410327c712b0ad37828bcc46a4c4"
+   "sha256": "f221708e12c201d3fa9467dfb008346923ff04911f037cea7f73a64bfb056a57"
   },
   {
    "chemin": "suivi.js",
