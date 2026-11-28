@@ -1168,10 +1168,18 @@ async function envoyerAttente() {
     while (db.mailsAttente.length && essais-- > 0) {
       const x = db.mailsAttente[0];
       const r = await envoyerMail(x.dest, x.sujet, x.texte);
-      if (r.ok) { db.mailsAttente.shift(); save(); continue; }
+      // 3.11.1 : on retire CE mail (la file a pu changer pendant l'envoi : « Renvoyer la rase », nouvelle notification)
+      const i = db.mailsAttente.indexOf(x);
+      if (r.ok) {
+        if (i >= 0) db.mailsAttente.splice(i, 1);
+        // la rase partie plus tard (internet revenu) est notée « envoyée » : l'écran Caisse n'affiche plus l'alerte
+        const jr = (x.rase || x.raseAuto) && db.jours.find(k => k.id === (x.rase || x.raseAuto));
+        if (jr) { jr.mailEnvoye = now(); jr.mailErreur = null; broadcast(); }
+        save(); continue;
+      }
       if (/internet|réponse du serveur mail|mot de passe/i.test(r.erreur || '')) break;
       x.echecs = (x.echecs || 0) + 1; x.erreur = r.erreur;
-      db.mailsAttente.push(db.mailsAttente.shift()); save();
+      if (i >= 0) { db.mailsAttente.splice(i, 1); db.mailsAttente.push(x); } save();
     }
   } catch (e) {} finally { envoiEnCours = false; }
 }
@@ -2097,7 +2105,17 @@ const routes = {
     const erreurs = res.ok ? [] : [res.erreur];
     // envoi automatique de la rase par mail (rangée ensuite dans l'appli de gestion)
     if (db.config.mail && db.config.mail.actif) {
-      envoyerRase(j, r, rase).then(m => { j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur; save(); broadcast(); });
+      envoyerRase(j, r, rase).then(m => {
+        j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur;
+        // 3.11.1 : sans internet au moment de la rase, le mail est gardé et repart tout seul (toutes les 5 min), comme
+        // pour la rase automatique. Avant, il fallait penser à appuyer sur « Renvoyer la rase » : sinon elle n'arrivait jamais.
+        const ml = db.config.mail || {};
+        if (!m.ok && ml.user && ml.pass && !db.mailsAttente.some(x => x.rase === j.id)) {
+          db.mailsAttente.push({ ...mailRase(j, r, rase), ts: now(), important: true, rase: j.id });
+          j.mailErreur = 'Pas encore envoyée (internet ?) : elle partira toute seule';
+        }
+        save(); broadcast();
+      }).catch(e => console.error(e));
     }
     return { rase, resume: r, erreurs };
   },
@@ -2111,7 +2129,10 @@ const routes = {
     if (!peut(u, 'caissier')) E('Non autorisé', 403);
     const j = db.jours.find(x => x.id === b.jour && x.rase); if (!j) E('Rase introuvable');
     const m = await envoyerRase(j, resumeJour(j), j.rase);
-    j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur; save();
+    j.mailEnvoye = m.ok ? now() : null; j.mailErreur = m.ok ? null : m.erreur;
+    // 3.11.1 : envoyée à la main → on retire la copie en attente (pas de doublon quand internet revient)
+    if (m.ok) db.mailsAttente = db.mailsAttente.filter(x => x.rase !== j.id && x.raseAuto !== j.id);
+    save();
     return m;
   },
   'POST /api/rapport-x': async (b, u) => {

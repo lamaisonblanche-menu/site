@@ -1,11 +1,11 @@
 {
- "version": "3.11.0",
- "date": "2026-11-27T20:12:22.585Z",
- "notes": "Rase automatique, supplément 500 DA, pointage et verrouillage",
+ "version": "3.11.1",
+ "date": "2026-11-28T02:53:02.554Z",
+ "notes": "Rase sans internet : le mail part tout seul plus tard ; gâteau d'anniversaire : « Recommander » garde le prix",
  "fichiers": [
   {
    "chemin": "VERSION",
-   "sha256": "d30f1520c6b70aa635e37a22df030c16723c65eb74814c5e751fe40eeed95b7a"
+   "sha256": "8cf0cfc21e584bc76ce0d7716517eeb0dc0498ba57c05d028543748d51155c09"
   },
   {
    "chemin": "impression-usb.ps1",
@@ -17,7 +17,7 @@
   },
   {
    "chemin": "public/app.js",
-   "sha256": "d319617a1b8490fab3ebc067a2e9f290c7d4f50feea5e2cd8a05ceb4da1b1061"
+   "sha256": "b3fba632aacb134e669fbefe0706b0a91440df3d9dd0a1cfb41d18f75cec3831"
   },
   {
    "chemin": "public/index.html",
@@ -57,7 +57,7 @@
   },
   {
    "chemin": "server.js",
-   "sha256": "52e952cc6cdf3040c8cffff531ca674abf4bd0bfee5fffd47146b99e195270a8"
+   "sha256": "af433e22be7e0a6d7654df982929181fa8cd5bcf4d75b33f519fcee3cd3a5560"
   },
   {
    "chemin": "suivi.js",
