@@ -1614,7 +1614,10 @@ Object.assign(A, {
   recommander(id) {
     const l = cmd().lignes.find(x => x.id === id); if (!l) return;
     const p = prod(l.pid); const opts = (l.opts || []).map(o => { const g = (S.etat.options || []).find(x => x.id === o.g); return g ? { g: g.id, i: g.choix.findIndex(ch => ch.nom === o.nom) } : null; }).filter(o => o && o.i >= 0);
-    S.draft.push({ pid: l.pid, qte: 1, note: l.note || '', opts, suite: l.suite === (catDe(p).suite || 0) ? null : l.suite, emporter: !!l.emporter });
+    const d = { pid: l.pid, qte: 1, note: l.note || '', opts, suite: l.suite === (catDe(p).suite || 0) ? null : l.suite, emporter: !!l.emporter };
+    // 3.11.1 : article à prix libre (gâteau d'anniversaire) : on reprend le prix tapé la première fois (sinon 0 DA et envoi refusé)
+    if (estLibre(p)) d.prix = Math.max(0, (+l.prix || 0) - optsDe(d).reduce((s, o) => s + o.prix, 0));
+    S.draft.push(d);
     closeModal(); render(); toast('Ajouté : ' + l.nom + ' — appuyez sur Envoyer');
   },
   kb(id, k) {

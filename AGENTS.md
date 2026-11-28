@@ -288,3 +288,15 @@ Changements du 23/11 au soir (3.4.0 → 3.5.2) :
   demande le prix (obligatoire), envoyé dans la ligne (`x.prix`, entier 1 à 1 000 000, vérifié par `verifierLignes`). Gardé à prix libre par « Enregistrer » de la carte.
 - À faire si Manil le demande : le site (branche main) affiche encore « Rigatoni au saumon ».
 
+
+### 3.11.1 (28/11/2026, Claude) — analyse quotidienne (branche `analyse/2026-11-28`, PR à valider par Manil)
+- Rase faite à la main sans internet : le mail de rase est gardé dans `db.mailsAttente` (`important`, `rase: <id du jour>`) et repart tout seul
+  toutes les 5 min, comme pour la rase automatique. Avant, il n'était envoyé qu'une fois : sans internet à la fermeture, la rase n'arrivait
+  jamais dans l'appli de gestion si personne n'appuyait sur « Renvoyer la rase ».
+- `envoyerAttente()` : le mail envoyé est retiré par identité (plus de `shift()` : la file peut changer pendant l'envoi) ; une rase
+  (manuelle ou automatique) partie plus tard passe à « envoyée » (`mailEnvoye`, `mailErreur` vidé) — avant, l'alerte rouge restait à l'écran Caisse.
+  « Renvoyer la rase » réussi retire la copie en attente (pas de doublon).
+- « Recommander le même » sur un article à prix libre (gâteau d'anniversaire) reprend le prix tapé. Avant : ligne à 0 DA et envoi refusé.
+- Test : `app/tests/mail-rase.test.js` (faux serveur SMTP local).
+- Proposé, non fait : sur le site (branche main), « Rigatoni au saumon » → « Tagliatelles au saumon » ; prix du gâteau modifiable par un caissier
+  après l'envoi (aujourd'hui : annuler puis retaper) ; rappel des propositions du 27/11 (seuil de remise, tickets de la table 18 dans le mail de rase).
